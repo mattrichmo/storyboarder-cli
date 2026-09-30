@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=77,<83"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "storyboarder-desk"
+version = "1.0.0"
+description = "A local-first editorial story production desk: CLI, TUI and React canvas"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+authors = [{name = "Storyboarder contributors"}]
+dependencies = [
+  "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "python-multipart>=0.0.20,<1",
+  "pydantic>=2.10,<3", "prompt-toolkit>=3.0.50,<4", "rich>=13.9,<16",
+  "Pillow>=11,<13", "reportlab>=4.3,<5", "filelock>=3.17,<4"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pytest-asyncio>=0.25,<2", "httpx>=0.28,<1", "build>=1.2,<2", "ruff>=0.11,<1"]
+
+[project.scripts]
+storyboarder = "storyboarder.cli.main:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+storyboarder = ["storage/migrations/*.sql", "static/*", "static/assets/*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 110
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

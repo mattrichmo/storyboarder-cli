@@ -1,0 +1,15 @@
+{
+  "name": "storyboarder-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline React client with an in-house SVG/DOM canvas",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "node build.mjs --check",
+    "test": "node --test tests/*.test.mjs",
+    "dev": "node build.mjs --watch"
+  },
+  "devDependencies": { "typescript": "5.8.3" },
+  "engines": { "node": ">=18" }
+}

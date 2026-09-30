@@ -1,0 +1,12 @@
+{
+  "shots": 1000,
+  "metadata_records": 1003,
+  "create_seconds": 1.8030480130000797,
+  "snapshot_seconds": 0.029369095000220113,
+  "graph_seconds": 0.056323554999835324,
+  "search_seconds": 0.016966620999482984,
+  "graph_nodes": 250,
+  "graph_truncated": true,
+  "filtered_nodes": 1,
+  "includes_original_image_loading": false
+}

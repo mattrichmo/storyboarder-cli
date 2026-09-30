@@ -1,0 +1,12 @@
+{
+  "module": "/mnt/data/storyboarder-wheel-check/lib/python3.13/site-packages/storyboarder/__init__.py",
+  "version": "1.0.0",
+  "wheel_isolation": "new venv with installed wheel; preinstalled container third-party dependencies explicitly reused through a .pth path (not a fresh network install)",
+  "checked": [
+    "installed module outside source root",
+    "workspace and schema migrations",
+    "bundled HTML/React/favicon",
+    "session API",
+    "token-authorized shared asset service"
+  ]
+}

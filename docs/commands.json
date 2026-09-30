@@ -1,0 +1,3307 @@
+{
+  "schema": "storyboarder.commands/v1",
+  "commands": [
+    {
+      "name": "asset.create",
+      "label": "New asset",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "type",
+          "label": "Asset type",
+          "type": "select",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": "reference"
+        },
+        {
+          "name": "tags",
+          "label": "Tags (comma-separated)",
+          "type": "tags",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "aliases",
+          "label": "Aliases (comma-separated)",
+          "type": "tags",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.update",
+      "label": "Edit asset",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "type",
+          "label": "Asset type",
+          "type": "select",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "tags",
+          "label": "Tags (comma-separated)",
+          "type": "tags",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "aliases",
+          "label": "Aliases (comma-separated)",
+          "type": "tags",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.list",
+      "label": "List assets",
+      "fields": [
+        {
+          "name": "query",
+          "label": "Search",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "tag",
+          "label": "Tag",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "asset_type",
+          "label": "Asset Type",
+          "type": "text",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "parent_id",
+          "label": "Parent Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "archived",
+          "label": "Archived",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 200
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "asset.show",
+      "label": "Show asset",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "sequence.create",
+      "label": "New sequence",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "location_id",
+          "label": "Location default / override",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "locations",
+          "help": "Blank inherits from the parent scope.",
+          "default": null
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "framing",
+          "label": "Framing",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "camera",
+          "label": "Camera",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "constraints",
+          "label": "Constraints",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "arc",
+          "label": "Arc",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "tone",
+          "label": "Tone",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "outline",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "sequence.update",
+      "label": "Edit sequence",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "sequences",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "location_id",
+          "label": "Location default / override",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "locations",
+          "help": "Blank inherits from the parent scope.",
+          "default": null
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "framing",
+          "label": "Framing",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "camera",
+          "label": "Camera",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "constraints",
+          "label": "Constraints",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "arc",
+          "label": "Arc",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "tone",
+          "label": "Tone",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "editor",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "sequence.list",
+      "label": "List sequences",
+      "fields": [
+        {
+          "name": "query",
+          "label": "Search",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "tag",
+          "label": "Tag",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "asset_type",
+          "label": "Asset Type",
+          "type": "text",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "parent_id",
+          "label": "Parent Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "archived",
+          "label": "Archived",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 200
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "sequence.show",
+      "label": "Show sequence",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "sequences",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "scene.create",
+      "label": "New scene",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "parent_id",
+          "label": "Parent sequence",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "sequences",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "location_id",
+          "label": "Location default / override",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "locations",
+          "help": "Blank inherits from the parent scope.",
+          "default": null
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "framing",
+          "label": "Framing",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "camera",
+          "label": "Camera",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "constraints",
+          "label": "Constraints",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "summary",
+          "label": "Summary",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "continuity",
+          "label": "Continuity",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "outline",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "scene.update",
+      "label": "Edit scene",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "scenes",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "location_id",
+          "label": "Location default / override",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "locations",
+          "help": "Blank inherits from the parent scope.",
+          "default": null
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "framing",
+          "label": "Framing",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "camera",
+          "label": "Camera",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "constraints",
+          "label": "Constraints",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "summary",
+          "label": "Summary",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "continuity",
+          "label": "Continuity",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "editor",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "scene.list",
+      "label": "List scenes",
+      "fields": [
+        {
+          "name": "query",
+          "label": "Search",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "tag",
+          "label": "Tag",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "asset_type",
+          "label": "Asset Type",
+          "type": "text",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "parent_id",
+          "label": "Parent Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "archived",
+          "label": "Archived",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 200
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "scene.show",
+      "label": "Show scene",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "scenes",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "shot.create",
+      "label": "New shot",
+      "fields": [
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "parent_id",
+          "label": "Parent scene",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "scenes",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "location_id",
+          "label": "Location default / override",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "locations",
+          "help": "Blank inherits from the parent scope.",
+          "default": null
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "framing",
+          "label": "Framing",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "camera",
+          "label": "Camera",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "constraints",
+          "label": "Constraints",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "number",
+          "label": "Number",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "action",
+          "label": "Action",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "dialogue",
+          "label": "Dialogue",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "duration",
+          "label": "Duration (seconds)",
+          "type": "number",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "continuity",
+          "label": "Continuity",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "outline",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "shot.update",
+      "label": "Edit shot",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "location_id",
+          "label": "Location default / override",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "locations",
+          "help": "Blank inherits from the parent scope.",
+          "default": null
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "framing",
+          "label": "Framing",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "camera",
+          "label": "Camera",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "constraints",
+          "label": "Constraints",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "number",
+          "label": "Number",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "action",
+          "label": "Action",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "dialogue",
+          "label": "Dialogue",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "duration",
+          "label": "Duration (seconds)",
+          "type": "number",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "continuity",
+          "label": "Continuity",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "editor",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "shot.list",
+      "label": "List shots",
+      "fields": [
+        {
+          "name": "query",
+          "label": "Search",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "tag",
+          "label": "Tag",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "asset_type",
+          "label": "Asset Type",
+          "type": "text",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "parent_id",
+          "label": "Parent Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "archived",
+          "label": "Archived",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 200
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "shot.show",
+      "label": "Show shot",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "project.update",
+      "label": "Edit project guide",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "projects",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "description",
+          "label": "Description",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "location_id",
+          "label": "Location default / override",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "locations",
+          "help": "Blank inherits from the parent scope.",
+          "default": null
+        },
+        {
+          "name": "time",
+          "label": "Time",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "framing",
+          "label": "Framing",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "camera",
+          "label": "Camera",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "constraints",
+          "label": "Constraints",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "premise",
+          "label": "Premise",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "visual_style",
+          "label": "Visual Style",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "guide",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "entity.update",
+      "label": "Apply structured authoring changes",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "changes",
+          "label": "Changes",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "entity.usage",
+      "label": "Inspect record references",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "entity.archive",
+      "label": "Archive record",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "entity.restore",
+      "label": "Restore record",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "entity.delete",
+      "label": "Delete record",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "story.move",
+      "label": "Move / reorder story record",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "position",
+          "label": "New position (zero-based)",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "parent_id",
+          "label": "New parent (optional)",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "parents",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "outline",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "media.import",
+      "label": "Import file or folder",
+      "fields": [
+        {
+          "name": "path",
+          "label": "File or folder path",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "recursive",
+          "label": "Include nested folders",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "intake",
+      "destructive": false,
+      "browser": false,
+      "read_only": false
+    },
+    {
+      "name": "media.tags",
+      "label": "Tag media",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "media",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "tags",
+          "label": "Tags (comma-separated)",
+          "type": "tags",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "intake",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "media.show",
+      "label": "Inspect media",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "media",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "asset.attach",
+      "label": "Attach managed reference",
+      "fields": [
+        {
+          "name": "asset_id",
+          "label": "Asset",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "media_id",
+          "label": "Exact image",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "media",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.primary",
+      "label": "Use as primary reference",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Media membership",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "asset_media",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.detach",
+      "label": "Detach reference",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Media membership",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "asset_media",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.merge",
+      "label": "Merge assets",
+      "fields": [
+        {
+          "name": "source_id",
+          "label": "Source asset (will be archived)",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "target_id",
+          "label": "Target asset",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target_revision",
+          "label": "Target revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "intake.accept",
+      "label": "Accept intake item",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "intake",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "asset_id",
+          "label": "Attach to existing asset",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "create_title",
+          "label": "Or create an asset with this title",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "create_type",
+          "label": "New asset type",
+          "type": "select",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": "reference"
+        },
+        {
+          "name": "tags",
+          "label": "Tags (comma-separated)",
+          "type": "tags",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "intake",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "intake.discard",
+      "label": "Discard intake item",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "intake",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "intake",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "link.create",
+      "label": "Connect assets",
+      "fields": [
+        {
+          "name": "source_id",
+          "label": "Source asset",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target_id",
+          "label": "Target asset",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "relation",
+          "label": "Relationship",
+          "type": "select",
+          "required": true,
+          "options": [
+            "appears-at",
+            "alternate-view-of",
+            "wears",
+            "part-of",
+            "related-to"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "connections",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "assignment.create",
+      "label": "Assign exact shot reference",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "asset_id",
+          "label": "Asset",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "role",
+          "label": "Shot role",
+          "type": "select",
+          "required": true,
+          "options": [
+            "subject",
+            "setting-reference",
+            "costume",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": "reference"
+        },
+        {
+          "name": "media_id",
+          "label": "Exact asset image (optional)",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "asset_images",
+          "help": "Must belong to the chosen asset. Blank preserves a semantic reference without silently selecting its primary image.",
+          "default": null
+        }
+      ],
+      "page": "editor",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "assignment.update",
+      "label": "Edit exact shot reference",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assignments",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "role",
+          "label": "Shot role",
+          "type": "select",
+          "required": true,
+          "options": [
+            "subject",
+            "setting-reference",
+            "costume",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "media_id",
+          "label": "Exact asset image",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "asset_images",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "editor",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "context.put",
+      "label": "Add / edit direction block",
+      "fields": [
+        {
+          "name": "owner_id",
+          "label": "Story scope",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "key",
+          "label": "Direction block name",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation",
+          "label": "Inheritance rule",
+          "type": "select",
+          "required": true,
+          "options": [
+            "append",
+            "replace",
+            "exclude"
+          ],
+          "source": "",
+          "help": "",
+          "default": "append"
+        },
+        {
+          "name": "content",
+          "label": "Direction text",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Existing block revision (blank for new)",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "guide",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "context.resolve",
+      "label": "Preview resolved context",
+      "fields": [
+        {
+          "name": "owner_id",
+          "label": "Story scope",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "guide",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "frame.add",
+      "label": "Attach frame image file",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "path",
+          "label": "Image file path",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "frames",
+      "destructive": false,
+      "browser": false,
+      "read_only": false
+    },
+    {
+      "name": "frame.attach",
+      "label": "Attach managed frame candidate",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "media_id",
+          "label": "Image",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "media",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "frames",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "frame.state",
+      "label": "Change frame state",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "frames",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        },
+        {
+          "name": "state",
+          "label": "Frame state",
+          "type": "select",
+          "required": true,
+          "options": [
+            "draft",
+            "selected",
+            "approved",
+            "archived"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "frames",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "canvas.graph",
+      "label": "Read canvas graph",
+      "fields": [
+        {
+          "name": "mode",
+          "label": "View",
+          "type": "select",
+          "required": false,
+          "options": [
+            "story",
+            "assets",
+            "scene"
+          ],
+          "source": "",
+          "help": "",
+          "default": "story"
+        },
+        {
+          "name": "query",
+          "label": "Search",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "asset_type",
+          "label": "Asset Type",
+          "type": "text",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "tag",
+          "label": "Tag",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "relation",
+          "label": "Relation",
+          "type": "text",
+          "required": false,
+          "options": [
+            "appears-at",
+            "alternate-view-of",
+            "wears",
+            "part-of",
+            "related-to"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "scene_id",
+          "label": "Scene Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "scenes",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "sequence_id",
+          "label": "Sequence Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "sequences",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 250
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "canvas.neighbors",
+      "label": "Explore neighbors",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "connections",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "canvas.save",
+      "label": "Save named layout",
+      "fields": [
+        {
+          "name": "name",
+          "label": "Name",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "mode",
+          "label": "View",
+          "type": "select",
+          "required": true,
+          "options": [
+            "story",
+            "assets",
+            "scene"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "positions",
+          "label": "Positions",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "settings",
+          "label": "Settings",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Existing layout revision",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "canvas.show",
+      "label": "Show named layout",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "layouts",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "composition.preview",
+      "label": "Preview scene composition",
+      "fields": [
+        {
+          "name": "owner_id",
+          "label": "Story scope",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "composition",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "export.bundle",
+      "label": "Export portable scene bundle",
+      "fields": [
+        {
+          "name": "owner_id",
+          "label": "Story scope",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "include_media",
+          "label": "Copy exact media into bundle",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": true
+        }
+      ],
+      "page": "composition",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "export.board",
+      "label": "Export visual storyboard",
+      "fields": [
+        {
+          "name": "owner_id",
+          "label": "Story scope",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "format",
+          "label": "Output format",
+          "type": "select",
+          "required": false,
+          "options": [
+            "html",
+            "pdf",
+            "png",
+            "all"
+          ],
+          "source": "",
+          "help": "",
+          "default": "all"
+        },
+        {
+          "name": "approved_only",
+          "label": "Only approved frame candidates (references still labelled)",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "composition",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "project.doctor",
+      "label": "Check project health",
+      "fields": [
+        {
+          "name": "hashes",
+          "label": "Verify all media hashes",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "settings",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "project.backup",
+      "label": "Create full project backup",
+      "fields": [],
+      "page": "settings",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "cache.rebuild",
+      "label": "Rebuild thumbnail cache",
+      "fields": [],
+      "page": "settings",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "cache.clear",
+      "label": "Clear rebuildable cache",
+      "fields": [],
+      "page": "settings",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "project.sync",
+      "label": "Rebuild manifest title hint",
+      "fields": [],
+      "page": "settings",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "job.create",
+      "label": "Prepare external script request",
+      "fields": [
+        {
+          "name": "script",
+          "label": "Registered script",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "scripts",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target",
+          "label": "Output type",
+          "type": "select",
+          "required": true,
+          "options": [
+            "asset",
+            "frame"
+          ],
+          "source": "",
+          "help": "",
+          "default": "asset"
+        },
+        {
+          "name": "shot_id",
+          "label": "Shot / resolved context (required for frame)",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "title",
+          "label": "Requested output title",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "asset_type",
+          "label": "Asset type",
+          "type": "select",
+          "required": false,
+          "options": [
+            "character",
+            "location",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": "reference"
+        },
+        {
+          "name": "prompt",
+          "label": "Explicit script instructions",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "automation",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "job.run",
+      "label": "Launch registered script",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "jobs",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "automation",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "job.cancel",
+      "label": "Cancel external job",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "jobs",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "automation",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "job.retry",
+      "label": "Queue explicit retry",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "jobs",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "automation",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "job.approve",
+      "label": "Import reviewed outputs",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "jobs",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "automation",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "job.preview",
+      "label": "Review outputs and logs",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "jobs",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "automation",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "link.remove",
+      "label": "Remove link",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "links",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "assignment.remove",
+      "label": "Remove assignment",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assignments",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "context.remove",
+      "label": "Remove direction block",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "context_blocks",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "frame.remove",
+      "label": "Remove frame",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "frames",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "canvas.remove",
+      "label": "Remove canvas",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Record",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "layouts",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Record revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "media.list",
+      "label": "List media",
+      "fields": [],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "intake.list",
+      "label": "List intake",
+      "fields": [
+        {
+          "name": "state",
+          "label": "State",
+          "type": "text",
+          "required": false,
+          "options": [
+            "pending",
+            "accepted",
+            "discarded"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "link.list",
+      "label": "List links",
+      "fields": [],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "assignment.list",
+      "label": "List assignments",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "context.list",
+      "label": "List context blocks",
+      "fields": [
+        {
+          "name": "owner_id",
+          "label": "Owner Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "frame.list",
+      "label": "List frames",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "canvas.list",
+      "label": "List layouts",
+      "fields": [
+        {
+          "name": "mode",
+          "label": "Mode",
+          "type": "text",
+          "required": false,
+          "options": [
+            "story",
+            "assets",
+            "scene"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "job.list",
+      "label": "List jobs",
+      "fields": [
+        {
+          "name": "status",
+          "label": "Status",
+          "type": "text",
+          "required": false,
+          "options": [
+            "queued",
+            "running",
+            "succeeded",
+            "failed",
+            "cancelled"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    }
+  ]
+}

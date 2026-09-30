@@ -1,0 +1,89 @@
+{
+  "$defs": {
+    "OutputEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "maxLength": 100,
+          "minLength": 1,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "title": "Key",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "title": {
+          "default": "",
+          "maxLength": 240,
+          "title": "Title",
+          "type": "string"
+        },
+        "notes": {
+          "default": "",
+          "maxLength": 100000,
+          "title": "Notes",
+          "type": "string"
+        },
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        }
+      },
+      "required": [
+        "key",
+        "path"
+      ],
+      "title": "OutputEntry",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "title": "Schema",
+      "type": "string",
+      "const": "storyboarder.result/v1"
+    },
+    "provider": {
+      "default": "external-script",
+      "maxLength": 200,
+      "title": "Provider",
+      "type": "string"
+    },
+    "model": {
+      "default": "unspecified",
+      "maxLength": 200,
+      "title": "Model",
+      "type": "string"
+    },
+    "outputs": {
+      "items": {
+        "$ref": "#/$defs/OutputEntry"
+      },
+      "maxItems": 16,
+      "minItems": 1,
+      "title": "Outputs",
+      "type": "array"
+    }
+  },
+  "required": [
+    "schema",
+    "outputs"
+  ],
+  "title": "Storyboarder external result v1",
+  "type": "object",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

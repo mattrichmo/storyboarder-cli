@@ -1,0 +1,16 @@
+# Observed versions in the Linux/Python 3.13 verification environment.
+# Reproduction snapshot, not a cross-platform native-wheel lock or a security scan.
+fastapi==0.128.2
+uvicorn==0.48.0
+python-multipart==0.0.29
+pydantic==2.13.4
+prompt-toolkit==3.0.52
+rich==15.0.0
+Pillow==12.3.0
+reportlab==4.4.9
+filelock==3.29.0
+pytest==9.0.2
+pytest-asyncio==1.3.0
+httpx==0.28.1
+setuptools==82.0.1
+playwright==1.57.0

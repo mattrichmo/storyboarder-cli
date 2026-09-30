@@ -1,0 +1,17 @@
+include LICENSE README.md THIRD_PARTY_NOTICES.md pyproject.toml Makefile
+recursive-include src/storyboarder/static *
+recursive-include src/storyboarder/storage/migrations *.sql
+recursive-include clients/web *.ts *.tsx *.css *.mjs *.json *.svg *.js *.txt *.py
+recursive-include docs *.md *.json *.png *.txt *.xml
+recursive-include schemas *.json
+recursive-include scripts *.py *.sh *.ps1
+recursive-include examples *.py *.json
+recursive-include tests *.py
+recursive-include .github *.yml
+include requirements-tested.txt
+prune clients/web/node_modules
+prune .venv
+prune build
+prune artifacts
+prune dist
+global-exclude __pycache__ *.py[cod] .DS_Store

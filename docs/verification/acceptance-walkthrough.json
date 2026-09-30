@@ -1,0 +1,10 @@
+{
+  "project_id": "e2add936-8d41-47f5-bff1-83efc94d2af8",
+  "moved_project": "/mnt/data/storyboarder-final-acceptance/projects/acceptance-moved",
+  "graph_nodes": 3,
+  "graph_edges": 2,
+  "exact_reference": "262dc47f-67c9-4d75-9be4-bf1667388c77",
+  "bundle": "exports/scenes/scene-a6bfffee-189df2a6a240647c.zip",
+  "board": "exports/boards/3bc220dc-0d1d5a4dc3fdf3af.zip",
+  "healthy": true
+}

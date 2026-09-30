@@ -1,0 +1,29 @@
+{
+  "transport": "HTTP transport bridge",
+  "url": "http://127.0.0.1:7430",
+  "checks": [
+    "Compiled React shell mounted and loaded live session.",
+    "Intake queue rendered.",
+    "Asset library rendered.",
+    "Story outline rendered.",
+    "Story guide rendered.",
+    "Scene & shot editor rendered.",
+    "Frame comparison rendered.",
+    "Composition & exports rendered.",
+    "External scripts rendered.",
+    "Settings & health rendered.",
+    "Native DOM/SVG canvas renders story nodes.",
+    "Typed asset authored in browser and confirmed through independent HTTP read.",
+    "Keyboard L/Enter creates a typed canonical asset relationship.",
+    "Pointer dragging, arrow positioning, and named layout save leave canonical records unchanged.",
+    "Reference-aware removal offers hide/archive/delete; hiding does not delete a record.",
+    "Managed image attached as a new frame version and compared side by side.",
+    "Browser export creates a real HTML/PDF/PNG ZIP downloadable from the scoped API.",
+    "390px library has no page overflow; mobile inspector traps focus and closes with Escape.",
+    "Browser creates a workspace-scoped project isolated from the existing story.",
+    "Workspace project switching restores the original project."
+  ],
+  "page_errors": [],
+  "console_errors": [],
+  "passed": true
+}
