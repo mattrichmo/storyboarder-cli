@@ -1,0 +1,47 @@
+name: Offline development toolchain
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/provenance-workspace-v2]
+    paths: [.github/workflows/offline-toolchain.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  toolchain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - run: npm ci
+        working-directory: clients/web
+      - name: Collect pinned compiler and optional validation tools
+        shell: bash
+        run: |
+          mkdir -p toolchain/wheels
+          tar -czf toolchain/typescript.tgz -C clients/web/node_modules typescript
+          python -m pip download --only-binary=:all: --dest toolchain/wheels 'opentimelineio>=0.18,<0.20' 'ruff>=0.11,<1' 'build>=1.2,<2'
+          curl --fail --location --max-time 30 https://screenjson.com/schema.json --output toolchain/screenjson-upstream-schema.json
+          python -m json.tool toolchain/screenjson-upstream-schema.json > /dev/null
+          python -m pip --version > toolchain/toolchain.txt
+          node --version >> toolchain/toolchain.txt
+          node -p "require('./clients/web/node_modules/typescript/package.json').version" >> toolchain/toolchain.txt
+          git rev-parse HEAD >> toolchain/toolchain.txt
+          find toolchain -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > toolchain/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v7
+        with:
+          name: storyboarder-offline-dev-linux-py313
+          path: toolchain/
+          if-no-files-found: error
+          retention-days: 7
