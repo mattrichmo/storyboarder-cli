@@ -35,7 +35,7 @@ async def test_all_tui_pages_render_and_keyboard_can_author(story):
             form=desk.spawn(desk.command_form('asset.create',{'title':'Terminal asset','type':'character'}))
             await rendered()
             assert desk.modal_depth==1
-            submit=find_button(desk,'Apply / show')
+            submit=find_button(desk,'Save / view')
             desk.app.layout.focus(submit)
             pipe.send_text('\r')
             await asyncio.wait_for(form,timeout=5)

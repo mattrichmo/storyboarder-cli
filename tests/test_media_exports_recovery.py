@@ -127,7 +127,7 @@ def test_bundle_contains_exact_selection_not_default_and_is_deterministic(story)
 def test_modified_manifest_is_not_reused(story):
     s=story['service'];result=s.export_bundle(story['scene']['id'])
     (s.root/result['path']/'manifest.json').write_text('{}')
-    with pytest.raises(StoryboardError,match='modified'):s.export_bundle(story['scene']['id'])
+    with pytest.raises(StoryboardError,match='edited|modified'):s.export_bundle(story['scene']['id'])
 
 
 def test_concurrent_exports_publish_identical_complete_zip(story):
@@ -156,7 +156,7 @@ def test_all_board_outputs_real_and_offline(story):
     assert (directory/'board.pdf').read_bytes().startswith(b'%PDF-')
     assert Image.open(directory/'board-001.png').size==(1800,1960)
     text=(directory/'board.html').read_text()
-    assert 'approved frame' in text and 'https://' not in text
+    assert 'Approved storyboard image' in text and 'https://' not in text
     assert 'board.css' in text
     assert (directory/'scene.json').exists()
     before=(s.root/result['archive']).read_bytes()

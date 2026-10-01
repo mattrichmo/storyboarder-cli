@@ -101,6 +101,8 @@ def commit_export(staged, destination, archive):
         temporary = archive.with_name(archive.name + ".part-" + uuid.uuid4().hex)
         try:
             deterministic_zip(destination, temporary)
+            if archive.exists() and sha256(archive) != sha256(temporary):
+                raise StoryboardError("This export archive was edited. Move it aside before creating a fresh copy.")
             os.replace(temporary, archive)
         finally:
             temporary.unlink(missing_ok=True)

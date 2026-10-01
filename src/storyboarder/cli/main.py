@@ -17,6 +17,15 @@ from storyboarder.automation.registry import ScriptRegistry
 from storyboarder.domain.errors import StoryboardError, Conflict, NotFound
 
 
+class UsageError(Exception):
+    """Argument syntax failure, rendered once at the process boundary."""
+
+
+class ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        raise UsageError(message)
+
+
 def output(value, as_json=False):
     if as_json:
         print(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False))
@@ -57,7 +66,7 @@ def get_service(args):
 
 
 def build_parser():
-    parser = argparse.ArgumentParser(prog="storyboarder", description="A local story production desk. No arguments opens the TUI in an interactive terminal.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser = ArgumentParser(prog="storyboarder", description="A local story production desk. No arguments opens the TUI in an interactive terminal.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--version", action="version", version=__version__)
     parser.add_argument("--verbose", action="store_true")
     common(parser)
@@ -141,7 +150,15 @@ def build_parser():
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     parser = build_parser()
-    args = parser.parse_args(argv)
+    try:
+        args = parser.parse_args(argv)
+    except UsageError as exc:
+        if "--json" in argv:
+            print(json.dumps({"error": {"code": "invalid_arguments", "message": str(exc)}}), file=sys.stderr)
+        else:
+            parser.print_usage(sys.stderr)
+            print(f"storyboarder: {exc}", file=sys.stderr)
+        raise SystemExit(2)
     as_json = getattr(args, "json", False)
     logging.basicConfig(level=logging.DEBUG if getattr(args, "verbose", False) else logging.WARNING)
     command = getattr(args, "command", None)

@@ -33,10 +33,14 @@ class Repository:
         try:
             conn = sqlite3.connect(self.path.resolve().as_uri() + "?mode=ro", uri=True)
             current = conn.execute("PRAGMA user_version").fetchone()[0]
+            if current > SCHEMA_VERSION:
+                raise StoryboardError(f"Project schema version {current} is newer than supported version {SCHEMA_VERSION}. Upgrade Storyboarder; no data was changed.")
             tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
             if current < 1 or "schema_migrations" not in tables:
                 raise StoryboardError("The existing project database has no initialized Storyboarder schema. Preserve this folder and restore a verified backup; it was not changed.")
             applied = [row[0] for row in conn.execute("SELECT version FROM schema_migrations ORDER BY version")]
+            if applied and max(applied) > SCHEMA_VERSION:
+                raise StoryboardError("The migration ledger contains a newer schema version. Upgrade Storyboarder or restore a verified backup; no data was changed.")
             if applied != list(range(1, current + 1)):
                 raise StoryboardError("The existing project database has an incomplete migration ledger. Preserve this folder and restore a verified backup; it was not changed.")
         except sqlite3.DatabaseError as exc:
