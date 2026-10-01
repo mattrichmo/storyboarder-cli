@@ -108,16 +108,18 @@ def test_workspace_copy_keeps_identity_without_duplicate_navigation(workspace):
     assert workspace.current().root == copied
 
 
-def test_genuine_schema_one_upgrade_keeps_story_and_creates_preupgrade_backup(service):
-    marker = service.create_entity('asset', 'Survives upgrade', tags=['kept'])
-    with sqlite3.connect(service.repo.path) as conn:
-        conn.execute('DROP TABLE job_outputs')
-        conn.execute('DROP TABLE jobs')
-        conn.execute('DELETE FROM schema_migrations WHERE version=2')
-        conn.execute('PRAGMA user_version=1')
+@pytest.mark.parametrize('old_version', [1, 2])
+def test_genuine_legacy_upgrade_keeps_story_and_creates_preupgrade_backup(tmp_path, monkeypatch, old_version):
+    import storyboarder.storage.repository as repository
+    from storyboarder import SCHEMA_VERSION
+    with monkeypatch.context() as legacy:
+        legacy.setattr(repository, 'SCHEMA_VERSION', old_version)
+        service = Service(Project.create(tmp_path / 'legacy', 'Legacy project'))
+        marker = service.create_entity('asset', 'Survives upgrade', tags=['kept'])
     reopened = Service(Project(service.root))
     assert reopened.get('entities', marker['id']) == marker
-    assert Path(str(service.repo.path)+'.before-v2.bak').is_file()
+    assert Path(str(service.repo.path)+f'.before-v{SCHEMA_VERSION}.bak').is_file()
     with reopened.repo.transaction(False) as conn:
-        assert conn.execute('PRAGMA user_version').fetchone()[0] == 2
+        assert conn.execute('PRAGMA user_version').fetchone()[0] == SCHEMA_VERSION
         assert conn.execute('SELECT count(*) FROM jobs').fetchone()[0] == 0
+        assert conn.execute('SELECT count(*) FROM documents').fetchone()[0] == 0

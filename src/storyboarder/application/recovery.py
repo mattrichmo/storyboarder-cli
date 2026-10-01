@@ -1,3 +1,4 @@
+from contextlib import closing
 """Non-destructive health reporting, consistent backups and guarded restore."""
 from pathlib import Path, PurePosixPath
 import hashlib
@@ -119,6 +120,8 @@ def doctor(service, hashes=False):
             issues.append({"severity": "error", "code": "foreign_keys", "message": "Some project links are inconsistent. Make a backup before editing further.", "details": foreign_keys})
         if version != SCHEMA_VERSION or [row["version"] for row in migrations] != list(range(1, SCHEMA_VERSION + 1)):
             issues.append({"severity": "error", "code": "migration_state", "message": "This project needs a compatible Storyboarder version before you continue."})
+    from .document_recovery import document_health
+    issues.extend(document_health(service, hashes))
     snapshot = service.repo.snapshot()
     issues.extend(_semantic_issues(snapshot))
     known = set()
@@ -175,7 +178,7 @@ def backup(service):
             snapshot_db.parent.mkdir(parents=True)
             source = service.repo.connect()
             try:
-                with sqlite3.connect(snapshot_db) as destination:
+                with closing(sqlite3.connect(snapshot_db)) as destination:
                     source.backup(destination)
             finally:
                 source.close()
@@ -186,6 +189,9 @@ def backup(service):
             for media in records:
                 src = safe_path(service.root, media["path"], must_exist=True)
                 copy_plan.append((src, media["path"], media["sha256"]))
+            for artifact in lock.execute("SELECT path,sha256 FROM source_artifacts"):
+                src = safe_path(service.root, artifact["path"], must_exist=True)
+                copy_plan.append((src, artifact["path"], artifact["sha256"]))
             jobs = safe_path(service.root, ".storyboarder/jobs")
             if jobs.is_dir():
                 for file in jobs.rglob("*"):

@@ -1,3 +1,4 @@
+from contextlib import closing
 """Small SQLite repository. Services own transactions; no interface owns SQL."""
 from contextlib import contextmanager
 from pathlib import Path
@@ -19,6 +20,19 @@ def unpack(row):
     for key in JSON_COLUMNS & data.keys():
         data[key] = json.loads(data[key])
     return data
+
+
+def sql_statements(script):
+    """Split only complete SQLite statements, including trigger bodies."""
+    buffer = ""
+    for char in script:
+        buffer += char
+        if char == ";" and sqlite3.complete_statement(buffer):
+            yield buffer
+            buffer = ""
+    remainder = "\n".join(line for line in buffer.splitlines() if not line.strip().startswith("--"))
+    if remainder.strip():
+        raise StoryboardError("Migration contains an incomplete SQL statement.")
 
 
 class Repository:
@@ -106,11 +120,13 @@ class Repository:
             # Do not change database mode until its existing migration history is verified.
             conn.execute("PRAGMA journal_mode=WAL")
             if current and current < SCHEMA_VERSION:
-                with sqlite3.connect(str(self.path) + f".before-v{SCHEMA_VERSION}.bak") as dest:
+                with closing(sqlite3.connect(str(self.path) + f".before-v{SCHEMA_VERSION}.bak")) as dest:
                     conn.backup(dest)
             for path in migrations:
                 version = int(path.name.split("_", 1)[0])
-                sql = path.read_text()
+                if version > SCHEMA_VERSION:
+                    continue
+                sql = path.read_bytes().decode("utf-8")
                 checksum = hashlib.sha256(sql.encode()).hexdigest()
                 if version <= current:
                     found = conn.execute("SELECT checksum FROM schema_migrations WHERE version=?", (version,)).fetchone()
@@ -124,7 +140,7 @@ class Repository:
                     if conn.execute("PRAGMA user_version").fetchone()[0] >= version:
                         conn.rollback()
                         continue
-                    for statement in sql.split(";"):
+                    for statement in sql_statements(sql):
                         if statement.strip():
                             conn.execute(statement)
                     conn.execute("INSERT INTO schema_migrations VALUES (?,?,?,?)", (version, path.name, checksum, now()))

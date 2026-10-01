@@ -23,7 +23,7 @@ from storyboarder.automation.jobs import Jobs
 from storyboarder.domain.models import FIELD_MODELS
 from storyboarder.domain.errors import StoryboardError, NotFound, UnsafePath
 from storyboarder.media.files import safe_path, thumbnail, MAX_FILE_BYTES, FORMATS, safe_name
-from .limits import RequestBodyLimit
+from .limits import RequestBodyLimit, request_limit
 from .schemas import CreateProject, SelectProject, CreateEntity, UpdateEntity
 
 log = logging.getLogger(__name__)
@@ -87,7 +87,7 @@ def create_app(project=None, workspace=None, port=7430):
                 length = int(content_length)
             except ValueError:
                 return JSONResponse({"error": {"code": "invalid_length", "message": "Invalid request size."}}, status_code=400)
-            maximum = 1024**3 if request.url.path.endswith("/restore") else MAX_FILE_BYTES + 1024*1024 if request.url.path.endswith("/upload") else 2*1024*1024
+            maximum = request_limit(request.url.path)
             if length < 0:
                 return JSONResponse({"error": {"code": "invalid_length", "message": "Invalid request size."}}, status_code=400)
             if length > maximum:
@@ -261,6 +261,9 @@ def create_app(project=None, workspace=None, port=7430):
         finally:
             Path(temporary).unlink(missing_ok=True)
             await file.close()
+
+    from .documents import install_document_routes
+    install_document_routes(app, launch)
 
     static = Path(__file__).parents[1] / "static"
 

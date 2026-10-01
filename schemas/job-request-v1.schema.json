@@ -2,124 +2,27 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Storyboarder external job request v1",
   "type": "object",
-  "required": [
-    "schema",
-    "job_id",
-    "project_id",
-    "target",
-    "prompt",
-    "context",
-    "authored",
-    "references",
-    "constraints",
-    "destination",
-    "created_at"
-  ],
+  "required": ["schema", "job_id", "project_id", "target", "prompt", "context", "authored", "references", "constraints", "destination", "created_at"],
   "additionalProperties": false,
   "properties": {
-    "schema": {
-      "const": "storyboarder.job/v1"
-    },
-    "job_id": {
-      "type": "string",
-      "format": "uuid"
-    },
-    "project_id": {
-      "type": "string",
-      "format": "uuid"
-    },
+    "schema": {"const": "storyboarder.job/v1"},
+    "job_id": {"type": "string", "format": "uuid"},
+    "project_id": {"type": "string", "format": "uuid"},
     "target": {
-      "type": "object",
-      "required": [
-        "kind",
-        "shot_id",
-        "title",
-        "asset_type"
-      ],
+      "type": "object", "required": ["kind", "shot_id", "title", "asset_type"],
       "properties": {
-        "kind": {
-          "enum": [
-            "asset",
-            "frame"
-          ]
-        },
-        "shot_id": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "title": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 240
-        },
-        "asset_type": {
-          "enum": [
-            "character",
-            "location",
-            "prop",
-            "reference"
-          ]
-        }
-      },
-      "additionalProperties": false
+        "kind": {"enum": ["asset", "frame"]}, "shot_id": {"type": ["string", "null"]},
+        "title": {"type": "string", "minLength": 1, "maxLength": 240},
+        "asset_type": {"enum": ["character", "location", "prop", "reference"]}
+      }, "additionalProperties": false
     },
-    "prompt": {
-      "type": "string"
-    },
-    "context": {
-      "type": "object"
-    },
-    "authored": {
-      "type": "object",
-      "required": [
-        "owner",
-        "shots"
-      ],
-      "properties": {
-        "owner": {
-          "type": "object"
-        },
-        "shots": {
-          "type": "array",
-          "items": {
-            "type": "object"
-          }
-        }
-      }
-    },
-    "references": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "id",
-          "path",
-          "sha256"
-        ]
-      }
-    },
-    "constraints": {
-      "type": "object",
-      "required": [
-        "allowed_formats",
-        "max_file_bytes",
-        "max_output_bytes",
-        "max_outputs"
-      ]
-    },
-    "destination": {
-      "const": "output/"
-    },
-    "created_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "attempt": {
-      "type": "integer",
-      "minimum": 1,
-      "description": "Added for the execution attempt; absent in the queued snapshot."
-    }
+    "prompt": {"type": "string"}, "context": {"type": "object"},
+    "authored": {"type": "object", "required": ["owner", "shots"], "properties": {"owner": {"type": "object"}, "shots": {"type": "array", "items": {"type": "object"}}}},
+    "references": {"type": "array", "items": {"type": "object", "required": ["id", "path", "sha256"]}},
+    "constraints": {"type": "object", "required": ["allowed_formats", "max_file_bytes", "max_output_bytes", "max_outputs"]},
+    "destination": {"const": "output/"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "attempt": {"type": "integer", "minimum": 1, "description": "Added for the execution attempt; absent in the queued snapshot."},
+    "source_provenance": {"type": "array", "items": {"type": "object"}, "description": "Optional immutable screenplay source scopes, document versions and hashes captured at request creation."}
   }
 }

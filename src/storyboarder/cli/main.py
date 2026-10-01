@@ -26,7 +26,14 @@ class ArgumentParser(argparse.ArgumentParser):
         raise UsageError(message)
 
 
-def output(value, as_json=False):
+def output(value, as_json=False, as_jsonl=False):
+    if as_jsonl:
+        rows = value.get("items", [value]) if isinstance(value, dict) else value if isinstance(value, list) else [value]
+        for row in rows:
+            print(json.dumps(row, ensure_ascii=False, sort_keys=True, allow_nan=False))
+        if isinstance(value, dict) and value.get("next_offset") is not None:
+            print(json.dumps({"page": {k: value[k] for k in ("total", "limit", "offset", "next_offset")}}), file=sys.stderr)
+        return
     if as_json:
         print(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2, allow_nan=False))
         return
@@ -54,6 +61,8 @@ def output(value, as_json=False):
 def common(parser):
     parser.add_argument("-p", "--project", default=argparse.SUPPRESS, help="Explicit portable project folder")
     parser.add_argument("-w", "--workspace", default=argparse.SUPPRESS, help="Workspace navigator folder")
+    parser.add_argument("--jsonl", action="store_true", default=argparse.SUPPRESS, help="One result per line; pagination metadata on stderr")
+    parser.add_argument("--no-color", action="store_true", default=argparse.SUPPRESS, help="Disable terminal colors")
     parser.add_argument("--json", action="store_true", default=argparse.SUPPRESS, help="Stable JSON result and errors")
 
 
@@ -153,13 +162,16 @@ def main(argv=None):
     try:
         args = parser.parse_args(argv)
     except UsageError as exc:
-        if "--json" in argv:
+        if "--json" in argv or "--jsonl" in argv:
             print(json.dumps({"error": {"code": "invalid_arguments", "message": str(exc)}}), file=sys.stderr)
         else:
             parser.print_usage(sys.stderr)
             print(f"storyboarder: {exc}", file=sys.stderr)
         raise SystemExit(2)
-    as_json = getattr(args, "json", False)
+    as_jsonl = getattr(args, "jsonl", False)
+    as_json = getattr(args, "json", False) or as_jsonl
+    if getattr(args, "no_color", False):
+        os.environ["NO_COLOR"] = "1"
     logging.basicConfig(level=logging.DEBUG if getattr(args, "verbose", False) else logging.WARNING)
     command = getattr(args, "command", None)
     if command is None:
@@ -246,7 +258,7 @@ def main(argv=None):
                             value = json.loads(Path(value[1:]).read_text() if value.startswith("@") else value)
                         payload[field.name] = value
                 result = execute(service, command, payload)
-        output(result, as_json)
+        output(result, as_json, as_jsonl)
         failed = isinstance(result, dict) and (result.get("healthy") is False or result.get("status") == "failed" or bool(result.get("errors")))
         if failed:
             raise SystemExit(4)

@@ -54,12 +54,16 @@ class Jobs:
         with self.repo.transaction(False) as conn:
             if shot_id:
                 self.service.entity(conn, shot_id, "shot")
+        source_event = self.service.change_token()['event_id']
         composition = self.service.compose(shot_id or self.service.project.id)
+        from storyboarder.application.provenance import Provenance
+        source_provenance = Provenance(self.service).pins(shot_id) if shot_id else []
         if not composition["valid"]:
             raise StoryboardError("Resolve missing selected media before creating a job request.", {"validation": composition["validation"]})
         job_id = uid()
         references = [{**m, "path": f"inputs/{m['id']}{FORMATS[m['format']]}"} for m in composition["media"]]
         request = {"schema": JOB_VERSION, "job_id": job_id, "project_id": self.service.project.id, "target": {"kind": target, "shot_id": shot_id, "title": title(title_value), "asset_type": asset_type}, "prompt": text(prompt), "context": composition["context"], "references": references, "constraints": {"allowed_formats": sorted(FORMATS), "max_file_bytes": registered.get("max_file_bytes", MAX_FILE_BYTES), "max_output_bytes": registered.get("max_output_bytes", MAX_OUTPUT_BYTES), "max_outputs": MAX_OUTPUTS}, "destination": "output/", "created_at": now()}
+        request["source_provenance"] = source_provenance
         request["authored"] = {
             "owner": {key: composition["owner"][key] for key in ("id", "kind", "title", "description", "fields", "revision")},
             "shots": [{"id": shot["id"], "title": shot["title"], "fields": shot["fields"], "revision": shot["revision"], "context": shot["context"],
@@ -69,7 +73,13 @@ class Jobs:
         if len(dumps(request).encode()) > 10*1024*1024:
             raise StoryboardError("Request snapshot exceeds 10 MiB. Choose a specific shot rather than the whole project.")
         with self.repo.transaction() as conn:
+            if conn.execute('SELECT coalesce(max(id),0) FROM events').fetchone()[0] != source_event:
+                raise Conflict('The project changed while the request was composed. Refresh and prepare the request again.')
             row = self.repo.insert(conn, "jobs", {"id": job_id, "status": "queued", "script": script, "target": target, "shot_id": shot_id, "title": title(title_value), "asset_type": asset_type, "request": request, "created_at": now(), "updated_at": now()})
+            for source in source_provenance:
+                conn.execute('INSERT INTO job_source_pins VALUES(?,?,?)', (job_id, source['node_id'], dumps(source)))
+            for reference in references:
+                conn.execute('INSERT INTO job_media_pins VALUES(?,?,?)', (job_id, reference['id'], reference['sha256']))
             self.repo.event(conn, "job.queued", job_id)
             return row
 

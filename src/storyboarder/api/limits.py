@@ -9,6 +9,8 @@ from storyboarder.media.files import MAX_FILE_BYTES
 
 
 def request_limit(path):
+    if path.endswith('/documents/upload'):
+        return 21 * 1024 * 1024
     if path.endswith('/restore'):
         return 1024**3
     if path.endswith('/upload'):
