@@ -17,15 +17,25 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.App = void 0;
+exports.App = App;
 const react_1 = __importStar(require("./react"));
 const api_1 = require("./api");
 const utils_1 = require("./utils");
@@ -222,13 +232,14 @@ function App() {
                     react_1.default.createElement("small", null, c.destructive ? 'Confirmation required' : '')))),
                 !meta.commands.some(c => !c.read_only && c.browser && !['entity.update', 'canvas.save', 'project.sync'].includes(c.name) && c.label.toLowerCase().includes(paletteQuery.toLowerCase())) && react_1.default.createElement("p", { className: "muted" }, "No matching actions."))));
 }
-exports.App = App;
 
 },
 "api":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.runCommand = exports.jobImageUrl = exports.exportUrl = exports.originalUrl = exports.mediaUrl = exports.projectPath = exports.openSession = exports.api = exports.ApiError = void 0;
+exports.runCommand = exports.jobImageUrl = exports.exportUrl = exports.originalUrl = exports.mediaUrl = exports.projectPath = exports.ApiError = void 0;
+exports.api = api;
+exports.openSession = openSession;
 let launchToken = '';
 class ApiError extends Error {
     constructor(code, message, details = {}, status = 0) {
@@ -269,9 +280,7 @@ async function api(path, method = 'GET', data, signal) {
     }
     return result;
 }
-exports.api = api;
 async function openSession() { const session = await api('/session'); launchToken = session.token; return session; }
-exports.openSession = openSession;
 const projectPath = (id, path = '') => `/projects/${encodeURIComponent(id)}${path}`;
 exports.projectPath = projectPath;
 const mediaUrl = (project, media, size = 480) => `/api/v1/projects/${encodeURIComponent(project)}/media/${encodeURIComponent(media)}?size=${size}`;
@@ -304,15 +313,25 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Canvas = void 0;
+exports.Canvas = Canvas;
 const react_1 = __importStar(require("../react"));
 const api_1 = require("../api");
 const utils_1 = require("../utils");
@@ -323,7 +342,7 @@ function edgeLabel(edge) {
         return (0, utils_1.human)(edge.label);
     if (edge.kind === 'assignment') {
         const [role, selection] = edge.label.split(' · ');
-        return `${(0, utils_1.roleLabel)(role)} · ${selection === 'exact image' ? 'Image selected' : 'No image selected'}`;
+        return `${(0, utils_1.roleLabel)(role)} · ${selection === 'specific image selected' ? 'Specific image selected' : 'No specific image selected'}`;
     }
     if (edge.kind === 'location_default')
         return 'Location';
@@ -598,7 +617,7 @@ function Canvas({ state, selected, onSelect, action, refresh, notify }) {
             react_1.default.createElement("button", { onClick: () => requestDelete(selectedNode.id) }, "Remove\u2026")),
         selectedEdge && react_1.default.createElement("div", { className: "selection-tools" },
             react_1.default.createElement("strong", null, edgeLabel(selectedEdge)),
-            react_1.default.createElement("span", null, selectedEdge.kind === 'order' ? 'Story order' : selectedEdge.kind === 'assignment' ? 'Shot reference' : selectedEdge.kind === 'location_default' ? `Location from ${(0, utils_1.human)(selectedEdge.source_scope?.kind || 'project').toLowerCase()}` : 'Library item connection'),
+            react_1.default.createElement("span", null, selectedEdge.kind === 'order' ? 'Story order' : selectedEdge.kind === 'assignment' ? 'Shot reference' : selectedEdge.kind === 'location_default' ? `Location from ${(0, utils_1.human)(selectedEdge.source_scope?.kind || 'project').toLowerCase()}` : 'Connection between library items'),
             selectedEdge.kind === 'order' ? react_1.default.createElement("button", { onClick: () => { const child = state.entities.find(n => n.id === selectedEdge.target); if (child)
                     action('story.move', (0, utils_1.commandDefaults)(child)); } }, "Move in story") : selectedEdge.kind === 'location_default' ? react_1.default.createElement("button", { onClick: () => { const owner = state.entities.find(n => n.id === selectedEdge.source); if (owner)
                     action(owner.kind + '.update', (0, utils_1.commandDefaults)(owner)); } }, "Edit location\u2026") : react_1.default.createElement("button", { onClick: () => action(selectedEdge.kind === 'assignment' ? 'assignment.remove' : 'link.remove', { id: selectedEdge.id, revision: selectedEdge.revision }) }, "Remove connection\u2026"),
@@ -619,22 +638,25 @@ function Canvas({ state, selected, onSelect, action, refresh, notify }) {
                     react_1.default.createElement("button", { className: "danger", disabled: !usage?.can_delete, onClick: () => { const n = state.entities.find(n => n.id === deleteId); if (n)
                             action('entity.delete', (0, utils_1.commandDefaults)(n)); setDeleteId(null); } }, "Delete item\u2026")))));
 }
-exports.Canvas = Canvas;
 
 },
 "canvas/geometry":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.descendants = exports.edgePath = exports.fit = exports.tidy = exports.hitTest = exports.zoomAt = exports.screenToWorld = exports.clamp = exports.NODE_H = exports.NODE_W = void 0;
+exports.clamp = exports.NODE_H = exports.NODE_W = void 0;
+exports.screenToWorld = screenToWorld;
+exports.zoomAt = zoomAt;
+exports.hitTest = hitTest;
+exports.tidy = tidy;
+exports.fit = fit;
+exports.edgePath = edgePath;
+exports.descendants = descendants;
 exports.NODE_W = 238, exports.NODE_H = 222;
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 exports.clamp = clamp;
 function screenToWorld(point, view) { return { x: (point.x - view.x) / view.scale, y: (point.y - view.y) / view.scale }; }
-exports.screenToWorld = screenToWorld;
 function zoomAt(view, point, factor) { const scale = (0, exports.clamp)(view.scale * factor, .15, 3); const world = screenToWorld(point, view); return { scale, x: point.x - world.x * scale, y: point.y - world.y * scale }; }
-exports.zoomAt = zoomAt;
 function hitTest(point, positions) { return Object.keys(positions).reverse().find(id => { const p = positions[id]; return point.x >= p.x && point.x <= p.x + exports.NODE_W && point.y >= p.y && point.y <= p.y + exports.NODE_H; }) || null; }
-exports.hitTest = hitTest;
 function tidy(nodes, edges, mode) {
     const result = {};
     const sorted = [...nodes].sort((a, b) => a.position - b.position || a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
@@ -660,14 +682,10 @@ function tidy(nodes, edges, mode) {
     }
     return result;
 }
-exports.tidy = tidy;
 function fit(positions, width, height) { const points = Object.values(positions); if (!points.length)
     return { x: 60, y: 60, scale: 1 }; const x = Math.min(...points.map(p => p.x)), y = Math.min(...points.map(p => p.y)); const w = Math.max(...points.map(p => p.x)) + exports.NODE_W - x, h = Math.max(...points.map(p => p.y)) + exports.NODE_H - y; const scale = (0, exports.clamp)(Math.min((width - 100) / w, (height - 100) / h), .15, 1.2); return { scale, x: (width - w * scale) / 2 - x * scale, y: (height - h * scale) / 2 - y * scale }; }
-exports.fit = fit;
 function edgePath(a, b) { const start = { x: a.x + exports.NODE_W, y: a.y + exports.NODE_H / 2 }, end = { x: b.x, y: b.y + exports.NODE_H / 2 }; const bend = Math.max(65, Math.abs(end.x - start.x) * .5); return { path: `M ${start.x} ${start.y} C ${start.x + bend} ${start.y}, ${end.x - bend} ${end.y}, ${end.x} ${end.y}`, label: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 } }; }
-exports.edgePath = edgePath;
 function descendants(nodes, collapsed) { const result = new Set(); const visit = (id) => nodes.filter(n => n.parent_id === id).forEach(n => { result.add(n.id); visit(n.id); }); collapsed.forEach(visit); return result; }
-exports.descendants = descendants;
 
 },
 "components/ActionDialog":function(require,module,exports){
@@ -688,15 +706,25 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ActionDialog = void 0;
+exports.ActionDialog = ActionDialog;
 const react_1 = __importStar(require("../react"));
 const api_1 = require("../api");
 const utils_1 = require("../utils");
@@ -804,7 +832,7 @@ function ActionDialog({ command, state, meta, defaults = {}, onClose, onDone, on
                             opts.map(o => react_1.default.createElement("option", { key: o.value, value: o.value }, o.label))) : f.type === 'textarea' || f.type === 'json' ? react_1.default.createElement("textarea", { rows: f.type === 'json' ? 5 : 3, value: typeof values[f.name] === 'object' ? JSON.stringify(values[f.name], null, 2) : values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required, spellCheck: f.type !== 'json' }) : react_1.default.createElement("input", { type: f.type === 'integer' || f.type === 'number' ? 'number' : 'text', step: f.type === 'number' ? 'any' : undefined, value: Array.isArray(values[f.name]) ? values[f.name].join(', ') : values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required }),
                         " ",
                         f.help && react_1.default.createElement("small", null, f.help),
-                        isSource && !opts.length && f.required && react_1.default.createElement("small", { className: "warning-text" }, "Nothing to choose from yet. Create one first."));
+                        isSource && !opts.length && f.required && react_1.default.createElement("small", { className: "warning-text" }, (0, utils_1.emptySourceMessage)(f.source)));
                 })),
                 command.destructive && react_1.default.createElement("label", { className: "confirm-field" },
                     react_1.default.createElement("input", { type: "checkbox", checked: confirmed, onChange: (e) => setConfirmed(e.target.checked), required: true }),
@@ -814,7 +842,6 @@ function ActionDialog({ command, state, meta, defaults = {}, onClose, onDone, on
                 react_1.default.createElement("button", { type: "button", onClick: onClose, disabled: busy }, "Cancel"),
                 react_1.default.createElement("button", { className: command.destructive ? 'danger' : 'primary', type: "submit", disabled: busy || (command.destructive && !confirmed) }, busy ? 'Working…' : command.read_only ? 'Show result' : command.label))));
 }
-exports.ActionDialog = ActionDialog;
 
 },
 "components/Inspector":function(require,module,exports){
@@ -835,15 +862,25 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Inspector = void 0;
+exports.Inspector = Inspector;
 const react_1 = __importStar(require("../react"));
 const api_1 = require("../api");
 const utils_1 = require("../utils");
@@ -1014,7 +1051,7 @@ function Inspector({ state, id, onClose, onSelect, action }) {
                 "Edit ",
                 (0, utils_1.kindLabel)(entity).toLowerCase(),
                 " details")),
-        react_1.default.createElement("div", { className: "tabs", role: "tablist", "aria-label": "Inspector sections" }, ['details', 'references', 'context'].filter(t => t !== 'context' || entity.kind !== 'asset').map(t => react_1.default.createElement("button", { key: t, role: "tab", "aria-selected": tab === t, onClick: () => setTab(t) }, (0, utils_1.human)(t)))),
+        react_1.default.createElement("div", { className: "tabs", role: "tablist", "aria-label": "Item details sections" }, ['details', 'references', 'context'].filter(t => t !== 'context' || entity.kind !== 'asset').map(t => react_1.default.createElement("button", { key: t, role: "tab", "aria-selected": tab === t, onClick: () => setTab(t) }, (0, utils_1.human)(t)))),
         react_1.default.createElement("div", { className: "inspector-body" },
             tab === 'details' && react_1.default.createElement(react_1.default.Fragment, null,
                 entity.kind === 'shot' ? react_1.default.createElement(ShotDetails, { entity: entity, state: state }) : react_1.default.createElement(react_1.default.Fragment, null,
@@ -1092,10 +1129,9 @@ function Inspector({ state, id, onClose, onSelect, action }) {
                     react_1.default.createElement("button", { onClick: () => action('frame.attach', { shot_id: id }) }, "Add storyboard image"))),
             tab === 'context' && react_1.default.createElement(react_1.default.Fragment, null,
                 error && react_1.default.createElement("p", { role: "alert" }, error),
-                context ? react_1.default.createElement(Primitives_1.ContextView, { value: context }) : react_1.default.createElement("p", null, "Loading guidance\u2026"),
-                react_1.default.createElement("button", { onClick: () => action('context.put', { owner_id: id }) }, "Add guidance"))));
+                context ? react_1.default.createElement(Primitives_1.ContextView, { value: context }) : react_1.default.createElement("p", null, "Loading story direction\u2026"),
+                react_1.default.createElement("button", { onClick: () => action('context.put', { owner_id: id }) }, "Add direction note"))));
 }
-exports.Inspector = Inspector;
 
 },
 "components/Primitives":function(require,module,exports){
@@ -1116,15 +1152,33 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ExportLinks = exports.ContextView = exports.Validation = exports.Modal = exports.ErrorNotice = exports.Badge = exports.PageHeading = exports.Empty = exports.Icon = void 0;
+exports.Icon = Icon;
+exports.Empty = Empty;
+exports.PageHeading = PageHeading;
+exports.Badge = Badge;
+exports.ErrorNotice = ErrorNotice;
+exports.Modal = Modal;
+exports.Validation = Validation;
+exports.ContextView = ContextView;
+exports.ExportLinks = ExportLinks;
 const react_1 = __importStar(require("../react"));
 const api_1 = require("../api");
 const utils_1 = require("../utils");
@@ -1184,28 +1238,23 @@ function Icon({ name, size = 18 }) {
     };
     return react_1.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, paths[name] || paths.grid);
 }
-exports.Icon = Icon;
 function Empty({ title, children, action }) { return react_1.default.createElement("div", { className: "empty" },
     react_1.default.createElement("span", { className: "empty-mark" },
         react_1.default.createElement(Icon, { name: "outline", size: 28 })),
     react_1.default.createElement("h3", null, title),
     react_1.default.createElement("p", null, children),
     action); }
-exports.Empty = Empty;
 function PageHeading({ eyebrow, title, description, actions }) { return react_1.default.createElement("header", { className: "page-heading" },
     react_1.default.createElement("div", null,
         react_1.default.createElement("p", { className: "eyebrow" }, eyebrow),
         react_1.default.createElement("h1", null, title),
         description && react_1.default.createElement("p", { className: "lede" }, description)),
     actions && react_1.default.createElement("div", { className: "heading-actions" }, actions)); }
-exports.PageHeading = PageHeading;
 function Badge({ kind, children }) { return react_1.default.createElement("span", { className: `badge ${kind || ''}` }, children); }
-exports.Badge = Badge;
 function ErrorNotice({ error, children }) { return react_1.default.createElement("div", { className: "notice error", role: "alert" },
     react_1.default.createElement("strong", null, "We couldn\u2019t complete that."),
     react_1.default.createElement("p", null, error),
     children); }
-exports.ErrorNotice = ErrorNotice;
 function Modal({ title, children, onClose, wide = false }) {
     const dialog = (0, react_1.useRef)(null);
     const closeRef = (0, react_1.useRef)(onClose);
@@ -1242,7 +1291,6 @@ function Modal({ title, children, onClose, wide = false }) {
                     react_1.default.createElement(Icon, { name: "close" }))),
             children));
 }
-exports.Modal = Modal;
 function Validation({ issues }) { if (!issues.length)
     return react_1.default.createElement("p", { className: "success-line" },
         react_1.default.createElement(Icon, { name: "check" }),
@@ -1253,7 +1301,6 @@ function Validation({ issues }) { if (!issues.length)
     issues.map((i, n) => react_1.default.createElement("div", { key: `${i.code}-${n}`, className: `check-row ${i.severity}` },
         react_1.default.createElement(Badge, null, (0, utils_1.human)(i.severity)),
         react_1.default.createElement("span", null, i.message)))); }
-exports.Validation = Validation;
 function ContextView({ value }) { return react_1.default.createElement("div", { className: "context-view" },
     react_1.default.createElement("div", { className: "scope-chain" }, value.chain.map((c, i) => react_1.default.createElement("span", { key: c.id },
         i > 0 && ' / ',
@@ -1273,7 +1320,7 @@ function ContextView({ value }) { return react_1.default.createElement("div", { 
                 (0, utils_1.sourceLabel)(e.source.kind),
                 " \u00B7 ",
                 (0, utils_1.displayTitle)(e.source.title)))))),
-    !Object.keys(value.blocks).length && !Object.keys(value.scalars).length && react_1.default.createElement("p", { className: "muted" }, "No guidance has been added yet. Add it here or at a higher story level."),
+    !Object.keys(value.blocks).length && !Object.keys(value.scalars).length && react_1.default.createElement("p", { className: "muted" }, "No direction has been added yet. Add a note here or at a higher story level."),
     value.history.filter(h => h.operation !== 'append').map((h, i) => react_1.default.createElement("p", { className: "context-rule", key: `${h.key}-${i}` },
         react_1.default.createElement(Badge, null, (0, utils_1.operationLabel)(h.operation)),
         " ",
@@ -1281,7 +1328,6 @@ function ContextView({ value }) { return react_1.default.createElement("div", { 
         " \u00B7 ",
         (0, utils_1.displayTitle)(h.source.title),
         h.removed_sources.length ? ` · ${h.removed_sources.length} earlier ${h.removed_sources.length === 1 ? 'note was changed' : 'notes were changed'}` : ''))); }
-exports.ContextView = ContextView;
 function ExportLinks({ project, result }) { return react_1.default.createElement("div", { className: "export-result" },
     react_1.default.createElement("p", { className: "success-line" },
         react_1.default.createElement(Icon, { name: "check" }),
@@ -1298,7 +1344,6 @@ function ExportLinks({ project, result }) { return react_1.default.createElement
         react_1.default.createElement("summary", null, "Individual files"),
         react_1.default.createElement("div", { className: "file-links" }, result.files?.filter(p => !p.endsWith('.zip')).map(path => react_1.default.createElement("a", { key: path, href: (0, api_1.exportUrl)(project, path, true) }, path.split('/').pop())))),
     result.validation && react_1.default.createElement(Validation, { issues: result.validation })); }
-exports.ExportLinks = ExportLinks;
 
 },
 "main":function(require,module,exports){
@@ -1319,13 +1364,23 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 const react_1 = __importStar(require("./react"));
 const App_1 = require("./App");
@@ -1366,15 +1421,25 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.OutlinePage = void 0;
+exports.OutlinePage = OutlinePage;
 const react_1 = __importStar(require("../react"));
 const utils_1 = require("../utils");
 const Primitives_1 = require("../components/Primitives");
@@ -1498,7 +1563,7 @@ function OutlinePage(p) {
     };
     const sequences = children(p.state.project.id).filter(e => e.kind === 'sequence');
     return react_1.default.createElement(react_1.default.Fragment, null,
-        react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Story outline", title: "Build the story, scene by scene.", description: "Sequences hold scenes, and scenes hold shots. Change their order here to update the story everywhere.", actions: react_1.default.createElement("button", { className: "primary", onClick: () => p.action('sequence.create') },
+        react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Story outline", title: "Build the story, scene by scene.", description: "Organize scenes and shots into sequences, then rearrange them as the story changes.", actions: react_1.default.createElement("button", { className: "primary", onClick: () => p.action('sequence.create') },
                 react_1.default.createElement(Primitives_1.Icon, { name: "plus" }),
                 "New sequence") }),
         react_1.default.createElement("div", { className: "outline-toolbar" },
@@ -1519,11 +1584,10 @@ function OutlinePage(p) {
                     react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
                     react_1.default.createElement("input", { "aria-label": "Search story outline", value: query, onChange: (e) => setQuery(e.target.value), placeholder: "Find a scene or shot\u2026" })),
                 react_1.default.createElement("button", { onClick: () => setCollapsed([]) }, "Expand all"),
-                react_1.default.createElement("button", { onClick: () => p.go('canvas') }, "View on canvas"))),
+                react_1.default.createElement("button", { onClick: () => p.go('canvas') }, "Open story canvas"))),
         react_1.default.createElement("div", { className: "story-outline" }, sequences.map(render)),
         !records.length && react_1.default.createElement(Primitives_1.Empty, { title: "Start with a sequence", action: react_1.default.createElement("button", { onClick: () => p.action('sequence.create') }, "Create a sequence") }, "Add scenes and shots to shape the story. Reorder them here whenever the story changes."));
 }
-exports.OutlinePage = OutlinePage;
 
 },
 "pages/Pages":function(require,module,exports){
@@ -1544,21 +1608,43 @@ var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (
 }) : function(o, v) {
     o["default"] = v;
 });
-var __importStar = (this && this.__importStar) || function (mod) {
-    if (mod && mod.__esModule) return mod;
-    var result = {};
-    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
-    __setModuleDefault(result, mod);
-    return result;
-};
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.AutomationPage = exports.SettingsPage = exports.CompositionPage = exports.FramesPage = exports.EditorPage = exports.GuidePage = exports.ScopeSelect = exports.OutlinePage = exports.LibraryPage = exports.IntakePage = exports.UploadControl = exports.OverviewPage = exports.WorkspacePage = void 0;
+exports.OutlinePage = void 0;
+exports.WorkspacePage = WorkspacePage;
+exports.OverviewPage = OverviewPage;
+exports.UploadControl = UploadControl;
+exports.IntakePage = IntakePage;
+exports.LibraryPage = LibraryPage;
+exports.ScopeSelect = ScopeSelect;
+exports.GuidePage = GuidePage;
+exports.EditorPage = EditorPage;
+exports.FramesPage = FramesPage;
+exports.CompositionPage = CompositionPage;
+exports.SettingsPage = SettingsPage;
+exports.AutomationPage = AutomationPage;
 const react_1 = __importStar(require("../react"));
 const api_1 = require("../api");
 const utils_1 = require("../utils");
 const Primitives_1 = require("../components/Primitives");
 function recordButtons(p, e) { return react_1.default.createElement(react_1.default.Fragment, null,
-    react_1.default.createElement("button", { onClick: () => p.select(e.id) }, "Inspect"),
+    react_1.default.createElement("button", { onClick: () => p.select(e.id) }, "Details"),
     react_1.default.createElement("button", { onClick: () => p.action(e.kind + '.update', (0, utils_1.commandDefaults)(e)) }, "Edit")); }
 function WorkspacePage({ session, projects, onOpen, onRefresh }) {
     const [creating, setCreating] = (0, react_1.useState)(false), [title, setTitle] = (0, react_1.useState)(''), [slug, setSlug] = (0, react_1.useState)(''), [search, setSearch] = (0, react_1.useState)(''), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false);
@@ -1624,9 +1710,8 @@ function WorkspacePage({ session, projects, onOpen, onRefresh }) {
                     react_1.default.createElement("button", { type: "button", onClick: () => setCreating(false) }, "Cancel"),
                     react_1.default.createElement("button", { className: "primary", disabled: busy }, busy ? 'Creating…' : 'Create project')))));
 }
-exports.WorkspacePage = WorkspacePage;
 function OverviewPage(p) { const { state } = p; const [health, setHealth] = (0, react_1.useState)(null); (0, react_1.useEffect)(() => { (0, api_1.runCommand)(state.project.id, 'project.doctor').then(setHealth).catch(() => setHealth(null)); }, [state]); const seq = (0, utils_1.activeEntities)(state, 'sequence'); return react_1.default.createElement(react_1.default.Fragment, null,
-    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Project overview", title: (0, utils_1.displayTitle)(state.project.title), description: String(state.project.fields.premise || state.project.description || 'Give the story a shape. Gather references, build the outline, and make each shot intentional.'), actions: react_1.default.createElement("button", { onClick: () => p.action('project.update', (0, utils_1.commandDefaults)(state.project)) }, "Edit project guide") }),
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Project overview", title: (0, utils_1.displayTitle)(state.project.title), description: String(state.project.fields.premise || state.project.description || 'Give the story a shape. Gather references, build the outline, and make each shot intentional.'), actions: react_1.default.createElement("button", { onClick: () => p.action('project.update', (0, utils_1.commandDefaults)(state.project)) }, "Edit project details") }),
     react_1.default.createElement("div", { className: "metrics" }, [['Scenes', 'scene'], ['Shots', 'shot'], ['Reference items', 'asset'], ['Awaiting review', 'intake']].map(([label, key]) => react_1.default.createElement("button", { key: key, onClick: () => p.go(key === 'asset' ? 'library' : key === 'intake' ? 'intake' : 'outline') },
         react_1.default.createElement("strong", null, state.project.counts[key] || 0),
         react_1.default.createElement("span", null, label),
@@ -1646,9 +1731,9 @@ function OverviewPage(p) { const { state } = p; const [health, setHealth] = (0, 
                         " scenes")),
                 react_1.default.createElement("button", { onClick: () => p.action('scene.create', { parent_id: s.id }) }, "Add scene"))) : react_1.default.createElement(Primitives_1.Empty, { title: "Begin with a sequence", action: react_1.default.createElement("button", { onClick: () => p.action('sequence.create') }, "Create a sequence") }, "A sequence holds scenes. Each scene holds the shots that carry it."),
             react_1.default.createElement("div", { className: "section-heading" },
-                react_1.default.createElement("h2", null, "Story guidance"),
+                react_1.default.createElement("h2", null, "Story direction"),
                 react_1.default.createElement("button", { className: "text-button", onClick: () => p.go('guide') }, "Open guide \u2192")),
-            react_1.default.createElement("p", { className: "prose" }, state.project.fields.visual_style || 'Set the visual style, production notes, and story guidance in the Story guide.')),
+            react_1.default.createElement("p", { className: "prose" }, state.project.fields.visual_style || 'Set the visual style, production notes, and story direction in the Story guide.')),
         react_1.default.createElement("aside", { className: "overview-notes" },
             react_1.default.createElement("h2", null, "At the desk"),
             health && react_1.default.createElement("div", { className: `health-summary ${health.healthy ? 'healthy' : 'warning'}` },
@@ -1662,7 +1747,6 @@ function OverviewPage(p) { const { state } = p; const [health, setHealth] = (0, 
                 react_1.default.createElement("span", null, p.meta.commands.find(c => c.name === e.action)?.label || (0, utils_1.human)(e.action.replaceAll('.', ' '))),
                 react_1.default.createElement("small", null, (0, utils_1.niceDate)(e.created_at))))),
             react_1.default.createElement("div", { className: "notice" }, "Your project is saved on this computer. Back up its folder regularly to keep a second copy.")))); }
-exports.OverviewPage = OverviewPage;
 function UploadControl({ project, shot, done }) { const [recursive, setRecursive] = (0, react_1.useState)(false), [status, setStatus] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false), [failures, setFailures] = (0, react_1.useState)([]); async function upload(files) { if (!files)
     return; setBusy(true); setFailures([]); const eligible = Array.from(files).filter(f => recursive || !f.webkitRelativePath || f.webkitRelativePath.split('/').length <= 2); const errors = []; let accepted = 0; for (let i = 0; i < eligible.length; i++) {
     const file = eligible[i];
@@ -1699,7 +1783,6 @@ function UploadControl({ project, shot, done }) { const [recursive, setRecursive
             failures.length,
             " files not imported"),
         failures.map((f, i) => react_1.default.createElement("p", { className: "warning-text", key: i }, f)))); }
-exports.UploadControl = UploadControl;
 function IntakePage(p) { const [filter, setFilter] = (0, react_1.useState)('pending'), [query, setQuery] = (0, react_1.useState)(''), [checked, setChecked] = (0, react_1.useState)([]), [bulk, setBulk] = (0, react_1.useState)(''), [bulkTags, setBulkTags] = (0, react_1.useState)(''), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false); const items = p.state.intake.filter(i => (!filter || i.state === filter) && i.original_name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.media_id.localeCompare(b.media_id)); async function acceptBulk() { setBusy(true); try {
     for (const id of checked) {
         const item = p.state.intake.find(i => i.id === id);
@@ -1766,7 +1849,6 @@ finally {
                 react_1.default.createElement("button", { onClick: () => p.action('intake.discard', (0, utils_1.commandDefaults)(item)) }, "Remove from intake\u2026")),
             react_1.default.createElement("button", { onClick: () => p.action('media.tags', (0, utils_1.commandDefaults)(m)) }, "Tag image"))); })),
     !items.length && react_1.default.createElement(Primitives_1.Empty, { title: filter === 'pending' ? 'Intake is clear' : 'No matching intake items' }, "Import individual images or a folder. Identical images are grouped, and each import remains available to review.")); }
-exports.IntakePage = IntakePage;
 function LibraryPage(p) { const [query, setQuery] = (0, react_1.useState)(''), [type, setType] = (0, react_1.useState)(''), [tag, setTag] = (0, react_1.useState)(''), [page, setPage] = (0, react_1.useState)(0); const records = (0, utils_1.activeEntities)(p.state, 'asset').filter(e => (!type || e.fields.type === type) && (!tag || e.tags.includes(tag)) && [e.title, e.description, ...e.aliases].join(' ').toLowerCase().includes(query.toLowerCase())); const visible = records.slice(page * 48, (page + 1) * 48); (0, react_1.useEffect)(() => setPage(0), [query, type, tag]); return react_1.default.createElement(react_1.default.Fragment, null,
     react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Reference library", title: "The people, places, and things.", description: "Keep each character, location, or prop in one place with its reference images. Choose the specific image you want for each shot.", actions: react_1.default.createElement(react_1.default.Fragment, null,
             react_1.default.createElement("button", { onClick: () => p.go('intake') }, "Import references"),
@@ -1810,7 +1892,6 @@ function LibraryPage(p) { const [query, setQuery] = (0, react_1.useState)(''), [
             " of ",
             Math.ceil(records.length / 48)),
         react_1.default.createElement("button", { disabled: (page + 1) * 48 >= records.length, onClick: () => setPage(page + 1) }, "Next"))); }
-exports.LibraryPage = LibraryPage;
 var OutlinePage_1 = require("./OutlinePage");
 Object.defineProperty(exports, "OutlinePage", { enumerable: true, get: function () { return OutlinePage_1.OutlinePage; } });
 function ScopeSelect({ state, value, onChange, label = 'Applies to', shotsOnly = false }) { const choices = (0, utils_1.activeEntities)(state).filter(e => shotsOnly ? e.kind === 'shot' : e.kind !== 'asset').sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)); return react_1.default.createElement("label", { className: "field scope-select" },
@@ -1821,45 +1902,43 @@ function ScopeSelect({ state, value, onChange, label = 'Applies to', shotsOnly =
             (0, utils_1.human)(e.kind),
             " \u00B7 ",
             (0, utils_1.displayTitle)(e.title))))); }
-exports.ScopeSelect = ScopeSelect;
 function GuidePage(p) { const [scope, setScope] = (0, react_1.useState)(p.selected && p.state.entities.find(e => e.id === p.selected)?.kind !== 'asset' ? p.selected : p.state.project.id), [context, setContext] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''); const record = p.state.entities.find(e => e.id === scope) || p.state.project; (0, react_1.useEffect)(() => { let alive = true; (0, api_1.runCommand)(p.state.project.id, 'context.resolve', { owner_id: scope }).then(r => alive && setContext(r)).catch(e => alive && setError(e.message)); return () => { alive = false; }; }, [scope, p.state]); const blocks = p.state.context_blocks.filter(b => b.owner_id === scope); return react_1.default.createElement(react_1.default.Fragment, null,
-    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Story guide", title: "A guide for every part of the story.", description: "Guidance flows from the project to sequences, scenes, and shots. Add a note at any level to shape the work below it.", actions: react_1.default.createElement("button", { onClick: () => p.action(record.kind + '.update', (0, utils_1.commandDefaults)(record)) },
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Story guide", title: "A guide for every part of the story.", description: "Set direction for the whole project, then add notes for a sequence, scene, or shot when needed.", actions: react_1.default.createElement("button", { onClick: () => p.action(record.kind + '.update', (0, utils_1.commandDefaults)(record)) },
             "Edit ",
             record.kind === 'project' ? 'project' : (0, utils_1.human)(record.kind).toLowerCase(),
-            " guidance") }),
+            " direction") }),
     react_1.default.createElement(ScopeSelect, { state: p.state, value: scope, onChange: setScope }),
     error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
     react_1.default.createElement("div", { className: "guide-columns" },
         react_1.default.createElement("section", null,
             react_1.default.createElement("div", { className: "section-heading" },
-                react_1.default.createElement("h2", null, "Notes for this part"),
-                react_1.default.createElement("button", { onClick: () => p.action('context.put', { owner_id: scope }) }, "Add guidance note")),
+                react_1.default.createElement("h2", null, "Direction at this level"),
+                react_1.default.createElement("button", { onClick: () => p.action('context.put', { owner_id: scope }) }, "Add direction note")),
             Object.entries(record.fields).filter(([k, v]) => v !== '' && v != null).map(([key, value]) => react_1.default.createElement("section", { className: "detail-field", key: key },
                 react_1.default.createElement("h3", null, (0, utils_1.human)(key)),
                 react_1.default.createElement("p", { className: "prose" }, key === 'location_id' ? (0, utils_1.displayTitle)(p.state.entities.find(e => e.id === value)?.title || String(value)) : String(value)))),
             blocks.map(b => react_1.default.createElement("section", { className: "authored-block", key: b.id },
                 react_1.default.createElement("div", { className: "section-heading" },
                     react_1.default.createElement("h3", null, (0, utils_1.human)(b.key)),
-                    react_1.default.createElement(Primitives_1.Badge, null, (0, utils_1.operationLabel)(b.operation))),
-                react_1.default.createElement("p", { className: "prose" }, b.text || 'This guidance is turned off here.'),
+                    b.operation !== 'append' && react_1.default.createElement(Primitives_1.Badge, null, (0, utils_1.operationLabel)(b.operation))),
+                react_1.default.createElement("p", { className: "prose" }, b.text || 'Direction from above is hidden here.'),
                 react_1.default.createElement("div", { className: "button-row" },
-                    react_1.default.createElement("button", { onClick: () => p.action('context.put', (0, utils_1.commandDefaults)(b)) }, "Edit guidance"),
+                    react_1.default.createElement("button", { onClick: () => p.action('context.put', (0, utils_1.commandDefaults)(b)) }, "Edit direction note"),
                     react_1.default.createElement("button", { onClick: () => p.action('context.remove', (0, utils_1.commandDefaults)(b)) }, "Remove\u2026")))),
-            !blocks.length && react_1.default.createElement("p", { className: "muted" }, "No notes at this level yet. Guidance from the project and story above appears here too.")),
+            !blocks.length && react_1.default.createElement("p", { className: "muted" }, "No direction notes here yet. Notes from the project and story above still apply.")),
         react_1.default.createElement("section", { className: "resolved-panel" },
-            react_1.default.createElement("h2", null, "Applied guidance"),
+            react_1.default.createElement("h2", null, "Direction in effect"),
             context ? react_1.default.createElement(react_1.default.Fragment, null,
                 react_1.default.createElement(Primitives_1.ContextView, { value: context }),
                 Object.keys(context.blocks).length > 0 && react_1.default.createElement("div", { className: "optout-list" },
-                    react_1.default.createElement("h3", null, "Guidance turned off here"),
+                    react_1.default.createElement("h3", null, "Direction hidden here"),
                     Object.keys(context.blocks).filter(key => !blocks.some(b => b.key === key)).map(key => react_1.default.createElement("button", { key: key, onClick: () => p.action('context.put', { owner_id: scope, key, operation: 'exclude', content: '' }) },
                         "Turn off \u201C",
                         (0, utils_1.human)(key),
-                        "\u201D here\u2026")))) : react_1.default.createElement("p", null, "Loading guidance\u2026")))); }
-exports.GuidePage = GuidePage;
+                        "\u201D here\u2026")))) : react_1.default.createElement("p", null, "Loading story direction\u2026")))); }
 function EditorPage(p) { const [scope, setScope] = (0, react_1.useState)(p.selected && ['scene', 'shot'].includes(p.state.entities.find(e => e.id === p.selected)?.kind || '') ? p.selected : (0, utils_1.activeEntities)(p.state, 'shot')[0]?.id || (0, utils_1.activeEntities)(p.state, 'scene')[0]?.id || ''); const record = p.state.entities.find(e => e.id === scope); const [composition, setComposition] = (0, react_1.useState)(null); (0, react_1.useEffect)(() => { if (scope)
     (0, api_1.runCommand)(p.state.project.id, 'composition.preview', { owner_id: scope }).then(setComposition).catch(() => setComposition(null)); }, [scope, p.state]); return react_1.default.createElement(react_1.default.Fragment, null,
-    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Scene & shot editor", title: "Shape the scene and shot.", description: "Shape the action, dialogue, camera plan, continuity notes, and image references for each scene and shot.", actions: react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Scene & shot editor", title: "Shape the scene and shot.", description: "Add action, dialogue, camera notes, continuity, and image references to every scene and shot.", actions: react_1.default.createElement(react_1.default.Fragment, null,
             react_1.default.createElement("button", { onClick: () => p.action('scene.create') }, "New scene"),
             react_1.default.createElement("button", { onClick: () => p.action('shot.create') }, "New shot")) }),
     react_1.default.createElement("label", { className: "field scope-select" },
@@ -1894,10 +1973,9 @@ function EditorPage(p) { const [scope, setScope] = (0, react_1.useState)(p.selec
                         react_1.default.createElement("button", { onClick: () => p.action('assignment.update', { ...(0, utils_1.commandDefaults)(a), asset_id: a.asset_id }) }, "Change reference"),
                         react_1.default.createElement("button", { onClick: () => p.action('assignment.remove', (0, utils_1.commandDefaults)(a)) }, "Remove\u2026"))))))),
         composition && react_1.default.createElement("details", { className: "context-preview" },
-            react_1.default.createElement("summary", null, "Applied guidance and validation"),
+            react_1.default.createElement("summary", null, "Direction and production checks"),
             react_1.default.createElement(Primitives_1.ContextView, { value: composition.context }),
             react_1.default.createElement(Primitives_1.Validation, { issues: composition.validation }))) : react_1.default.createElement(Primitives_1.Empty, { title: "Select a scene or shot" }, "Create a sequence in the outline first, then build its scenes and shots.")); }
-exports.EditorPage = EditorPage;
 function FramesPage(p) { const [shot, setShot] = (0, react_1.useState)(p.selected && p.state.entities.find(e => e.id === p.selected)?.kind === 'shot' ? p.selected : (0, utils_1.activeEntities)(p.state, 'shot')[0]?.id || ''), [compare, setCompare] = (0, react_1.useState)([]), [archived, setArchived] = (0, react_1.useState)(false); (0, react_1.useEffect)(() => { setCompare([]); }, [shot]); const frames = p.state.frames.filter(f => f.shot_id === shot && (archived || f.state !== 'archived')).sort((a, b) => b.version - a.version); const visible = compare.length >= 2 ? frames.filter(f => compare.includes(f.id)) : frames; return react_1.default.createElement(react_1.default.Fragment, null,
     react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Storyboard frames", title: "Compare storyboard images", description: "Add storyboard images for a shot, compare versions, then select or approve the one you want to use.", actions: shot ? react_1.default.createElement("button", { onClick: () => p.action('frame.attach', { shot_id: shot }) }, "Add storyboard image") : undefined }),
     react_1.default.createElement(ScopeSelect, { state: p.state, value: shot, onChange: setShot, label: "Shot", shotsOnly: true }),
@@ -1931,7 +2009,6 @@ function FramesPage(p) { const [shot, setShot] = (0, react_1.useState)(p.selecte
                 react_1.default.createElement("summary", null, "Technical details"),
                 react_1.default.createElement("pre", null, JSON.stringify(f.provenance, null, 2)))))),
         !frames.length && react_1.default.createElement(Primitives_1.Empty, { title: "No storyboard images yet" }, "Add an image for this shot. Reference images remain in the library, separate from storyboard images.")) : react_1.default.createElement(Primitives_1.Empty, { title: "Choose a shot" }, "Create a shot in the outline before adding a storyboard image.")); }
-exports.FramesPage = FramesPage;
 function CompositionPage(p) { const [scope, setScope] = (0, react_1.useState)(p.selected && p.state.entities.find(e => e.id === p.selected)?.kind !== 'asset' ? p.selected : (0, utils_1.activeEntities)(p.state, 'scene')[0]?.id || p.state.project.id), [document, setDocument] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false), [approved, setApproved] = (0, react_1.useState)(false); (0, react_1.useEffect)(() => { let alive = true; setError(''); (0, api_1.runCommand)(p.state.project.id, 'composition.preview', { owner_id: scope }).then(r => alive && setDocument(r)).catch(e => alive && setError(e.message)); return () => { alive = false; }; }, [scope, p.state]); async function exportTo(format) { setBusy(true); try {
     const r = await (0, api_1.runCommand)(p.state.project.id, format === 'bundle' ? 'export.bundle' : 'export.board', { owner_id: scope, ...(format === 'bundle' ? { include_media: true } : { format, approved_only: approved }) });
     p.setResult(r);
@@ -1943,7 +2020,7 @@ catch (e) {
 finally {
     setBusy(false);
 } } return react_1.default.createElement(react_1.default.Fragment, null,
-    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Boards & exports", title: "Turn the outline into a board.", description: "Review the story guidance and chosen images, then create a board or a package to share." }),
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Boards & exports", title: "Turn the outline into a board.", description: "Review the story direction and chosen images, then create a board or a package to share." }),
     react_1.default.createElement("div", { className: "composition-toolbar" },
         react_1.default.createElement(ScopeSelect, { state: p.state, value: scope, onChange: setScope }),
         react_1.default.createElement("label", { className: "inline-check" },
@@ -1952,7 +2029,7 @@ finally {
         react_1.default.createElement("div", { className: "button-row" },
             react_1.default.createElement("button", { className: "primary", disabled: busy || !document?.valid, onClick: () => exportTo('bundle') }, "Download project package"),
             react_1.default.createElement("button", { disabled: busy || !document?.valid, onClick: () => exportTo('all') }, "Export HTML + PDF + PNG")),
-        busy && react_1.default.createElement("p", { role: "status" }, "Writing and checking export files\u2026")),
+        busy && react_1.default.createElement("p", { role: "status" }, "Preparing your files\u2026")),
     error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
     " ",
     p.result && react_1.default.createElement(Primitives_1.ExportLinks, { project: p.state.project.id, result: p.result }),
@@ -1960,7 +2037,7 @@ finally {
     document && react_1.default.createElement(react_1.default.Fragment, null,
         react_1.default.createElement(Primitives_1.Validation, { issues: document.validation }),
         react_1.default.createElement("details", { className: "context-preview" },
-            react_1.default.createElement("summary", null, "Story guidance"),
+            react_1.default.createElement("summary", null, "Story direction"),
             react_1.default.createElement(Primitives_1.ContextView, { value: document.context })),
         react_1.default.createElement("div", { className: "presentation-board" },
             react_1.default.createElement("header", null,
@@ -1977,11 +2054,11 @@ finally {
                         (0, utils_1.displayTitle)(scene.sequence.title),
                         " / ",
                         (0, utils_1.displayTitle)(scene.title)),
-                    react_1.default.createElement("button", { onClick: () => p.select(scene.id) }, "Inspect scene")),
+                    react_1.default.createElement("button", { onClick: () => p.select(scene.id) }, "Scene details")),
                 react_1.default.createElement("div", { className: "board-panels" }, scene.shots.map(shot => { const preferred = shot.frames.find(f => f.state === 'approved') || (!approved ? shot.frames.find(f => f.state === 'selected') : null); const image = preferred?.media_id || shot.assignments.find(a => a.media_id)?.media_id; return react_1.default.createElement("article", { className: "board-panel", key: shot.id },
                     react_1.default.createElement("div", { className: "board-image" },
-                        image ? react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(p.state.project.id, image, 960), alt: `${(0, utils_1.displayTitle)(shot.title)}: ${preferred ? 'storyboard frame' : 'source reference'}` }) : react_1.default.createElement("span", null, "No image selected"),
-                        react_1.default.createElement("span", null, preferred ? `${(0, utils_1.human)(preferred.state)} storyboard image · ${preferred.version}` : image ? 'Reference image' : 'No image')),
+                        image ? react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(p.state.project.id, image, 960), alt: `${(0, utils_1.displayTitle)(shot.title)}: ${preferred ? 'storyboard frame' : 'source reference'}` }) : react_1.default.createElement("span", null, "No storyboard image yet"),
+                        react_1.default.createElement("span", null, preferred ? `${(0, utils_1.human)(preferred.state)} storyboard image · ${preferred.version}` : image ? 'Reference image' : 'No storyboard image yet')),
                     react_1.default.createElement("div", { className: "board-shot-title" },
                         react_1.default.createElement("span", null, shot.fields.number || String(shot.position + 1).padStart(2, '0')),
                         react_1.default.createElement("h4", null, (0, utils_1.displayTitle)(shot.title))),
@@ -1999,10 +2076,9 @@ finally {
                         react_1.default.createElement("small", null, (0, utils_1.human)(a.role))))),
                     react_1.default.createElement("div", { className: "button-row" },
                         react_1.default.createElement("button", { onClick: () => p.action('shot.update', (0, utils_1.commandDefaults)(shot)) }, "Edit shot"),
-                        react_1.default.createElement("button", { onClick: () => p.action('context.resolve', { owner_id: shot.id }) }, "View guidance"))); })),
+                        react_1.default.createElement("button", { onClick: () => p.action('context.resolve', { owner_id: shot.id }) }, "View story direction"))); })),
                 !scene.shots.length && react_1.default.createElement("p", { className: "muted" }, "No shots in this scene yet."))),
-            !document.scenes.length && react_1.default.createElement(Primitives_1.Empty, { title: "No scenes to compose" }, "Build a sequence, scene, and shot in the story outline.")))); }
-exports.CompositionPage = CompositionPage;
+            !document.scenes.length && react_1.default.createElement(Primitives_1.Empty, { title: "Start your storyboard with a scene" }, "Create a sequence, then add scenes and shots in the Story outline.")))); }
 function SettingsPage(p) { const [health, setHealth] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false), [backup, setBackup] = (0, react_1.useState)(null), [restoreSlug, setRestoreSlug] = (0, react_1.useState)('restored-project'), [restoreFile, setRestoreFile] = (0, react_1.useState)(null), [confirmed, setConfirmed] = (0, react_1.useState)(false); async function check(hashes = false) { setBusy(true); try {
     setHealth(await (0, api_1.runCommand)(p.state.project.id, 'project.doctor', { hashes }));
     setError('');
@@ -2036,7 +2112,7 @@ catch (e) {
 finally {
     setBusy(false);
 } } return react_1.default.createElement(react_1.default.Fragment, null,
-    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Project care", title: "Keep the work dependable.", description: "Check project files, rebuild image previews, and make a backup you can restore later.", actions: react_1.default.createElement("button", { onClick: () => p.action('project.update', (0, utils_1.commandDefaults)(p.state.project)) }, "Edit project settings") }),
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Project care", title: "Keep the work dependable.", description: "Check project files, rebuild image previews, and make a backup you can restore later.", actions: react_1.default.createElement("button", { onClick: () => p.action('project.update', (0, utils_1.commandDefaults)(p.state.project)) }, "Edit project details") }),
     error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
     react_1.default.createElement("div", { className: "settings-grid" },
         react_1.default.createElement("section", null,
@@ -2068,7 +2144,7 @@ finally {
                     " media files checked"),
                 react_1.default.createElement(Primitives_1.Validation, { issues: health.issues }),
                 react_1.default.createElement("details", null,
-                    react_1.default.createElement("summary", null, "Project update history"),
+                    react_1.default.createElement("summary", null, "Technical details \u00B7 project updates"),
                     react_1.default.createElement("pre", null, JSON.stringify(health.migrations, null, 2)))),
             react_1.default.createElement("div", { className: "section-heading" },
                 react_1.default.createElement("h2", null, "Image previews")),
@@ -2106,9 +2182,8 @@ finally {
                     react_1.default.createElement("strong", null, e.title),
                     react_1.default.createElement("small", null, (0, utils_1.kindLabel)(e))),
                 react_1.default.createElement("button", { onClick: () => p.action('entity.restore', (0, utils_1.commandDefaults)(e)) }, "Restore item"),
-                react_1.default.createElement("button", { onClick: () => p.select(e.id) }, "Inspect"))),
+                react_1.default.createElement("button", { onClick: () => p.select(e.id) }, "Details"))),
             !p.state.entities.some(e => e.archived) && react_1.default.createElement("p", { className: "muted" }, "No archived items.")))); }
-exports.SettingsPage = SettingsPage;
 function AutomationPage(p) { const [selected, setSelected] = (0, react_1.useState)(null), [preview, setPreview] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''); (0, react_1.useEffect)(() => { let alive = true; if (selected)
     (0, api_1.api)((0, api_1.projectPath)(p.state.project.id, `/jobs/${selected}/preview`)).then(r => alive && setPreview(r)).catch(e => alive && setError(e.message)); return () => { alive = false; }; }, [selected, p.state]); const job = selected ? p.state.jobs.find(j => j.id === selected) : null; return react_1.default.createElement(react_1.default.Fragment, null,
     react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Image tools", title: "Create images with your tools.", description: "Choose story details and reference images, then review the results before adding them to your project.", actions: react_1.default.createElement("button", { className: "primary", onClick: () => p.action('job.create'), disabled: !p.meta.scripts.length }, "Prepare image request") }),
@@ -2126,8 +2201,10 @@ function AutomationPage(p) { const [selected, setSelected] = (0, react_1.useStat
                 " seconds")))) : react_1.default.createElement("div", { className: "empty compact" },
             react_1.default.createElement("h3", null, "No image tools available"),
             react_1.default.createElement("p", null, "Add a trusted image tool to use it here. You can create and organize the rest of your project without one."),
-            react_1.default.createElement("p", null, "Connect a tool by registering its command in the Storyboarder CLI:"),
-            react_1.default.createElement("code", null, "storyboarder script register sample --command '[\"/absolute/path/to/python\", \"/absolute/path/to/sample_adapter.py\"]'"))),
+            react_1.default.createElement("details", null,
+                react_1.default.createElement("summary", null, "Advanced setup"),
+                react_1.default.createElement("p", null, "Connect a compatible image tool by registering its command with the Storyboarder CLI."),
+                react_1.default.createElement("code", null, "storyboarder script register sample --command '[\"/path/to/python\", \"/path/to/image_tool.py\"]'")))),
     react_1.default.createElement("div", { className: "automation-columns" },
         react_1.default.createElement("section", null,
             react_1.default.createElement("h2", null, "Recent activity"),
@@ -2158,7 +2235,7 @@ function AutomationPage(p) { const [selected, setSelected] = (0, react_1.useStat
                     o.width,
                     " \u00D7 ",
                     o.height)))),
-            react_1.default.createElement("details", { open: true },
+            react_1.default.createElement("details", null,
                 react_1.default.createElement("summary", null, "Technical details \u00B7 run log"),
                 react_1.default.createElement("pre", null, typeof preview.logs === 'string' ? preview.logs : JSON.stringify(preview.logs || preview.log || {}, null, 2))),
             react_1.default.createElement("details", null,
@@ -2167,7 +2244,6 @@ function AutomationPage(p) { const [selected, setSelected] = (0, react_1.useStat
             react_1.default.createElement("details", null,
                 react_1.default.createElement("summary", null, "Technical details \u00B7 tool results"),
                 react_1.default.createElement("pre", null, JSON.stringify(job.result, null, 2)))) : react_1.default.createElement(Primitives_1.Empty, { title: "Choose an image request" }, "Review its images and notes before adding the results to the project.")))); }
-exports.AutomationPage = AutomationPage;
 
 },
 "react":function(require,module,exports){
@@ -2193,16 +2269,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 "utils":function(require,module,exports){
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.selectOptions = exports.commandDefaults = exports.allRecords = exports.activeEntities = exports.kindLabel = exports.niceDate = exports.fieldText = exports.shortId = exports.sourceLabel = exports.operationLabel = exports.roleLabel = exports.statusLabel = exports.fieldLabel = exports.displayTitle = exports.human = void 0;
+exports.activeEntities = exports.kindLabel = exports.niceDate = exports.fieldText = exports.shortId = exports.sourceLabel = exports.operationLabel = exports.roleLabel = exports.statusLabel = exports.emptySourceMessage = exports.fieldLabel = exports.displayTitle = exports.human = void 0;
+exports.allRecords = allRecords;
+exports.commandDefaults = commandDefaults;
+exports.selectOptions = selectOptions;
 const labels = {
-    asset: 'Library item', context: 'Guidance', location_id: 'Location', visual_style: 'Visual style', premise: 'Story premise',
+    asset: 'Library item', context: 'Story direction', scene: 'Scene', location_id: 'Location', visual_style: 'Visual style', premise: 'Story premise',
     arc: 'Sequence direction', tone: 'Tone', framing: 'Framing', camera: 'Camera plan', time: 'Time of day',
-    constraints: 'Production notes', owner_id: 'Apply guidance to', key: 'Topic', content: 'Direction notes',
-    operation: 'How this changes earlier guidance', revision: 'Version check', target_revision: 'Version check',
+    constraints: 'Production notes', owner_id: 'Apply direction to', key: 'Topic', content: 'Direction notes',
+    operation: 'How this changes earlier direction', revision: 'Version check', target_revision: 'Version check',
     parent_id: 'Place under', position: 'Order', shot_id: 'Shot', asset_id: 'Library item', media_id: 'Image',
     accepted: 'Added', discarded: 'Removed from intake', pending: 'Needs review', running: 'In progress', succeeded: 'Complete', failed: 'Needs attention', cancelled: 'Stopped',
     selected: 'Selected', approved: 'Approved', archived: 'Archived', queued: 'Ready to run', draft: 'Draft',
-    append: 'Add alongside earlier guidance', replace: 'Replace earlier guidance', exclude: 'Turn off guidance above',
+    append: 'Add to earlier notes', replace: 'Replace earlier notes', exclude: 'Hide earlier notes here',
+    order: 'Story order', relationship: 'Library connection', assignment: 'Shot reference', location_default: 'Default location',
+    story: 'Story flow', assets: 'Reference map', frame: 'Storyboard image', record: 'Item',
     character: 'Character', location: 'Location', prop: 'Prop', reference: 'General reference',
     'same-person-as': 'Same person as', 'appears-at': 'Appears at', 'alternate-view-of': 'Alternate view of',
     'setting-reference': 'Location reference', 'part-of': 'Part of', 'inspired-by': 'Inspired by', 'related-to': 'Related to', 'wears': 'Wears',
@@ -2215,11 +2296,24 @@ const displayTitle = (value) => /^[A-Z0-9]+(?:_[A-Z0-9]+)+$/.test(value) ? value
 exports.displayTitle = displayTitle;
 const fieldLabel = (name, fallback) => labels[name] || fallback || (0, exports.human)(name);
 exports.fieldLabel = fieldLabel;
+const emptySourceMessage = (source) => ({
+    assets: 'No library items to choose from yet. Create one first.',
+    sequences: 'No sequences to choose from yet. Create one first.',
+    scenes: 'No scenes to choose from yet. Create one first.',
+    shots: 'No shots to choose from yet. Create one first.',
+    locations: 'No locations to choose from yet. Add one to the reference library first.',
+    media: 'No project images yet. Import an image first.',
+    asset_images: 'No images in this library item yet. Add one first.',
+    story: 'No story levels to choose from yet. Create a sequence, scene, or shot first.',
+    parents: 'No suitable place to add this yet. Create a sequence or scene first.',
+    scripts: 'No image tools are connected yet. Use the Storyboarder CLI to add a trusted tool.',
+}[source] || 'Nothing to choose from yet. Add the item first.');
+exports.emptySourceMessage = emptySourceMessage;
 const statusLabel = (value) => (0, exports.human)(value);
 exports.statusLabel = statusLabel;
 const roleLabel = (value) => ({ subject: 'Subject', 'setting-reference': 'Location', costume: 'Wardrobe', prop: 'Prop', reference: 'General reference' }[value] || (0, exports.human)(value));
 exports.roleLabel = roleLabel;
-const operationLabel = (value) => ({ append: 'Added here', replace: 'Replaces earlier guidance', exclude: 'Turned off here' }[value] || (0, exports.human)(value));
+const operationLabel = (value) => ({ append: 'Added here', replace: 'Earlier direction replaced here', exclude: 'Earlier direction hidden here' }[value] || (0, exports.human)(value));
 exports.operationLabel = operationLabel;
 const sourceLabel = (kind) => ({ project: 'Project', sequence: 'Sequence', scene: 'Scene', shot: 'Shot', asset: 'Library item' }[kind] || (0, exports.human)(kind));
 exports.sourceLabel = sourceLabel;
@@ -2234,13 +2328,11 @@ exports.kindLabel = kindLabel;
 const activeEntities = (state, kind) => state.entities.filter(e => !e.archived && (!kind || e.kind === kind));
 exports.activeEntities = activeEntities;
 function allRecords(state) { return [...state.entities, ...state.media, ...state.intake, ...state.asset_media, ...state.links, ...state.assignments, ...state.context_blocks, ...state.frames, ...state.layouts, ...state.jobs]; }
-exports.allRecords = allRecords;
 function commandDefaults(entity) {
     if (!entity)
         return {};
     return { ...entity, ...(entity.fields || {}), id: entity.id, revision: entity.revision, ...(entity.kind && entity.kind !== 'asset' ? { owner_id: entity.id } : {}), ...(entity.kind === 'shot' ? { shot_id: entity.id } : {}), ...(entity.kind === 'asset' ? { asset_id: entity.id, source_id: entity.id } : {}), ...(entity.key ? { content: entity.text } : {}), tags: entity.tags || [], aliases: entity.aliases || [] };
 }
-exports.commandDefaults = commandDefaults;
 function selectOptions(field, state, meta, values) {
     if (field.options.length)
         return field.options.map(o => ({ value: o, label: (0, exports.human)(o) }));
@@ -2281,7 +2373,6 @@ function selectOptions(field, state, meta, values) {
         return { value: r.id, label };
     });
 }
-exports.selectOptions = selectOptions;
 
 }};
 const cache={};function load(id){if(cache[id])return cache[id].exports;if(!modules[id])throw Error('Missing app module '+id);const m=cache[id]={exports:{}};function req(relative){const parts=id.split('/');parts.pop();for(const p of relative.split('/')){if(p==='.'||!p)continue;if(p==='..')parts.pop();else parts.push(p)}return load(parts.join('/').replace(/\.js$/,''));}modules[id](req,m,m.exports);return m.exports;}load('main');})();

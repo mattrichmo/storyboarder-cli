@@ -1,9 +1,9 @@
 {
   "appVersion": "1.0.0",
-  "typescript": "5.4.5",
+  "typescript": "5.8.3",
   "react": "18.2.0",
-  "entry": "assets/app-5355f2b44308.js",
+  "entry": "assets/app-053735e32d15.js",
   "style": "assets/app-80fe8c072097.css",
-  "sha256": "5355f2b44308e51780c1dfa0356c7cf92b6f7fbf26b2cb2afd9ba95d41b89fdb",
+  "sha256": "053735e32d15617ebab5e2f7b0ef19a87be3c2bf18502366b11673713cc3b01c",
   "style_sha256": "80fe8c072097bcbb45c80a04e7310b8a5c8f3b9d6893d1477652caf5e2a62dce"
 }
