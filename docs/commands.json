@@ -3,7 +3,7 @@
   "commands": [
     {
       "name": "asset.create",
-      "label": "New asset",
+      "label": "New library item",
       "fields": [
         {
           "name": "title",
@@ -37,7 +37,7 @@
         },
         {
           "name": "type",
-          "label": "Asset type",
+          "label": "Item type",
           "type": "select",
           "required": false,
           "options": [
@@ -78,11 +78,11 @@
     },
     {
       "name": "asset.update",
-      "label": "Edit asset",
+      "label": "Edit library item",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Library item",
           "type": "text",
           "required": true,
           "options": [],
@@ -92,12 +92,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
@@ -132,7 +132,7 @@
         },
         {
           "name": "type",
-          "label": "Asset type",
+          "label": "Item type",
           "type": "select",
           "required": false,
           "options": [
@@ -173,7 +173,7 @@
     },
     {
       "name": "asset.list",
-      "label": "List assets",
+      "label": "Find library items",
       "fields": [
         {
           "name": "query",
@@ -197,7 +197,7 @@
         },
         {
           "name": "asset_type",
-          "label": "Asset Type",
+          "label": "Item type",
           "type": "text",
           "required": false,
           "options": [
@@ -212,7 +212,7 @@
         },
         {
           "name": "parent_id",
-          "label": "Parent Id",
+          "label": "Place under",
           "type": "text",
           "required": false,
           "options": [],
@@ -222,7 +222,7 @@
         },
         {
           "name": "archived",
-          "label": "Archived",
+          "label": "Include archived",
           "type": "boolean",
           "required": false,
           "options": [],
@@ -232,7 +232,7 @@
         },
         {
           "name": "limit",
-          "label": "Limit",
+          "label": "Maximum results",
           "type": "integer",
           "required": false,
           "options": [],
@@ -242,7 +242,7 @@
         },
         {
           "name": "offset",
-          "label": "Offset",
+          "label": "Start at",
           "type": "integer",
           "required": false,
           "options": [],
@@ -258,11 +258,11 @@
     },
     {
       "name": "asset.show",
-      "label": "Show asset",
+      "label": "View library item details",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Library item",
           "type": "text",
           "required": true,
           "options": [],
@@ -312,12 +312,12 @@
         },
         {
           "name": "location_id",
-          "label": "Location default / override",
+          "label": "Location",
           "type": "text",
           "required": false,
           "options": [],
           "source": "locations",
-          "help": "Blank inherits from the parent scope.",
+          "help": "Leave blank to use the location set higher in the story.",
           "default": null
         },
         {
@@ -392,7 +392,7 @@
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -402,12 +402,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
@@ -442,12 +442,12 @@
         },
         {
           "name": "location_id",
-          "label": "Location default / override",
+          "label": "Location",
           "type": "text",
           "required": false,
           "options": [],
           "source": "locations",
-          "help": "Blank inherits from the parent scope.",
+          "help": "Leave blank to use the location set higher in the story.",
           "default": null
         },
         {
@@ -518,7 +518,7 @@
     },
     {
       "name": "sequence.list",
-      "label": "List sequences",
+      "label": "Find sequences",
       "fields": [
         {
           "name": "query",
@@ -542,7 +542,7 @@
         },
         {
           "name": "asset_type",
-          "label": "Asset Type",
+          "label": "Item type",
           "type": "text",
           "required": false,
           "options": [
@@ -557,7 +557,7 @@
         },
         {
           "name": "parent_id",
-          "label": "Parent Id",
+          "label": "Place under",
           "type": "text",
           "required": false,
           "options": [],
@@ -567,7 +567,7 @@
         },
         {
           "name": "archived",
-          "label": "Archived",
+          "label": "Include archived",
           "type": "boolean",
           "required": false,
           "options": [],
@@ -577,7 +577,7 @@
         },
         {
           "name": "limit",
-          "label": "Limit",
+          "label": "Maximum results",
           "type": "integer",
           "required": false,
           "options": [],
@@ -587,7 +587,7 @@
         },
         {
           "name": "offset",
-          "label": "Offset",
+          "label": "Start at",
           "type": "integer",
           "required": false,
           "options": [],
@@ -603,11 +603,11 @@
     },
     {
       "name": "sequence.show",
-      "label": "Show sequence",
+      "label": "View sequence details",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -667,12 +667,12 @@
         },
         {
           "name": "location_id",
-          "label": "Location default / override",
+          "label": "Location",
           "type": "text",
           "required": false,
           "options": [],
           "source": "locations",
-          "help": "Blank inherits from the parent scope.",
+          "help": "Leave blank to use the location set higher in the story.",
           "default": null
         },
         {
@@ -747,7 +747,7 @@
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -757,12 +757,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
@@ -797,12 +797,12 @@
         },
         {
           "name": "location_id",
-          "label": "Location default / override",
+          "label": "Location",
           "type": "text",
           "required": false,
           "options": [],
           "source": "locations",
-          "help": "Blank inherits from the parent scope.",
+          "help": "Leave blank to use the location set higher in the story.",
           "default": null
         },
         {
@@ -873,7 +873,7 @@
     },
     {
       "name": "scene.list",
-      "label": "List scenes",
+      "label": "Find scenes",
       "fields": [
         {
           "name": "query",
@@ -897,7 +897,7 @@
         },
         {
           "name": "asset_type",
-          "label": "Asset Type",
+          "label": "Item type",
           "type": "text",
           "required": false,
           "options": [
@@ -912,7 +912,7 @@
         },
         {
           "name": "parent_id",
-          "label": "Parent Id",
+          "label": "Place under",
           "type": "text",
           "required": false,
           "options": [],
@@ -922,7 +922,7 @@
         },
         {
           "name": "archived",
-          "label": "Archived",
+          "label": "Include archived",
           "type": "boolean",
           "required": false,
           "options": [],
@@ -932,7 +932,7 @@
         },
         {
           "name": "limit",
-          "label": "Limit",
+          "label": "Maximum results",
           "type": "integer",
           "required": false,
           "options": [],
@@ -942,7 +942,7 @@
         },
         {
           "name": "offset",
-          "label": "Offset",
+          "label": "Start at",
           "type": "integer",
           "required": false,
           "options": [],
@@ -958,11 +958,11 @@
     },
     {
       "name": "scene.show",
-      "label": "Show scene",
+      "label": "View scene details",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1022,12 +1022,12 @@
         },
         {
           "name": "location_id",
-          "label": "Location default / override",
+          "label": "Location",
           "type": "text",
           "required": false,
           "options": [],
           "source": "locations",
-          "help": "Blank inherits from the parent scope.",
+          "help": "Leave blank to use the location set higher in the story.",
           "default": null
         },
         {
@@ -1132,7 +1132,7 @@
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1142,12 +1142,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
@@ -1182,12 +1182,12 @@
         },
         {
           "name": "location_id",
-          "label": "Location default / override",
+          "label": "Location",
           "type": "text",
           "required": false,
           "options": [],
           "source": "locations",
-          "help": "Blank inherits from the parent scope.",
+          "help": "Leave blank to use the location set higher in the story.",
           "default": null
         },
         {
@@ -1288,7 +1288,7 @@
     },
     {
       "name": "shot.list",
-      "label": "List shots",
+      "label": "Find shots",
       "fields": [
         {
           "name": "query",
@@ -1312,7 +1312,7 @@
         },
         {
           "name": "asset_type",
-          "label": "Asset Type",
+          "label": "Item type",
           "type": "text",
           "required": false,
           "options": [
@@ -1327,7 +1327,7 @@
         },
         {
           "name": "parent_id",
-          "label": "Parent Id",
+          "label": "Place under",
           "type": "text",
           "required": false,
           "options": [],
@@ -1337,7 +1337,7 @@
         },
         {
           "name": "archived",
-          "label": "Archived",
+          "label": "Include archived",
           "type": "boolean",
           "required": false,
           "options": [],
@@ -1347,7 +1347,7 @@
         },
         {
           "name": "limit",
-          "label": "Limit",
+          "label": "Maximum results",
           "type": "integer",
           "required": false,
           "options": [],
@@ -1357,7 +1357,7 @@
         },
         {
           "name": "offset",
-          "label": "Offset",
+          "label": "Start at",
           "type": "integer",
           "required": false,
           "options": [],
@@ -1373,11 +1373,11 @@
     },
     {
       "name": "shot.show",
-      "label": "Show shot",
+      "label": "View shot details",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1393,11 +1393,11 @@
     },
     {
       "name": "project.update",
-      "label": "Edit project guide",
+      "label": "Edit project direction",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1407,12 +1407,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
@@ -1447,12 +1447,12 @@
         },
         {
           "name": "location_id",
-          "label": "Location default / override",
+          "label": "Location",
           "type": "text",
           "required": false,
           "options": [],
           "source": "locations",
-          "help": "Blank inherits from the parent scope.",
+          "help": "Leave blank to use the location set higher in the story.",
           "default": null
         },
         {
@@ -1523,11 +1523,11 @@
     },
     {
       "name": "entity.update",
-      "label": "Apply structured authoring changes",
+      "label": "Edit item details",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1537,12 +1537,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
@@ -1563,11 +1563,11 @@
     },
     {
       "name": "entity.usage",
-      "label": "Inspect record references",
+      "label": "See where an item is used",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1583,11 +1583,11 @@
     },
     {
       "name": "entity.archive",
-      "label": "Archive record",
+      "label": "Archive item",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1597,12 +1597,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         }
       ],
@@ -1613,11 +1613,11 @@
     },
     {
       "name": "entity.restore",
-      "label": "Restore record",
+      "label": "Restore item",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1627,12 +1627,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         }
       ],
@@ -1643,11 +1643,11 @@
     },
     {
       "name": "entity.delete",
-      "label": "Delete record",
+      "label": "Delete item",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1657,12 +1657,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         }
       ],
@@ -1673,11 +1673,11 @@
     },
     {
       "name": "story.move",
-      "label": "Move / reorder story record",
+      "label": "Move or reorder a story item",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Story item",
           "type": "text",
           "required": true,
           "options": [],
@@ -1687,17 +1687,17 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
           "name": "position",
-          "label": "New position (zero-based)",
+          "label": "New position",
           "type": "integer",
           "required": true,
           "options": [],
@@ -1707,7 +1707,7 @@
         },
         {
           "name": "parent_id",
-          "label": "New parent (optional)",
+          "label": "Place under (optional)",
           "type": "text",
           "required": false,
           "options": [],
@@ -1717,6 +1717,492 @@
         }
       ],
       "page": "outline",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "project.doctor",
+      "label": "Check project health",
+      "fields": [
+        {
+          "name": "hashes",
+          "label": "Check image contents",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "settings",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "project.backup",
+      "label": "Back up project",
+      "fields": [],
+      "page": "settings",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "project.sync",
+      "label": "Update project title",
+      "fields": [],
+      "page": "settings",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "link.remove",
+      "label": "Remove connection",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Connection",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "links",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "assignment.remove",
+      "label": "Remove shot reference",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Shot reference",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assignments",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "context.remove",
+      "label": "Remove direction note",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Direction note",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "context_blocks",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "frame.remove",
+      "label": "Remove storyboard image",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Storyboard image",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "frames",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "canvas.remove",
+      "label": "Remove saved layout",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Saved arrangement",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "layouts",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.attach",
+      "label": "Add image to library item",
+      "fields": [
+        {
+          "name": "asset_id",
+          "label": "Library item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "media_id",
+          "label": "Image",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "media",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.primary",
+      "label": "Set cover image",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Library image",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "asset_media",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.detach",
+      "label": "Remove image from library item",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Library image",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "asset_media",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "asset.merge",
+      "label": "Combine library items",
+      "fields": [
+        {
+          "name": "source_id",
+          "label": "Item to combine",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        },
+        {
+          "name": "target_id",
+          "label": "Keep this item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target_revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "library",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "link.create",
+      "label": "Connect library items",
+      "fields": [
+        {
+          "name": "source_id",
+          "label": "First item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target_id",
+          "label": "Second item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "relation",
+          "label": "How they are connected",
+          "type": "select",
+          "required": true,
+          "options": [
+            "appears-at",
+            "alternate-view-of",
+            "wears",
+            "part-of",
+            "related-to"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "connections",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "assignment.create",
+      "label": "Use a reference in a shot",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "asset_id",
+          "label": "Library item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assets",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "role",
+          "label": "How it appears in the shot",
+          "type": "select",
+          "required": true,
+          "options": [
+            "subject",
+            "setting-reference",
+            "costume",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": "reference"
+        },
+        {
+          "name": "media_id",
+          "label": "Choose a specific image (optional)",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "asset_images",
+          "help": "Choose an image from this library item. Leave blank if any of its images may be used.",
+          "default": null
+        }
+      ],
+      "page": "editor",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "assignment.update",
+      "label": "Edit shot reference",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Shot reference",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "assignments",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        },
+        {
+          "name": "role",
+          "label": "How it appears in the shot",
+          "type": "select",
+          "required": true,
+          "options": [
+            "subject",
+            "setting-reference",
+            "costume",
+            "prop",
+            "reference"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "media_id",
+          "label": "Choose a specific image",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "asset_images",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "editor",
       "destructive": false,
       "browser": true,
       "read_only": false
@@ -1753,11 +2239,11 @@
     },
     {
       "name": "media.tags",
-      "label": "Tag media",
+      "label": "Edit image tags",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Image",
           "type": "text",
           "required": true,
           "options": [],
@@ -1767,12 +2253,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
@@ -1793,11 +2279,11 @@
     },
     {
       "name": "media.show",
-      "label": "Inspect media",
+      "label": "View image details",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Image",
           "type": "text",
           "required": true,
           "options": [],
@@ -1812,152 +2298,12 @@
       "read_only": true
     },
     {
-      "name": "asset.attach",
-      "label": "Attach managed reference",
-      "fields": [
-        {
-          "name": "asset_id",
-          "label": "Asset",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "assets",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "media_id",
-          "label": "Exact image",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "media",
-          "help": "",
-          "default": null
-        }
-      ],
-      "page": "library",
-      "destructive": false,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "asset.primary",
-      "label": "Use as primary reference",
-      "fields": [
-        {
-          "name": "id",
-          "label": "Media membership",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "asset_media",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        }
-      ],
-      "page": "library",
-      "destructive": false,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "asset.detach",
-      "label": "Detach reference",
-      "fields": [
-        {
-          "name": "id",
-          "label": "Media membership",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "asset_media",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        }
-      ],
-      "page": "library",
-      "destructive": true,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "asset.merge",
-      "label": "Merge assets",
-      "fields": [
-        {
-          "name": "source_id",
-          "label": "Source asset (will be archived)",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "assets",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        },
-        {
-          "name": "target_id",
-          "label": "Target asset",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "assets",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "target_revision",
-          "label": "Target revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "",
-          "default": null
-        }
-      ],
-      "page": "library",
-      "destructive": true,
-      "browser": true,
-      "read_only": false
-    },
-    {
       "name": "intake.accept",
-      "label": "Accept intake item",
+      "label": "Add image to library",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Imported image",
           "type": "text",
           "required": true,
           "options": [],
@@ -1967,17 +2313,17 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
           "name": "asset_id",
-          "label": "Attach to existing asset",
+          "label": "Add to an existing item",
           "type": "text",
           "required": false,
           "options": [],
@@ -1987,7 +2333,7 @@
         },
         {
           "name": "create_title",
-          "label": "Or create an asset with this title",
+          "label": "Or create a new item",
           "type": "text",
           "required": false,
           "options": [],
@@ -1997,7 +2343,7 @@
         },
         {
           "name": "create_type",
-          "label": "New asset type",
+          "label": "New item type",
           "type": "select",
           "required": false,
           "options": [
@@ -2028,11 +2374,11 @@
     },
     {
       "name": "intake.discard",
-      "label": "Discard intake item",
+      "label": "Remove image from intake",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Imported image",
           "type": "text",
           "required": true,
           "options": [],
@@ -2042,12 +2388,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         }
       ],
@@ -2057,170 +2403,12 @@
       "read_only": false
     },
     {
-      "name": "link.create",
-      "label": "Connect assets",
-      "fields": [
-        {
-          "name": "source_id",
-          "label": "Source asset",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "assets",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "target_id",
-          "label": "Target asset",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "assets",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "relation",
-          "label": "Relationship",
-          "type": "select",
-          "required": true,
-          "options": [
-            "appears-at",
-            "alternate-view-of",
-            "wears",
-            "part-of",
-            "related-to"
-          ],
-          "source": "",
-          "help": "",
-          "default": null
-        }
-      ],
-      "page": "connections",
-      "destructive": false,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "assignment.create",
-      "label": "Assign exact shot reference",
-      "fields": [
-        {
-          "name": "shot_id",
-          "label": "Shot",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "shots",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "asset_id",
-          "label": "Asset",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "assets",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "role",
-          "label": "Shot role",
-          "type": "select",
-          "required": true,
-          "options": [
-            "subject",
-            "setting-reference",
-            "costume",
-            "prop",
-            "reference"
-          ],
-          "source": "",
-          "help": "",
-          "default": "reference"
-        },
-        {
-          "name": "media_id",
-          "label": "Exact asset image (optional)",
-          "type": "text",
-          "required": false,
-          "options": [],
-          "source": "asset_images",
-          "help": "Must belong to the chosen asset. Blank preserves a semantic reference without silently selecting its primary image.",
-          "default": null
-        }
-      ],
-      "page": "editor",
-      "destructive": false,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "assignment.update",
-      "label": "Edit exact shot reference",
-      "fields": [
-        {
-          "name": "id",
-          "label": "Record",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "assignments",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        },
-        {
-          "name": "role",
-          "label": "Shot role",
-          "type": "select",
-          "required": true,
-          "options": [
-            "subject",
-            "setting-reference",
-            "costume",
-            "prop",
-            "reference"
-          ],
-          "source": "",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "media_id",
-          "label": "Exact asset image",
-          "type": "text",
-          "required": false,
-          "options": [],
-          "source": "asset_images",
-          "help": "",
-          "default": null
-        }
-      ],
-      "page": "editor",
-      "destructive": false,
-      "browser": true,
-      "read_only": false
-    },
-    {
       "name": "context.put",
-      "label": "Add / edit direction block",
+      "label": "Add or edit a direction note",
       "fields": [
         {
           "name": "owner_id",
-          "label": "Story scope",
+          "label": "Apply direction to",
           "type": "text",
           "required": true,
           "options": [],
@@ -2230,7 +2418,7 @@
         },
         {
           "name": "key",
-          "label": "Direction block name",
+          "label": "Topic",
           "type": "text",
           "required": true,
           "options": [],
@@ -2240,7 +2428,7 @@
         },
         {
           "name": "operation",
-          "label": "Inheritance rule",
+          "label": "How it changes earlier direction",
           "type": "select",
           "required": true,
           "options": [
@@ -2254,7 +2442,7 @@
         },
         {
           "name": "content",
-          "label": "Direction text",
+          "label": "Direction notes",
           "type": "textarea",
           "required": false,
           "options": [],
@@ -2264,7 +2452,7 @@
         },
         {
           "name": "revision",
-          "label": "Existing block revision (blank for new)",
+          "label": "Version check",
           "type": "integer",
           "required": false,
           "options": [],
@@ -2280,11 +2468,11 @@
     },
     {
       "name": "context.resolve",
-      "label": "Preview resolved context",
+      "label": "Preview story direction",
       "fields": [
         {
           "name": "owner_id",
-          "label": "Story scope",
+          "label": "Apply direction to",
           "type": "text",
           "required": true,
           "options": [],
@@ -2300,7 +2488,7 @@
     },
     {
       "name": "frame.add",
-      "label": "Attach frame image file",
+      "label": "Add storyboard image from file",
       "fields": [
         {
           "name": "shot_id",
@@ -2314,7 +2502,7 @@
         },
         {
           "name": "path",
-          "label": "Image file path",
+          "label": "Image file",
           "type": "text",
           "required": true,
           "options": [],
@@ -2340,7 +2528,7 @@
     },
     {
       "name": "frame.attach",
-      "label": "Attach managed frame candidate",
+      "label": "Use project image as storyboard frame",
       "fields": [
         {
           "name": "shot_id",
@@ -2380,11 +2568,11 @@
     },
     {
       "name": "frame.state",
-      "label": "Change frame state",
+      "label": "Update storyboard image status",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Storyboard image",
           "type": "text",
           "required": true,
           "options": [],
@@ -2394,17 +2582,17 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         },
         {
           "name": "state",
-          "label": "Frame state",
+          "label": "Status",
           "type": "select",
           "required": true,
           "options": [
@@ -2425,7 +2613,7 @@
     },
     {
       "name": "canvas.graph",
-      "label": "Read canvas graph",
+      "label": "View story connections",
       "fields": [
         {
           "name": "mode",
@@ -2453,7 +2641,7 @@
         },
         {
           "name": "asset_type",
-          "label": "Asset Type",
+          "label": "Item type",
           "type": "text",
           "required": false,
           "options": [
@@ -2478,8 +2666,8 @@
         },
         {
           "name": "relation",
-          "label": "Relation",
-          "type": "text",
+          "label": "Connection type",
+          "type": "select",
           "required": false,
           "options": [
             "appears-at",
@@ -2494,7 +2682,7 @@
         },
         {
           "name": "scene_id",
-          "label": "Scene Id",
+          "label": "Scene",
           "type": "text",
           "required": false,
           "options": [],
@@ -2504,7 +2692,7 @@
         },
         {
           "name": "sequence_id",
-          "label": "Sequence Id",
+          "label": "Sequence",
           "type": "text",
           "required": false,
           "options": [],
@@ -2514,7 +2702,7 @@
         },
         {
           "name": "limit",
-          "label": "Limit",
+          "label": "Maximum cards",
           "type": "integer",
           "required": false,
           "options": [],
@@ -2530,11 +2718,11 @@
     },
     {
       "name": "canvas.neighbors",
-      "label": "Explore neighbors",
+      "label": "See connected items",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Choose item",
           "type": "text",
           "required": true,
           "options": [],
@@ -2550,7 +2738,7 @@
     },
     {
       "name": "canvas.save",
-      "label": "Save named layout",
+      "label": "Save canvas arrangement",
       "fields": [
         {
           "name": "name",
@@ -2614,11 +2802,11 @@
     },
     {
       "name": "canvas.show",
-      "label": "Show named layout",
+      "label": "Show saved arrangement",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Saved arrangement",
           "type": "text",
           "required": true,
           "options": [],
@@ -2634,11 +2822,11 @@
     },
     {
       "name": "composition.preview",
-      "label": "Preview scene composition",
+      "label": "Preview storyboard",
       "fields": [
         {
           "name": "owner_id",
-          "label": "Story scope",
+          "label": "Apply direction to",
           "type": "text",
           "required": true,
           "options": [],
@@ -2654,11 +2842,11 @@
     },
     {
       "name": "export.bundle",
-      "label": "Export portable scene bundle",
+      "label": "Create project handoff package",
       "fields": [
         {
           "name": "owner_id",
-          "label": "Story scope",
+          "label": "Apply direction to",
           "type": "text",
           "required": true,
           "options": [],
@@ -2668,7 +2856,7 @@
         },
         {
           "name": "include_media",
-          "label": "Copy exact media into bundle",
+          "label": "Include reference images",
           "type": "boolean",
           "required": false,
           "options": [],
@@ -2684,11 +2872,11 @@
     },
     {
       "name": "export.board",
-      "label": "Export visual storyboard",
+      "label": "Export storyboard",
       "fields": [
         {
           "name": "owner_id",
-          "label": "Story scope",
+          "label": "Apply direction to",
           "type": "text",
           "required": true,
           "options": [],
@@ -2698,7 +2886,7 @@
         },
         {
           "name": "format",
-          "label": "Output format",
+          "label": "File format",
           "type": "select",
           "required": false,
           "options": [
@@ -2713,7 +2901,7 @@
         },
         {
           "name": "approved_only",
-          "label": "Only approved frame candidates (references still labelled)",
+          "label": "Use approved storyboard images only",
           "type": "boolean",
           "required": false,
           "options": [],
@@ -2728,37 +2916,8 @@
       "read_only": false
     },
     {
-      "name": "project.doctor",
-      "label": "Check project health",
-      "fields": [
-        {
-          "name": "hashes",
-          "label": "Verify all media hashes",
-          "type": "boolean",
-          "required": false,
-          "options": [],
-          "source": "",
-          "help": "",
-          "default": null
-        }
-      ],
-      "page": "settings",
-      "destructive": false,
-      "browser": true,
-      "read_only": true
-    },
-    {
-      "name": "project.backup",
-      "label": "Create full project backup",
-      "fields": [],
-      "page": "settings",
-      "destructive": false,
-      "browser": true,
-      "read_only": false
-    },
-    {
       "name": "cache.rebuild",
-      "label": "Rebuild thumbnail cache",
+      "label": "Rebuild image previews",
       "fields": [],
       "page": "settings",
       "destructive": false,
@@ -2767,16 +2926,7 @@
     },
     {
       "name": "cache.clear",
-      "label": "Clear rebuildable cache",
-      "fields": [],
-      "page": "settings",
-      "destructive": false,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "project.sync",
-      "label": "Rebuild manifest title hint",
+      "label": "Clear image previews",
       "fields": [],
       "page": "settings",
       "destructive": false,
@@ -2785,11 +2935,11 @@
     },
     {
       "name": "job.create",
-      "label": "Prepare external script request",
+      "label": "Prepare an image request",
       "fields": [
         {
           "name": "script",
-          "label": "Registered script",
+          "label": "Image tool",
           "type": "text",
           "required": true,
           "options": [],
@@ -2799,7 +2949,7 @@
         },
         {
           "name": "target",
-          "label": "Output type",
+          "label": "Create",
           "type": "select",
           "required": true,
           "options": [
@@ -2812,7 +2962,7 @@
         },
         {
           "name": "shot_id",
-          "label": "Shot / resolved context (required for frame)",
+          "label": "Shot (for a storyboard image)",
           "type": "text",
           "required": false,
           "options": [],
@@ -2822,7 +2972,7 @@
         },
         {
           "name": "title",
-          "label": "Requested output title",
+          "label": "Name for the result",
           "type": "text",
           "required": true,
           "options": [],
@@ -2832,7 +2982,7 @@
         },
         {
           "name": "asset_type",
-          "label": "Asset type",
+          "label": "Library item type",
           "type": "select",
           "required": false,
           "options": [
@@ -2847,7 +2997,7 @@
         },
         {
           "name": "prompt",
-          "label": "Explicit script instructions",
+          "label": "Instructions for the tool",
           "type": "textarea",
           "required": false,
           "options": [],
@@ -2863,11 +3013,11 @@
     },
     {
       "name": "job.run",
-      "label": "Launch registered script",
+      "label": "Run image tool",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Run",
           "type": "text",
           "required": true,
           "options": [],
@@ -2877,12 +3027,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         }
       ],
@@ -2893,11 +3043,11 @@
     },
     {
       "name": "job.cancel",
-      "label": "Cancel external job",
+      "label": "Stop image tool",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Run",
           "type": "text",
           "required": true,
           "options": [],
@@ -2907,12 +3057,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         }
       ],
@@ -2923,11 +3073,11 @@
     },
     {
       "name": "job.retry",
-      "label": "Queue explicit retry",
+      "label": "Run again",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Run",
           "type": "text",
           "required": true,
           "options": [],
@@ -2937,12 +3087,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         }
       ],
@@ -2953,11 +3103,11 @@
     },
     {
       "name": "job.approve",
-      "label": "Import reviewed outputs",
+      "label": "Add reviewed results to project",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Run",
           "type": "text",
           "required": true,
           "options": [],
@@ -2967,12 +3117,12 @@
         },
         {
           "name": "revision",
-          "label": "Record revision",
+          "label": "Version check",
           "type": "integer",
           "required": true,
           "options": [],
           "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
+          "help": "Keeps a newer edit from being overwritten.",
           "default": null
         }
       ],
@@ -2983,11 +3133,11 @@
     },
     {
       "name": "job.preview",
-      "label": "Review outputs and logs",
+      "label": "Review image tool results",
       "fields": [
         {
           "name": "id",
-          "label": "Record",
+          "label": "Image request",
           "type": "text",
           "required": true,
           "options": [],
@@ -3002,158 +3152,8 @@
       "read_only": true
     },
     {
-      "name": "link.remove",
-      "label": "Remove link",
-      "fields": [
-        {
-          "name": "id",
-          "label": "Record",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "links",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        }
-      ],
-      "page": "",
-      "destructive": true,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "assignment.remove",
-      "label": "Remove assignment",
-      "fields": [
-        {
-          "name": "id",
-          "label": "Record",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "assignments",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        }
-      ],
-      "page": "",
-      "destructive": true,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "context.remove",
-      "label": "Remove direction block",
-      "fields": [
-        {
-          "name": "id",
-          "label": "Record",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "context_blocks",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        }
-      ],
-      "page": "",
-      "destructive": true,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "frame.remove",
-      "label": "Remove frame",
-      "fields": [
-        {
-          "name": "id",
-          "label": "Record",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "frames",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        }
-      ],
-      "page": "",
-      "destructive": true,
-      "browser": true,
-      "read_only": false
-    },
-    {
-      "name": "canvas.remove",
-      "label": "Remove canvas",
-      "fields": [
-        {
-          "name": "id",
-          "label": "Record",
-          "type": "text",
-          "required": true,
-          "options": [],
-          "source": "layouts",
-          "help": "",
-          "default": null
-        },
-        {
-          "name": "revision",
-          "label": "Record revision",
-          "type": "integer",
-          "required": true,
-          "options": [],
-          "source": "",
-          "help": "Use the revision you last read. Stale updates return a conflict.",
-          "default": null
-        }
-      ],
-      "page": "",
-      "destructive": true,
-      "browser": true,
-      "read_only": false
-    },
-    {
       "name": "media.list",
-      "label": "List media",
+      "label": "List images",
       "fields": [],
       "page": "",
       "destructive": false,
@@ -3162,7 +3162,7 @@
     },
     {
       "name": "intake.list",
-      "label": "List intake",
+      "label": "List image intake",
       "fields": [
         {
           "name": "state",
@@ -3186,7 +3186,7 @@
     },
     {
       "name": "link.list",
-      "label": "List links",
+      "label": "List connections",
       "fields": [],
       "page": "",
       "destructive": false,
@@ -3195,7 +3195,7 @@
     },
     {
       "name": "assignment.list",
-      "label": "List assignments",
+      "label": "List shot references",
       "fields": [
         {
           "name": "shot_id",
@@ -3215,7 +3215,7 @@
     },
     {
       "name": "context.list",
-      "label": "List context blocks",
+      "label": "List direction notes",
       "fields": [
         {
           "name": "owner_id",
@@ -3235,7 +3235,7 @@
     },
     {
       "name": "frame.list",
-      "label": "List frames",
+      "label": "List storyboard images",
       "fields": [
         {
           "name": "shot_id",
@@ -3255,7 +3255,7 @@
     },
     {
       "name": "canvas.list",
-      "label": "List layouts",
+      "label": "List saved arrangements",
       "fields": [
         {
           "name": "mode",
@@ -3279,7 +3279,7 @@
     },
     {
       "name": "job.list",
-      "label": "List jobs",
+      "label": "List image requests",
       "fields": [
         {
           "name": "status",
@@ -3302,6 +3302,1195 @@
       "destructive": false,
       "browser": true,
       "read_only": true
+    },
+    {
+      "name": "document.import",
+      "label": "Import source document",
+      "fields": [
+        {
+          "name": "path",
+          "label": "Source file path",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "document_id",
+          "label": "Existing document",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Last-read document revision",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "label",
+          "label": "Draft label",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": "Imported draft"
+        },
+        {
+          "name": "dry_run",
+          "label": "Validate without importing",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        },
+        {
+          "name": "format",
+          "label": "Source format",
+          "type": "select",
+          "required": true,
+          "options": [
+            "screenjson",
+            "otio"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": false,
+      "read_only": false
+    },
+    {
+      "name": "screenplay.import",
+      "label": "Import screenplay",
+      "fields": [
+        {
+          "name": "path",
+          "label": "Source file path",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "document_id",
+          "label": "Existing document",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Last-read document revision",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "label",
+          "label": "Draft label",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": "Imported draft"
+        },
+        {
+          "name": "dry_run",
+          "label": "Validate without importing",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": false,
+      "read_only": false
+    },
+    {
+      "name": "screenplay.list",
+      "label": "List screenplay documents",
+      "fields": [
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "edit.import",
+      "label": "Import editorial cut",
+      "fields": [
+        {
+          "name": "path",
+          "label": "Source file path",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "document_id",
+          "label": "Existing document",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Last-read document revision",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "label",
+          "label": "Draft label",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": "Imported draft"
+        },
+        {
+          "name": "dry_run",
+          "label": "Validate without importing",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": false,
+      "read_only": false
+    },
+    {
+      "name": "edit.list",
+      "label": "List edit documents",
+      "fields": [
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.list",
+      "label": "Find source documents",
+      "fields": [
+        {
+          "name": "kind",
+          "label": "Kind",
+          "type": "text",
+          "required": false,
+          "options": [
+            "screenplay",
+            "edit"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "query",
+          "label": "Query",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "archived",
+          "label": "Archived",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.show",
+      "label": "Show source document",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Choose item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.versions",
+      "label": "List creative drafts",
+      "fields": [
+        {
+          "name": "document_id",
+          "label": "Document",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.tree",
+      "label": "Read source tree",
+      "fields": [
+        {
+          "name": "document_id",
+          "label": "Document",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Draft (blank for current)",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "query",
+          "label": "Query",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.children",
+      "label": "Read child elements",
+      "fields": [
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "parent_id",
+          "label": "Parent Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.node",
+      "label": "Read a source element",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Choose item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.validate",
+      "label": "Validate stored source",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Choose item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "entities",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Draft (blank for current)",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.revise",
+      "label": "Save source as a new draft",
+      "fields": [
+        {
+          "name": "node_id",
+          "label": "Source element",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "changes",
+          "label": "Authored changes",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        },
+        {
+          "name": "label",
+          "label": "Label",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": "Revised draft"
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "document.diff",
+      "label": "Compare creative drafts",
+      "fields": [
+        {
+          "name": "before_id",
+          "label": "Earlier draft",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "after_id",
+          "label": "Later draft",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "document.export",
+      "label": "Export a source draft",
+      "fields": [
+        {
+          "name": "document_id",
+          "label": "Document",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Draft (blank for current)",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "include_identities",
+          "label": "Add stable OTIO identities",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "document.archive",
+      "label": "Archive source document",
+      "fields": [
+        {
+          "name": "document_id",
+          "label": "Document",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "documents",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "document.restore",
+      "label": "Restore source document",
+      "fields": [
+        {
+          "name": "document_id",
+          "label": "Document",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "shot.link-source",
+      "label": "Link screenplay source",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "node_id",
+          "label": "Source element",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "shot.sources",
+      "label": "Inspect shot sources",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Choose item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "provenance.link",
+      "label": "Connect production provenance",
+      "fields": [
+        {
+          "name": "source_type",
+          "label": "Source type",
+          "type": "select",
+          "required": true,
+          "options": [
+            "node",
+            "entity",
+            "frame",
+            "media",
+            "job",
+            "version",
+            "artifact"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "source_id",
+          "label": "Source Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target_type",
+          "label": "Result type",
+          "type": "select",
+          "required": true,
+          "options": [
+            "node",
+            "entity",
+            "frame",
+            "media",
+            "job",
+            "version",
+            "artifact"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target_id",
+          "label": "Target Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "relation",
+          "label": "Relationship",
+          "type": "select",
+          "required": true,
+          "options": [
+            "visualizes",
+            "appears-in",
+            "uses-reference",
+            "derived-from",
+            "corresponds-to"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "notes",
+          "label": "Notes",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "provenance",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "provenance.trace",
+      "label": "Trace production lineage",
+      "fields": [
+        {
+          "name": "kind",
+          "label": "Item type",
+          "type": "select",
+          "required": true,
+          "options": [
+            "node",
+            "entity",
+            "frame",
+            "media",
+            "job",
+            "version",
+            "artifact"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "record_id",
+          "label": "Item",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "direction",
+          "label": "Direction",
+          "type": "select",
+          "required": false,
+          "options": [
+            "upstream",
+            "downstream",
+            "both"
+          ],
+          "source": "",
+          "help": "",
+          "default": "both"
+        },
+        {
+          "name": "depth",
+          "label": "Maximum depth",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 6
+        },
+        {
+          "name": "limit",
+          "label": "Maximum nodes",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        }
+      ],
+      "page": "provenance",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "provenance.retire",
+      "label": "Retire a source link",
+      "fields": [
+        {
+          "name": "edge_id",
+          "label": "Edge Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        }
+      ],
+      "page": "provenance",
+      "destructive": true,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "provenance.impact",
+      "label": "Review downstream draft impact",
+      "fields": [
+        {
+          "name": "before_id",
+          "label": "Before Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "after_id",
+          "label": "After Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 300
+        }
+      ],
+      "page": "provenance",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "coverage.report",
+      "label": "Review source and delivery coverage",
+      "fields": [
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "annotation.create",
+      "label": "Add a pinned review note",
+      "fields": [
+        {
+          "name": "endpoint_type",
+          "label": "Endpoint Type",
+          "type": "select",
+          "required": true,
+          "options": [
+            "node",
+            "entity",
+            "frame",
+            "media",
+            "job",
+            "version",
+            "artifact"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "endpoint_id",
+          "label": "Endpoint Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "content",
+          "label": "Review note",
+          "type": "textarea",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
+    },
+    {
+      "name": "annotation.list",
+      "label": "Read pinned notes",
+      "fields": [
+        {
+          "name": "kind",
+          "label": "Kind",
+          "type": "select",
+          "required": true,
+          "options": [
+            "node",
+            "entity",
+            "frame",
+            "media",
+            "job",
+            "version",
+            "artifact"
+          ],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "record_id",
+          "label": "Record Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": true,
+      "read_only": true
+    },
+    {
+      "name": "annotation.update",
+      "label": "Update review note",
+      "fields": [
+        {
+          "name": "annotation_id",
+          "label": "Annotation Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        },
+        {
+          "name": "content",
+          "label": "Content",
+          "type": "textarea",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "state",
+          "label": "State",
+          "type": "select",
+          "required": false,
+          "options": [
+            "open",
+            "resolved"
+          ],
+          "source": "",
+          "help": "",
+          "default": "open"
+        }
+      ],
+      "page": "documents",
+      "destructive": false,
+      "browser": true,
+      "read_only": false
     }
   ]
 }

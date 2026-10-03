@@ -1,7 +1,8 @@
 # Storyboarder v2 implementation ledger
 
-Source authority: GitHub `mattrichmo/storyboarder` at `7f58e26b25f52d6c6b6fa569730bd56a5ccb2365`.
-Working branch: `feat/provenance-workspace-v2`; main is unchanged.
+Repository: GitHub `mattrichmo/storyboarder`. The source-document and provenance
+checkpoint is now integrated into `main`; its original baseline was
+`7f58e26b25f52d6c6b6fa569730bd56a5ccb2365`.
 
 The previously reported v2 source was not retained. This is a new implementation. Historical screenshots and test reports are not evidence for these changes.
 
@@ -13,7 +14,15 @@ The previously reported v2 source was not retained. This is a new implementation
 
 ## Fresh verification
 
-Linux / Python 3.13.5: `PYTHONPATH=/mnt/data/storyboarder-repo/src python -m pytest -q` — **168 passed in 18.70 seconds**. This includes real subprocess CLI commands, FastAPI requests, genuine schema 1/2 upgrades, concurrent source edits, JSON round trips, pinned-generation lineage and backup connection closure. TypeScript 5.8.3 and ten geometry tests passed for the unchanged frontend before these backend additions. The current checkpoint has not yet completed remote platform verification.
+Verified on October 3, 2026 at integrated commit `7a7554a`:
+
+- Local macOS / Python 3.14.3: `python -m pytest -q` — **168 passed**. This includes real subprocess CLI commands, FastAPI requests, genuine schema 1/2 upgrades, concurrent source edits, JSON round trips, pinned-generation lineage and backup connection closure.
+- The frontend rebuilt with the pinned TypeScript 5.8.3 compiler; **10 canvas geometry tests passed**. The refreshed compiled client is committed.
+- Wheel and source-distribution packaging passed locally.
+- [GitHub verification](https://github.com/mattrichmo/storyboarder/actions/runs/37162789763) passed on Linux / Python 3.11, macOS / Python 3.12, and Windows / Python 3.13, including frontend builds, Python tests, geometry tests and packaging.
+
+The older screenshots and browser acceptance reports still describe the original
+authoring interface. They do not verify unfinished source-document interfaces.
 
 ## Remaining work
 
