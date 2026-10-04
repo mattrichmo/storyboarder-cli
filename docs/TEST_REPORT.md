@@ -1,5 +1,10 @@
 # Verification report — 28 September 2026
 
+This is a historical report of the 28 September 2026 verification run. It records
+that checkout's schema 2 and test results; this report has not been rerun or
+revalidated as part of later schema changes. See the current package schema
+version in `docs/PRODUCT_CONTRACT.md`.
+
 ## Executed results
 
 | Check | Observed result |

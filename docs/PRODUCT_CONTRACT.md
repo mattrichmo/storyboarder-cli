@@ -4,7 +4,7 @@ This document records implemented decisions, not a future build plan.
 
 ## Formats and identities
 
-App 1.0.0; project/workspace TOML format 1; SQLite schema 2; API `/api/v1`;
+App 1.0.0; project/workspace TOML format 1; SQLite schema 4; API `/api/v1`;
 scene export `storyboarder.export/v1`; script request `storyboarder.job/v1`;
 script result `storyboarder.result/v1`; trusted registry `storyboarder.scripts/v1`.
 UUID4 strings are immutable record IDs. Renames/reorders do not replace IDs.

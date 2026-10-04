@@ -28,6 +28,11 @@ actions show a confirmation. Reorder uses an explicit parent/position form. Conn
 rows traverse canonical neighbors; story rows show compact hierarchy/shot data.
 2D pointer dragging is intentionally a browser interaction, not a hidden TUI graph.
 
+Source actions use searchable, paginated document, draft, element, provenance and note
+pickers. Selecting a mutable source record supplies its current revision automatically.
+These generic forms support the CLI/API preview workflows; a dedicated source-document
+workspace and visual draft comparison remain unfinished.
+
 Intake accepts file/folder paths with an explicit recursion option, tags, create/attach
 and discard workflows. Frames accept external files or managed images, show state and
 revision, and provide **Compare / pin** plus a generated contact sheet/system-viewer

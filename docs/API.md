@@ -15,6 +15,11 @@ stale tabs. This boundary is not protection against malicious same-user local co
 - Session, metadata/command catalog, project list/create, active-project selection.
 - Project state, a lightweight latest-event token, and paginated/filtered entities; typed create/patch.
 - `/api/v1/projects/{project_id}/commands/{name}`: explicit application command allowlist.
+- Source record pickers use `GET /api/v1/projects/{project_id}/commands/{name}/fields/{field_name}/choices`
+  with `query`, `limit` (1–100), `offset`, and a JSON `values` object containing the
+  action's selection context. Only declared source fields of browser-enabled commands
+  are accepted. Follow `next_offset` for another page; append `/{record_id}` to resolve
+  a selected record and its current revision before submitting an action.
 - Graph/neighbor and context/composition operations through dedicated routes/catalog.
 - Managed media, thumbnails, upload, export-file delivery and pending job previews.
 - Workspace-scoped new-folder backup restore.

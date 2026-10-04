@@ -1,5 +1,5 @@
-from contextlib import closing
 """Non-destructive health reporting, consistent backups and guarded restore."""
+from contextlib import closing
 from pathlib import Path, PurePosixPath
 import hashlib
 import json
@@ -109,32 +109,45 @@ def _semantic_issues(snapshot):
 
 def doctor(service, hashes=False):
     issues = []
-    with service.repo.transaction(False) as conn:
-        integrity = [r[0] for r in conn.execute("PRAGMA integrity_check")]
-        foreign_keys = [dict(r) for r in conn.execute("PRAGMA foreign_key_check")]
-        version = conn.execute("PRAGMA user_version").fetchone()[0]
-        migrations = [dict(r) for r in conn.execute("SELECT * FROM schema_migrations ORDER BY version")]
-        if integrity != ["ok"]:
-            issues.append({"severity": "error", "code": "database_integrity", "message": "The project data file could not be read completely. Make a backup before editing further.", "details": integrity})
-        if foreign_keys:
-            issues.append({"severity": "error", "code": "foreign_keys", "message": "Some project links are inconsistent. Make a backup before editing further.", "details": foreign_keys})
-        if version != SCHEMA_VERSION or [row["version"] for row in migrations] != list(range(1, SCHEMA_VERSION + 1)):
-            issues.append({"severity": "error", "code": "migration_state", "message": "This project needs a compatible Storyboarder version before you continue."})
+
+    # Keep SQLite-level checks independent of JSON unpacking below. A malformed
+    # JSON value can make Repository.snapshot() fail even though SQLite can
+    # still report useful integrity and foreign-key results.
+    integrity, foreign_keys, version, migrations, database_opened = _sqlite_health(service, issues)
     from .document_recovery import document_health
     issues.extend(document_health(service, hashes))
-    snapshot = service.repo.snapshot()
-    issues.extend(_semantic_issues(snapshot))
     known = set()
-    for media in snapshot["media"]:
-        known.add(media["path"])
+
+    snapshot = None
+    if database_opened:
         try:
-            file = safe_path(service.root, media["path"], must_exist=True)
-            if file.stat().st_size != media["size"]:
-                issues.append({"severity": "error", "code": "size_mismatch", "media_id": media["id"], "path": media["path"], "message": "An image has changed since it was added. Restore the original from backup or import it again."})
-            elif hashes and sha256(file) != media["sha256"]:
-                issues.append({"severity": "error", "code": "hash_mismatch", "media_id": media["id"], "path": media["path"], "message": "An image’s contents have changed since it was added. Restore the original from backup or import it again."})
-        except (StoryboardError, OSError) as exc:
-            issues.append({"severity": "error", "code": "missing_or_unsafe_media", "media_id": media["id"], "path": media["path"], "message": "An image is missing or can’t be opened from the project folder. Restore it or import it again."})
+            snapshot = service.repo.snapshot()
+        except json.JSONDecodeError:
+            issues.append({"severity": "error", "code": "snapshot_json", "message": "Saved project details contain malformed JSON. Preserve this project folder and restore a verified backup; doctor did not change project data."})
+        except Exception as exc:
+            # Doctor is a diagnostic boundary: unexpected malformed record shapes
+            # should become visible structured findings instead of losing earlier
+            # SQLite diagnostics to a traceback.
+            issues.append({"severity": "error", "code": "snapshot_read", "message": "Some project records could not be read. Preserve this project folder and restore a verified backup; doctor did not change project data.", "details": {"error_type": type(exc).__name__}})
+    else:
+        issues.append({"severity": "error", "code": "snapshot_read", "message": "Project records were not read because the database could not be opened read-only. Preserve this project folder and restore a verified backup; doctor did not change project data.", "details": {"error_type": "database_unavailable"}})
+
+    if snapshot is not None:
+        try:
+            issues.extend(_semantic_issues(snapshot))
+        except Exception as exc:
+            issues.append({"severity": "error", "code": "snapshot_validation", "message": "Some project records could not be checked because their saved values are malformed. Preserve this project folder and restore a verified backup.", "details": {"error_type": type(exc).__name__}})
+
+        for media in snapshot.get("media", []):
+            known.add(media.get("path"))
+            try:
+                file = safe_path(service.root, media["path"], must_exist=True)
+                if file.stat().st_size != media["size"]:
+                    issues.append({"severity": "error", "code": "size_mismatch", "media_id": media["id"], "path": media["path"], "message": "An image has changed since it was added. Restore the original from backup or import it again."})
+                elif hashes and sha256(file) != media["sha256"]:
+                    issues.append({"severity": "error", "code": "hash_mismatch", "media_id": media["id"], "path": media["path"], "message": "An image’s contents have changed since it was added. Restore the original from backup or import it again."})
+            except (StoryboardError, OSError, KeyError, TypeError) as exc:
+                issues.append({"severity": "error", "code": "missing_or_unsafe_media", "media_id": media.get("id"), "path": media.get("path"), "message": "An image is missing or can’t be opened from the project folder. Restore it or import it again."})
     try:
         media_root = safe_path(service.root, "media")
     except (StoryboardError, OSError) as exc:
@@ -145,7 +158,7 @@ def doctor(service, hashes=False):
             relative = file.relative_to(service.root).as_posix()
             if file.is_symlink():
                 issues.append({"severity": "error", "code": "symlink", "path": relative, "message": "An image path points to a linked file. Replace it with a regular image inside the project folder."})
-            elif file.is_file() and relative not in known:
+            elif snapshot is not None and file.is_file() and relative not in known:
                 issues.append({"severity": "warning", "code": "orphan_media", "path": relative, "message": "This image is in the project folder but not in the library. Import it from Image intake or move it after reviewing."})
     try:
         staging = safe_path(service.root, ".storyboarder/staging")
@@ -155,13 +168,75 @@ def doctor(service, hashes=False):
     if staging and staging.exists():
         for file in staging.iterdir():
             issues.append({"severity": "warning", "code": "staging_file", "path": file.relative_to(service.root).as_posix(), "message": "An image import may still be in progress. Close open Storyboarder windows before clearing temporary files."})
-    for job in snapshot["jobs"]:
-        if job["status"] == "running":
-            issues.append({"severity": "info", "code": "running_job", "job_id": job["id"], "message": "An image tool run is marked as running. If it stopped unexpectedly, cancel it before trying again."})
-    project = service.project.summary()
-    if service.project.manifest.get("title") != project["title"]:
-        issues.append({"severity": "warning", "code": "manifest_hint_stale", "message": "The project folder’s saved title is out of date. Update the project title to refresh it."})
-    return {"healthy": not any(i["severity"] == "error" for i in issues), "schema_version": version, "supported_schema_version": SCHEMA_VERSION, "database": ".storyboarder/storyboard.sqlite3", "project": str(service.root), "journal_mode": "wal", "integrity": integrity, "hashes_checked": hashes, "media_checked": len(snapshot["media"]), "migrations": migrations, "issues": issues}
+    if snapshot is not None:
+        for job in snapshot.get("jobs", []):
+            if job.get("status") == "running":
+                issues.append({"severity": "info", "code": "running_job", "job_id": job.get("id"), "message": "An image tool run is marked as running. If it stopped unexpectedly, cancel it before trying again."})
+    if database_opened:
+        try:
+            project = service.project.summary()
+        except Exception as exc:
+            issues.append({"severity": "error", "code": "project_summary_read", "message": "The project summary could not be read. Preserve this project folder and restore a verified backup; doctor did not change project data.", "details": {"error_type": type(exc).__name__}})
+        else:
+            if service.project.manifest.get("title") != project["title"]:
+                issues.append({"severity": "warning", "code": "manifest_hint_stale", "message": "The project folder’s saved title is out of date. Update the project title to refresh it."})
+    else:
+        issues.append({"severity": "error", "code": "project_summary_read", "message": "The project summary could not be read because the database could not be opened read-only. Preserve this project folder and restore a verified backup; doctor did not change project data.", "details": {"error_type": "database_unavailable"}})
+    return {"healthy": not any(i["severity"] == "error" for i in issues), "schema_version": version, "supported_schema_version": SCHEMA_VERSION, "database": ".storyboarder/storyboard.sqlite3", "project": str(service.root), "journal_mode": "wal", "integrity": integrity, "hashes_checked": hashes, "media_checked": len(snapshot["media"]) if snapshot is not None else None, "snapshot_available": snapshot is not None, "migrations": migrations, "issues": issues}
+
+
+def _sqlite_health(service, issues):
+    """Collect independent, read-only SQLite diagnostics despite partial damage."""
+    integrity = []
+    foreign_keys = []
+    version = None
+    migrations = []
+    database = service.repo.path
+    connection = None
+    database_opened = False
+
+    def add(code, message, details=None):
+        issue = {"severity": "error", "code": code, "message": message}
+        if details is not None:
+            issue["details"] = details
+        issues.append(issue)
+
+    try:
+        connection = sqlite3.connect(database.resolve().as_uri() + "?mode=ro", uri=True)
+        database_opened = True
+        connection.row_factory = sqlite3.Row
+        try:
+            integrity = [row[0] for row in connection.execute("PRAGMA integrity_check")]
+            if integrity != ["ok"]:
+                add("database_integrity", "The project data file could not be read completely. Make a backup before editing further.", integrity)
+        except sqlite3.DatabaseError as exc:
+            add("database_integrity_check", "SQLite could not complete its database integrity check. Preserve the project folder and restore a verified backup.", {"error_type": type(exc).__name__})
+
+        try:
+            foreign_keys = [dict(row) for row in connection.execute("PRAGMA foreign_key_check")]
+            if foreign_keys:
+                add("foreign_keys", "Some project links are inconsistent. Make a backup before editing further.", foreign_keys)
+        except sqlite3.DatabaseError as exc:
+            add("foreign_key_check", "SQLite could not complete its foreign-key check. Preserve the project folder and restore a verified backup.", {"error_type": type(exc).__name__})
+
+        try:
+            version = connection.execute("PRAGMA user_version").fetchone()[0]
+            tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            if "schema_migrations" in tables:
+                migrations = [dict(row) for row in connection.execute("SELECT * FROM schema_migrations ORDER BY version")]
+                migration_versions = [row["version"] for row in migrations]
+            else:
+                migration_versions = []
+            if version != SCHEMA_VERSION or migration_versions != list(range(1, SCHEMA_VERSION + 1)):
+                add("migration_state", "This project needs a compatible Storyboarder version before you continue.")
+        except sqlite3.DatabaseError as exc:
+            add("migration_state", "The project schema history could not be read. Preserve the project folder and restore a verified backup.", {"error_type": type(exc).__name__})
+    except sqlite3.DatabaseError as exc:
+        add("database_unreadable", "SQLite could not open the project data file for read-only checks. Preserve the project folder and restore a verified backup.", {"error_type": type(exc).__name__})
+    finally:
+        if connection is not None:
+            connection.close()
+    return integrity, foreign_keys, version, migrations, database_opened
 
 
 def backup(service):

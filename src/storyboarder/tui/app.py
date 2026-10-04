@@ -1,6 +1,7 @@
 """Full-screen authoring desk. All mutations call application.commands.execute."""
 from __future__ import annotations
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import os
 import webbrowser
@@ -20,7 +21,7 @@ from prompt_toolkit.output import ColorDepth
 from PIL import Image, ImageOps
 from storyboarder.application.projects import Project, Workspace, discover
 from storyboarder.application.service import Service
-from storyboarder.application.commands import COMMANDS, execute, options_for
+from storyboarder.application.commands import COMMANDS, execute, options_for, source_options, source_record
 from storyboarder.application.recovery import restore
 from storyboarder.domain.errors import StoryboardError, Conflict
 from storyboarder.media.files import safe_path, thumbnail
@@ -44,6 +45,11 @@ STYLE = Style.from_dict({
     'scrollbar.background': 'bg:#e9ede2', 'scrollbar.button': 'bg:#a1b595',
 })
 
+PAGED_CHOICES = {
+    'documents', 'document_nodes', 'versions', 'provenance_edges', 'annotations',
+    'provenance_endpoints', 'provenance_source', 'provenance_target', 'provenance_typed_endpoint',
+}
+
 
 class Desk:
     def __init__(self, project=None, workspace=None, *, input=None, output=None):
@@ -65,8 +71,10 @@ class Desk:
         self.thumbnail_fragments = []
         self.show_thumbnails = os.environ.get('STORYBOARDER_NO_THUMBNAILS') != '1'
         self.compare_ids = []
-        self.busy = False
         self.modal_depth = 0
+        self._busy_operations = set()
+        self._busy_workers = set()
+        self._modal_entries = []
         self.pending_tasks = set()
         self.search = TextArea(multiline=False, height=1, prompt='Find on this page: ', style='class:text-area', name='page-search')
         self.search.buffer.on_text_changed += lambda _: self.rebuild_rows()
@@ -109,6 +117,10 @@ class Desk:
         def create(event): self.create_default()
         @keys.add('c-f', filter=main_only)
         def search(event): event.app.layout.focus(self.search)
+        @keys.add('escape', filter=Condition(lambda: bool(self._modal_entries)))
+        def close_top_dialog(event):
+            _, cancel_modal = self._modal_entries[-1]
+            cancel_modal()
         for key, page in [('c-p', 'workspace'), ('c-l', 'library'), ('c-o', 'outline'), ('f6', 'connections')]:
             keys.add(key, filter=main_only)(lambda event, name=page: self.go(name))
         self.app = Application(layout=Layout(self.root, focused_element=self.records.control), key_bindings=keys,
@@ -120,6 +132,37 @@ class Desk:
         self.pending_tasks.add(task)
         task.add_done_callback(self.pending_tasks.discard)
         return task
+
+    @property
+    def busy(self):
+        return bool(self._busy_operations or self._busy_workers)
+
+    @asynccontextmanager
+    async def busy_operation(self):
+        token = object()
+        self._busy_operations.add(token)
+        self.app.invalidate()
+        try:
+            yield
+        finally:
+            self._busy_operations.discard(token)
+            self.app.invalidate()
+
+    def _worker_finished(self, task):
+        self._busy_workers.discard(task)
+        self.app.invalidate()
+
+    async def run_worker(self, function, *args, **kwargs):
+        """Track blocking work until its thread finishes, even if its caller is cancelled."""
+        worker = asyncio.create_task(asyncio.to_thread(function, *args, **kwargs))
+        self._busy_workers.add(worker)
+        worker.add_done_callback(self._worker_finished)
+        self.app.invalidate()
+        try:
+            return await asyncio.shield(worker)
+        finally:
+            if worker.done():
+                self._worker_finished(worker)
 
     def set_message(self, message):
         self.message = str(message)
@@ -282,18 +325,22 @@ class Desk:
             self.set_message('A project action is still running. Its status will appear when it finishes.')
             return
         try:
-            if self.service: self.state = await asyncio.to_thread(self.service.state)
-            if self.workspace: self.projects = await asyncio.to_thread(self.workspace.list)
-            if self.anchor: self.neighbors = await asyncio.to_thread(self.service.neighbors, self.anchor)
+            if self.service: self.state = await self.run_worker(self.service.state)
+            if self.workspace: self.projects = await self.run_worker(self.workspace.list)
+            if self.anchor: self.neighbors = await self.run_worker(self.service.neighbors, self.anchor)
             self.rebuild_rows()
             self.set_message('Project refreshed. Unsaved edits are unchanged.')
         except (StoryboardError, OSError) as exc:
             self.set_message(str(exc))
 
-    async def show_dialog(self, dialog, future, focus=None):
+    async def show_dialog(self, dialog, future, focus=None, on_escape=None):
         previous = self.app.layout.current_window
         floating = Float(content=dialog)
+        def default_cancel():
+            if not future.done(): future.set_result(None)
+        entry = (future, on_escape or default_cancel)
         self.root.floats.append(floating)
+        self._modal_entries.append(entry)
         self.modal_depth += 1
         self.app.layout.focus(focus or dialog)
         self.app.invalidate()
@@ -301,6 +348,7 @@ class Desk:
             return await future
         finally:
             if floating in self.root.floats: self.root.floats.remove(floating)
+            if entry in self._modal_entries: self._modal_entries.remove(entry)
             self.modal_depth -= 1
             try: self.app.layout.focus(previous)
             except ValueError: self.app.layout.focus(self.records.control)
@@ -313,21 +361,72 @@ class Desk:
         dialog = Dialog(title=title, body=body, buttons=[Button('Close', handler=close)], width=D(preferred=94, max=110))
         await self.show_dialog(dialog, future, body)
 
-    async def choose(self, title, choices, current=None):
+    async def choose(self, title, choices, current=None, loader=None):
         future = asyncio.get_running_loop().create_future()
         search = TextArea(multiline=False, height=1, prompt='Find: ')
         original = list(choices)
         radios = RadioList(choices or [('', 'No eligible choices')], default=current, select_on_focus=True)
-        def filter_(_):
-            choices = [(v, clean(label)) for v, label in original if search.text.casefold() in str(label).casefold()]
+        page_status = Label('')
+        more = Button('More results', handler=lambda: self.spawn(load_more()))
+        page_state = {'offset': 0, 'next_offset': None, 'total': len(original), 'choices': [], 'request': 0, 'loading': False}
+
+        def set_choices(choices):
             radios.values = choices or [('', 'No matching choices')]
             radios._selected_index = 0
             radios.current_value = radios.values[0][0]
+
+        async def load_page(query, offset, append=False):
+            if loader is None or page_state['loading']: return
+            page_state['loading'] = True
+            page_state['request'] += 1
+            request = page_state['request']
+            page_status.text = 'Loading choices…'
+            more.text = 'Loading…'
+            self.app.invalidate()
+            try:
+                page = await loader(query, offset)
+                if request != page_state['request'] or query != search.text: return
+                items = page.get('items', [])
+                page_choices = [(item['id'], clean(item.get('label') or item.get('title') or item['id'])) for item in items]
+                combined = page_state['choices'] + page_choices if append else page_choices
+                page_state.update(offset=offset, next_offset=page.get('next_offset'), total=page.get('total', len(combined)), choices=combined)
+                set_choices(combined)
+                showing = len(combined)
+                page_status.text = f"{page_state['total']} matches · showing {showing}"
+                more.text = 'More results' if page_state['next_offset'] is not None else 'No more results'
+            except StoryboardError as exc:
+                page_status.text = clean(str(exc))
+                more.text = 'Retry results'
+            finally:
+                if request == page_state['request']:
+                    page_state['loading'] = False
+                self.app.invalidate()
+
+        async def load_more():
+            if page_state['next_offset'] is not None:
+                await load_page(search.text, page_state['next_offset'], append=True)
+
+        def filter_(_):
+            if loader:
+                page_state['request'] += 1
+                page_state['loading'] = False
+                page_state['next_offset'] = None
+                page_state['choices'] = []
+                self.spawn(load_page(search.text, 0))
+                return
+            choices = [(v, clean(label)) for v, label in original if search.text.casefold() in str(label).casefold()]
+            set_choices(choices)
         search.buffer.on_text_changed += filter_
         def resolve(value):
             if not future.done(): future.set_result(value)
-        dialog = Dialog(title=title, body=HSplit([search, Window(height=1), Box(radios, height=D(min=4, max=18, preferred=14))]),
-                        buttons=[Button('Choose', handler=lambda: resolve(radios.current_value)), Button('Cancel', handler=lambda: resolve(None))], width=D(preferred=92, max=110))
+        if loader:
+            body = HSplit([search, page_status, Window(height=1), Box(radios, height=D(min=4, max=18, preferred=14))])
+            buttons = [Button('Choose', handler=lambda: resolve(radios.current_value)), more, Button('Cancel', handler=lambda: resolve(None))]
+            self.spawn(load_page(search.text, 0))
+        else:
+            body = HSplit([search, Window(height=1), Box(radios, height=D(min=4, max=18, preferred=14))])
+            buttons = [Button('Choose', handler=lambda: resolve(radios.current_value)), Button('Cancel', handler=lambda: resolve(None))]
+        dialog = Dialog(title=title, body=body, buttons=buttons, width=D(preferred=92, max=110))
         return await self.show_dialog(dialog, future, radios)
 
     async def simple_form(self, title, fields, warning=''):
@@ -368,6 +467,24 @@ class Desk:
                 if isinstance(w, TextArea): result[field.name] = w.text
                 if isinstance(w, Checkbox): result[field.name] = w.checked
             return result
+        def selected_record(field, value, payload=None):
+            if value in (None, ''): return None
+            if field.source in PAGED_CHOICES:
+                try: return source_record(self.service, field.source, value, payload or current_values())
+                except StoryboardError: return None
+            return next((r for r in all_records if r.get('id') == value), None)
+
+        if any(field.name == 'revision' for field in command.fields):
+            for field in command.fields:
+                if field.name not in ('revision', 'target_revision') and field.source:
+                    record = selected_record(field, values.get(field.name), values)
+                    if record and record.get('revision') is not None:
+                        values['revision'] = record['revision']
+                        if name == 'annotation.update':
+                            values['content'] = record.get('text', '')
+                            values['state'] = record.get('state', 'open')
+                        break
+
         def update_widgets(record):
             merged = defaults(record)
             for field in command.fields:
@@ -378,22 +495,44 @@ class Desk:
                         widgets[field.name].text = ', '.join(value) if isinstance(value,list) and field.type == 'tags' else json.dumps(value,ensure_ascii=False,indent=2) if isinstance(value,(dict,list)) else str(value or '')
                     elif isinstance(widgets[field.name], Button):
                         values[field.name] = merged[field.name]
-                        choices = options_for(field.source,self.state,current_values()) if field.source else [(v,human(v)) for v in field.options]
+                        choices = options_for(field.source,self.state,current_values(),self.service) if field.source else [(v,human(v)) for v in field.options]
                         label = next((label for v,label in choices if v == merged[field.name]), str(merged[field.name]))
                         widgets[field.name].text = clean(label)[:64]
             if record.get('asset_id'): values['asset_id'] = record['asset_id']
         async def pick(field):
-            choices = options_for(field.source,self.state,current_values()) if field.source else [(v,human(v)) for v in field.options]
-            if not field.required: choices = [('', 'Not set')] + choices
-            value = await self.choose(field.label, choices, values.get(field.name))
+            if field.source in PAGED_CHOICES:
+                async def load_choices(query, offset):
+                    return await self.run_worker(source_options, self.service, field.source, current_values(), query, 100, offset)
+                choices = []
+                value = await self.choose(field.label, choices, values.get(field.name), loader=load_choices)
+            else:
+                choices = options_for(field.source,self.state,current_values(),self.service) if field.source else [(v,human(v)) for v in field.options]
+                if not field.required: choices = [('', 'Not set')] + choices
+                value = await self.choose(field.label, choices, values.get(field.name))
             if value is None: return
             values[field.name] = value
-            widgets[field.name].text = clean(next((label for key,label in choices if key == value), value))[:64] or 'Not set'
-            record = next((r for r in all_records if r['id'] == value), None)
-            if record and field.name in ('id','source_id'):
-                if name.endswith('.update'): update_widgets(record)
-                values['revision'] = record['revision']
-            if record and field.name == 'target_id': values['target_revision'] = record['revision']
+            record = selected_record(field, value)
+            if field.source in PAGED_CHOICES and record:
+                label = record.get('label') or record.get('title') or record.get('original_name') or record.get('id')
+            else:
+                label = next((label for key,label in choices if key == value), value)
+            widgets[field.name].text = clean(label)[:64] or 'Not set'
+            if record and field.name in ('id','source_id','document_id','node_id','edge_id','annotation_id'):
+                if name.endswith('.update') and field.name in ('id','source_id'): update_widgets(record)
+                if name == 'annotation.update':
+                    values['content'] = record.get('text', '')
+                    values['state'] = record.get('state', 'open')
+                    if 'content' in widgets: widgets['content'].text = record.get('text', '')
+                    if 'state' in widgets:
+                        state_field = next(item for item in command.fields if item.name == 'state')
+                        state_choices = [(option, human(option)) for option in state_field.options]
+                        widgets['state'].text = clean(next((label for option,label in state_choices if option == values['state']), values['state']))[:64]
+                if 'revision' in values:
+                    revision = record.get('revision', record.get('document_revision'))
+                    if revision is not None: values['revision'] = revision
+            if record and field.name == 'target_id' and 'target_revision' in values:
+                revision = record.get('revision', record.get('document_revision'))
+                if revision is not None: values['target_revision'] = revision
             if field.name == 'asset_id' and 'media_id' in widgets:
                 values['media_id'] = ''
                 widgets['media_id'].text = 'Choose a specific image'
@@ -403,8 +542,12 @@ class Desk:
             if field.name in ('revision','target_revision'): continue
             body.append(Label(field.label+(' *' if field.required else '')))
             if field.source or field.options:
-                choices = options_for(field.source,self.state,values) if field.source else [(v,human(v)) for v in field.options]
-                label = next((label for v,label in choices if v == value), 'Choose…' if field.required else 'Not set')
+                if field.source in PAGED_CHOICES:
+                    record = selected_record(field, value, values)
+                    label = (record.get('label') or record.get('title') or record.get('original_name') or record.get('id')) if record else ('Choose…' if field.required else 'Not set')
+                else:
+                    choices = options_for(field.source,self.state,values,self.service) if field.source else [(v,human(v)) for v in field.options]
+                    label = next((label for v,label in choices if v == value), 'Choose…' if field.required else 'Not set')
                 widget = Button(clean(label)[:64], handler=lambda f=field: self.spawn(pick(f)), width=68)
             elif field.type == 'boolean': widget = Checkbox('Enabled', checked=bool(value))
             else:
@@ -443,31 +586,32 @@ class Desk:
                     elif field.type == 'tags': value = [s.strip() for s in (value or '').split(',') if s.strip()] if isinstance(value,str) else value or []
                     elif field.type == 'boolean': value = bool(value)
                     payload[field.name] = value
-                working[0] = self.busy = True
+                working[0] = True
                 status.text = 'Saving this change to your project…'
                 self.app.invalidate()
-                result = await asyncio.to_thread(execute, self.service, name, payload)
-                self.state = await asyncio.to_thread(self.service.state)
-                if self.workspace: self.projects = await asyncio.to_thread(self.workspace.list)
-                if not future.done(): future.set_result(result)
-                self.set_message('Completed · '+command.label)
+                async with self.busy_operation():
+                    result = await self.run_worker(execute, self.service, name, payload)
+                    self.state = await self.run_worker(self.service.state)
+                    if self.workspace: self.projects = await self.run_worker(self.workspace.list)
+                    if not future.done(): future.set_result(result)
+                    self.set_message('Completed · '+command.label)
             except (StoryboardError, OSError, ValueError, TypeError) as exc:
                 status.text = clean(str(exc)) + (' Your edits are still here. Refresh the project, then reapply them.' if isinstance(exc,Conflict) else '')
                 status.formatted_text_control.style = 'class:error'
             finally:
-                working[0] = self.busy = False
+                working[0] = False
                 self.app.invalidate()
         async def reload_record():
-            self.state = await asyncio.to_thread(self.service.state)
+            self.state = await self.run_worker(self.service.state)
             record = next((r for r in self.state['entities'] if r['id'] == current_values().get('id')),None)
             if record:
                 choice = await self.choose('Replace your draft with the latest saved details?', [('no','Keep my draft'),('yes','Refresh details and replace my draft')], 'no')
                 if choice == 'yes': update_widgets(record);status.text='Project details refreshed.'
         async def cancel_run():
             try:
-                job = await asyncio.to_thread(self.service.get, 'jobs', current_values()['id'])
+                job = await self.run_worker(self.service.get, 'jobs', current_values()['id'])
                 if job['status'] in ('queued','running'):
-                    await asyncio.to_thread(execute, self.service, 'job.cancel', {'id':job['id'],'revision':job['revision']})
+                    await self.run_worker(execute, self.service, 'job.cancel', {'id':job['id'],'revision':job['revision']})
                     status.text = 'Stop requested. The tool is shutting down.'
             except StoryboardError as exc:
                 status.text = clean(str(exc))
@@ -479,7 +623,7 @@ class Desk:
         if name.endswith('.update'): buttons.insert(1, Button('Refresh details', handler=lambda: self.spawn(reload_record())))
         pane = ScrollablePane(HSplit(body), height=D(preferred=26, max=32), show_scrollbar=True)
         dialog = Dialog(title=command.label, body=pane, buttons=buttons, width=D(preferred=100,max=116))
-        result = await self.show_dialog(dialog, future, next(iter(widgets.values()), buttons[0]))
+        result = await self.show_dialog(dialog, future, next(iter(widgets.values()), buttons[0]), on_escape=cancel)
         self.rebuild_rows()
         if result is not None and (command.read_only or name.startswith('export.') or name in ('project.backup','job.run','job.approve')):
             if name == 'composition.preview': text = markdown(result)
@@ -515,9 +659,9 @@ class Desk:
 
     async def open_project(self, path):
         try:
-            self.service = await asyncio.to_thread(Service, path)
-            self.state = await asyncio.to_thread(self.service.state)
-            if self.workspace: await asyncio.to_thread(self.workspace.register,path)
+            self.service = await self.run_worker(Service, path)
+            self.state = await self.run_worker(self.service.state)
+            if self.workspace: await self.run_worker(self.workspace.register,path)
             self.go('overview')
             self.set_message('Opened '+self.state['project']['title']+' from '+str(self.service.root))
         except (StoryboardError,OSError) as exc: await self.message_dialog('Could not open this project',str(exc))
@@ -533,10 +677,11 @@ class Desk:
         values = await self.simple_form('Create a project',fields)
         if not values: return
         try:
-            if self.workspace: project = await asyncio.to_thread(self.workspace.create,values['title'],values['slug'])
-            else: project = await asyncio.to_thread(Project.create,values['path'],values['title'])
-            await self.open_project(project.root)
-            if self.workspace: self.projects = self.workspace.list()
+            async with self.busy_operation():
+                if self.workspace: project = await self.run_worker(self.workspace.create,values['title'],values['slug'])
+                else: project = await self.run_worker(Project.create,values['path'],values['title'])
+                await self.open_project(project.root)
+                if self.workspace: self.projects = await self.run_worker(self.workspace.list)
         except (StoryboardError,OSError) as exc: await self.message_dialog('Could not create this project',str(exc))
 
     async def restore_backup(self):
@@ -545,8 +690,9 @@ class Desk:
         confirmation = await self.choose('Restore this backup?', [('no','Cancel'),('yes','Validate and restore into the new folder')], 'no')
         if confirmation != 'yes': return
         try:
-            result = await asyncio.to_thread(restore,values['archive'],values['path'])
-            if self.workspace: await asyncio.to_thread(self.workspace.register,values['path'])
+            async with self.busy_operation():
+                result = await self.run_worker(restore,values['archive'],values['path'])
+                if self.workspace: await self.run_worker(self.workspace.register,values['path'])
             await self.message_dialog('Project restored',f"A new project copy is ready at:\n{result.get('path', values['path'])}")
             await self.refresh()
         except (StoryboardError,OSError) as exc: await self.message_dialog('Restore did not complete',str(exc))
@@ -560,7 +706,7 @@ class Desk:
         try:
             record = self.service.get('media',media_id)
             path = safe_path(self.service.root,record['path'],must_exist=True)
-            opened = await asyncio.to_thread(webbrowser.open,path.as_uri())
+            opened = await self.run_worker(webbrowser.open,path.as_uri())
             self.set_message(('Opened image: ' if opened else 'Open this image: ')+str(path))
         except (StoryboardError,OSError) as exc: self.set_message(str(exc))
 
@@ -588,7 +734,7 @@ class Desk:
             draw.text((i*640+20,425),f"Version {f['version']} / {f['state']}",fill=(45,61,40),font=ImageFont.load_default(size=20))
         path = self.service.root/'.storyboarder/cache/frame-comparison.png'
         sheet.save(path)
-        await asyncio.to_thread(webbrowser.open,path.as_uri())
+        await self.run_worker(webbrowser.open,path.as_uri())
         await self.message_dialog('Storyboard image comparison',text+'\n\nA comparison sheet was opened in your image viewer.')
 
     async def help(self):

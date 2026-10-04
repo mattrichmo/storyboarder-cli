@@ -3629,7 +3629,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "entities",
+          "source": "documents",
           "help": "",
           "default": null
         }
@@ -3649,7 +3649,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3689,7 +3689,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3699,7 +3699,7 @@
           "type": "text",
           "required": false,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         },
@@ -3749,7 +3749,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         },
@@ -3759,7 +3759,7 @@
           "type": "text",
           "required": false,
           "options": [],
-          "source": "",
+          "source": "document_nodes",
           "help": "",
           "default": null
         },
@@ -3799,7 +3799,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "entities",
+          "source": "document_nodes",
           "help": "",
           "default": null
         }
@@ -3819,7 +3819,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "entities",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3829,7 +3829,7 @@
           "type": "text",
           "required": false,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         }
@@ -3849,7 +3849,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "document_nodes",
           "help": "",
           "default": null
         },
@@ -3899,7 +3899,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         },
@@ -3909,7 +3909,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         }
@@ -3929,7 +3929,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3939,7 +3939,7 @@
           "type": "text",
           "required": false,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         },
@@ -3969,7 +3969,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3999,7 +3999,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -4039,7 +4039,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "document_nodes",
           "help": "",
           "default": null
         },
@@ -4107,7 +4107,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_source",
           "help": "",
           "default": null
         },
@@ -4135,7 +4135,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_target",
           "help": "",
           "default": null
         },
@@ -4199,7 +4199,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_typed_endpoint",
           "help": "",
           "default": null
         },
@@ -4253,7 +4253,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_edges",
           "help": "",
           "default": null
         },
@@ -4361,7 +4361,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_typed_endpoint",
           "help": "",
           "default": null
         },
@@ -4409,7 +4409,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_typed_endpoint",
           "help": "",
           "default": null
         },
@@ -4449,7 +4449,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "annotations",
           "help": "",
           "default": null
         },

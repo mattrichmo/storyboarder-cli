@@ -94,6 +94,11 @@ class AuthoringOperations:
             "jobs": ("SELECT id FROM jobs WHERE shot_id=?", (record_id,)),
             "generated_outputs": ("SELECT output_key FROM job_outputs WHERE entity_id=?", (record_id,)),
             "context_blocks": ("SELECT id FROM context_blocks WHERE owner_id=?", (record_id,)),
+            # Provenance and annotations are intentionally retained as history,
+            # including retired links and resolved notes. The database guards
+            # deletion on these references, so report them before attempting it.
+            "provenance_links": ("SELECT id FROM provenance_edges WHERE (source_type='entity' AND source_id=?) OR (target_type='entity' AND target_id=?)", (record_id, record_id)),
+            "annotations": ("SELECT id FROM annotations WHERE endpoint_type='entity' AND endpoint_id=?", (record_id,)),
         }
         result = {name: [r[0] for r in conn.execute(sql, args)] for name, (sql, args) in queries.items()}
         result["can_delete"] = not any(result.values())

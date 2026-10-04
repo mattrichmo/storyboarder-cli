@@ -9,7 +9,7 @@ from typing import Any, Callable
 
 import json
 
-from storyboarder.domain.errors import StoryboardError
+from storyboarder.domain.errors import StoryboardError, NotFound
 
 from storyboarder.domain.models import ASSET_TYPES, ROLES, RELATION_RULES, FRAME_STATES, FIELD_MODELS
 
@@ -155,8 +155,274 @@ def execute(service, name, payload=None, browser=False):
         values[f.name] = value
     return command.handler(service, values)
 
-def options_for(source, state, values=None):
+_PAGED_SOURCES = {
+    "documents", "document_nodes", "versions", "provenance_edges", "annotations",
+    "provenance_endpoints", "provenance_source", "provenance_target", "provenance_typed_endpoint",
+}
+
+
+def _source_page(items, total, limit, offset):
+    return {
+        "items": items,
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "next_offset": offset + len(items) if offset + len(items) < total else None,
+        "truncated": offset + len(items) < total,
+    }
+
+
+def _source_label(record):
+    return str(record.get("label") or record.get("title") or record.get("original_name") or record.get("id", ""))
+
+
+def _document_nodes_page(service, *, query, limit, offset, document_id=None, version_id=None,
+                         include_archived=False, all_versions=False):
+    """Return one indexed page from the current source trees without materializing a snapshot."""
+    from storyboarder.storage.repository import unpack
+
+    clauses, params = (["1=1"] if include_archived else ["d.archived=0"]), []
+    if document_id:
+        clauses.append("d.id=?")
+        params.append(document_id)
+    if version_id:
+        clauses.append("v.id=?")
+        params.append(version_id)
+    elif not all_versions:
+        clauses.append("d.current_version_id=v.id")
+    if query:
+        pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        clauses.append("(n.title LIKE ? ESCAPE '\\' OR n.text LIKE ? ESCAPE '\\')")
+        params.extend([pattern, pattern])
+    where = " AND ".join(clauses)
+    query_sql = """FROM document_nodes n
+        JOIN document_versions v ON v.id=n.version_id
+        JOIN documents d ON d.id=v.document_id
+        WHERE """ + where
+    with service.repo.transaction(False) as conn:
+        total = conn.execute("SELECT count(*) " + query_sql, params).fetchone()[0]
+        rows = conn.execute("""SELECT n.id,n.version_id,n.logical_id,n.parent_id,n.node_type,n.position,n.title,
+            substr(n.text,1,500) AS text,n.source_pointer,n.content_sha256,n.identity,
+            d.id AS document_id,d.title AS document_title,d.kind AS document_kind,d.revision AS document_revision,
+            v.label AS version_label
+            """ + query_sql + " ORDER BY d.title,d.id,v.number,n.source_pointer,n.id LIMIT ? OFFSET ?",
+            (*params, limit, offset)).fetchall()
+    items = []
+    for row in rows:
+        item = unpack(row)
+        item["revision"] = item["document_revision"]
+        item["label"] = f"{item['document_title']} · {item.get('title') or item['node_type']} · {item['source_pointer']}"
+        items.append(item)
+    return _source_page(items, total, limit, offset)
+
+
+def _versions_page(service, query, limit, offset, document_id=None, active_only=False):
+    from storyboarder.storage.repository import unpack
+
+    clauses, params = (["d.archived=0"] if active_only else ["1=1"]), []
+    if document_id:
+        clauses.append("d.id=?")
+        params.append(document_id)
+    if query:
+        pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        clauses.append("(d.title LIKE ? ESCAPE '\\' OR v.label LIKE ? ESCAPE '\\')")
+        params.extend([pattern, pattern])
+    where = " AND ".join(clauses)
+    join = " FROM document_versions v JOIN documents d ON d.id=v.document_id WHERE " + where
+    with service.repo.transaction(False) as conn:
+        total = conn.execute("SELECT count(*)" + join, params).fetchone()[0]
+        rows = conn.execute("SELECT v.id,v.document_id,v.parent_version_id,v.number,v.label,v.format_version,v.content_sha256,v.created_at,d.title AS document_title,d.revision AS document_revision" + join + " ORDER BY d.title,d.id,v.number DESC,v.id LIMIT ? OFFSET ?", (*params, limit, offset)).fetchall()
+    items = []
+    for row in rows:
+        item = unpack(row)
+        item["revision"] = item["document_revision"]
+        item["title"] = f"{item['document_title']} · Draft {item['number']} · {item['label']}"
+        item["label"] = item["title"]
+        items.append(item)
+    return _source_page(items, total, limit, offset)
+
+
+def _table_page(service, table, query, limit, offset, *, where="1=1", args=(), order="id"):
+    """Read a single explicit source table in bounded pages for source pickers."""
+    from storyboarder.storage.repository import unpack
+
+    allowed = {"frames", "media", "jobs", "provenance_edges", "annotations"}
+    if table not in allowed:
+        raise StoryboardError("That source selector is not available.")
+    clauses, params = [where], list(args)
+    if query:
+        pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        if table == "provenance_edges":
+            clauses.append("(source_snapshot LIKE ? ESCAPE '\\' OR target_snapshot LIKE ? ESCAPE '\\' OR relation LIKE ? ESCAPE '\\' OR notes LIKE ? ESCAPE '\\')")
+            params.extend([pattern] * 4)
+        elif table == "annotations":
+            clauses.append("(text LIKE ? ESCAPE '\\' OR snapshot LIKE ? ESCAPE '\\' OR state LIKE ? ESCAPE '\\')")
+            params.extend([pattern] * 3)
+        elif table == "frames":
+            clauses.append("(notes LIKE ? ESCAPE '\\' OR state LIKE ? ESCAPE '\\')")
+            params.extend([pattern] * 2)
+        elif table == "media":
+            clauses.append("(original_name LIKE ? ESCAPE '\\' OR path LIKE ? ESCAPE '\\')")
+            params.extend([pattern] * 2)
+        else:
+            clauses.append("(title LIKE ? ESCAPE '\\' OR script LIKE ? ESCAPE '\\' OR status LIKE ? ESCAPE '\\')")
+            params.extend([pattern] * 3)
+    condition = " AND ".join(clauses)
+    with service.repo.transaction(False) as conn:
+        total = conn.execute(f"SELECT count(*) FROM {table} WHERE {condition}", params).fetchone()[0]
+        rows = conn.execute(f"SELECT * FROM {table} WHERE {condition} ORDER BY {order} LIMIT ? OFFSET ?", (*params, limit, offset)).fetchall()
+    return [unpack(row) for row in rows], total
+
+
+def source_options(service, source, values=None, query="", limit=100, offset=0):
+    """Return a bounded, searchable page for document and provenance form selectors."""
+    from storyboarder.application.documents import Documents
+    from storyboarder.application.provenance import unpack as unpack_edge
+
     values = values or {}
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+        raise StoryboardError("Page size must be an integer from 1 to 1,000.")
+    if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+        raise StoryboardError("Page offset must be a nonnegative integer.")
+    query = str(query or "")
+    docs = Documents(service)
+
+    if source == "documents":
+        result = docs.list(kind=values.get("kind"), query=query, archived=True, limit=limit, offset=offset)
+        items = [{**row, "label": f"{row['title']} · {row['kind']} · {'archived · ' if row['archived'] else ''}revision {row['revision']}"} for row in result["items"]]
+        return result | {"items": items}
+    if source == "document_nodes":
+        return _document_nodes_page(service, query=query, limit=limit, offset=offset,
+                                    document_id=values.get("document_id"), version_id=values.get("version_id"))
+    if source == "versions":
+        return _versions_page(service, query, limit, offset, values.get("document_id") or values.get("id"))
+    if source == "provenance_edges":
+        rows, total = _table_page(service, "provenance_edges", query, limit, offset, where="retired=0", order="created_at DESC,id")
+        items = []
+        for row in rows:
+            edge = unpack_edge(row)
+            source_label = edge.get("source_snapshot", {}).get("label") or f"{edge['source_type']}:{edge['source_id']}"
+            target_label = edge.get("target_snapshot", {}).get("label") or f"{edge['target_type']}:{edge['target_id']}"
+            items.append({**edge, "label": f"{source_label} → {choice_label(edge['relation'])} → {target_label}"})
+        return _source_page(items, total, limit, offset)
+    if source == "annotations":
+        rows, total = _table_page(service, "annotations", query, limit, offset, order="updated_at DESC,id")
+        items = [{**row, "label": f"{choice_label(row['state'])} · {row['text'][:90]} · {row['endpoint_type']}:{row['endpoint_id']}"} for row in rows]
+        return _source_page(items, total, limit, offset)
+    if source == "provenance_endpoints":
+        kind = values.get("source_type") or values.get("target_type") or values.get("kind") or values.get("endpoint_type")
+        active_only = values.get("active_only", True)
+        if kind not in ("node", "entity", "frame", "media", "job", "version", "artifact"):
+            return _source_page([], 0, limit, offset)
+        if kind == "node":
+            return _document_nodes_page(service, query=query, limit=limit, offset=offset,
+                                        document_id=values.get("document_id"), version_id=values.get("version_id"),
+                                        include_archived=not active_only, all_versions=not active_only)
+        if kind == "version":
+            return _versions_page(service, query, limit, offset, values.get("document_id") or values.get("id"), active_only)
+        if kind == "entity":
+            result = service.list_entities(query=query, archived=not active_only, limit=limit, offset=offset)
+            items = [{**row, "label": f"{choice_label(row['kind'])} · {row['title']}"} for row in result["items"]]
+            return result | {"items": items}
+        if kind == "artifact":
+            # Source artifacts are queried directly because they have no mutable project snapshot table.
+            from storyboarder.storage.repository import unpack
+            with service.repo.transaction(False) as conn:
+                clauses, params = ["1=1"], []
+                if query:
+                    pattern = "%" + query.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+                    clauses.append("(original_name LIKE ? ESCAPE '\\' OR path LIKE ? ESCAPE '\\')")
+                    params.extend([pattern, pattern])
+                condition = " AND ".join(clauses)
+                total = conn.execute(f"SELECT count(*) FROM source_artifacts WHERE {condition}", params).fetchone()[0]
+                records = [unpack(row) for row in conn.execute(f"SELECT * FROM source_artifacts WHERE {condition} ORDER BY created_at DESC,id LIMIT ? OFFSET ?", (*params, limit, offset)).fetchall()]
+            return _source_page([{**row, "label": f"{row['original_name']} · source artifact"} for row in records], total, limit, offset)
+        table = {"frame": "frames", "media": "media", "job": "jobs"}[kind]
+        frame_filter = "state!='archived' AND EXISTS(SELECT 1 FROM entities e WHERE e.id=frames.shot_id AND e.archived=0)" if kind == "frame" and active_only else "1=1"
+        rows, total = _table_page(service, table, query, limit, offset, where=frame_filter, order="id")
+        from storyboarder.storage.repository import unpack
+        with service.repo.transaction(False) as conn:
+            for row in rows:
+                if kind == "frame":
+                    shot = conn.execute("SELECT title FROM entities WHERE id=?", (row["shot_id"],)).fetchone()
+                    row["title"] = f"{shot['title'] if shot else 'Shot'} · image {row['version']}"
+                elif kind == "media":
+                    row["title"] = row.get("original_name")
+                row["type"] = kind
+                row["label"] = row.get("title") or row.get("original_name") or row.get("id")
+        return _source_page(rows, total, limit, offset)
+    if source in ("provenance_source", "provenance_target", "provenance_typed_endpoint"):
+        endpoint_source = source_options(service, "provenance_endpoints", values={
+            "kind": values.get("source_type") if source == "provenance_source" else values.get("target_type") if source == "provenance_target" else values.get("kind") or values.get("endpoint_type"),
+            "document_id": values.get("document_id"),
+            "version_id": values.get("version_id"),
+            "active_only": source != "provenance_typed_endpoint",
+        }, query=query, limit=limit, offset=offset)
+        return endpoint_source
+    return _source_page([], 0, limit, offset)
+
+
+def source_record(service, source, record_id, values=None):
+    """Resolve one picker record and expose the revision token expected by its mutation."""
+    from storyboarder.application.documents import Documents
+    from storyboarder.application.provenance import Provenance
+    from storyboarder.storage.repository import unpack
+
+    values = values or {}
+    docs = Documents(service)
+    if source == "documents":
+        return docs.show(record_id)
+    if source == "document_nodes":
+        record = docs.node(record_id)
+        if values.get("document_id") and record["document_id"] != values["document_id"]:
+            raise NotFound("This source element belongs to a different document. Refresh the selector.")
+        if values.get("version_id") and record["version_id"] != values["version_id"]:
+            raise NotFound("This source element belongs to a different draft. Refresh the selector.")
+        record["revision"] = record["document_revision"]
+        return record
+    if source == "versions":
+        record = docs.version(record_id)
+        selected_document = values.get("document_id") or values.get("id")
+        if selected_document and record["document_id"] != selected_document:
+            raise NotFound("This draft belongs to a different document. Refresh the selector.")
+        record["document_revision"] = docs.show(record["document_id"])["revision"]
+        record["revision"] = record["document_revision"]
+        return record
+    if source == "provenance_edges":
+        return Provenance(service).show(record_id)
+    if source == "annotations":
+        with service.repo.transaction(False) as conn:
+            row = conn.execute("SELECT * FROM annotations WHERE id=?", (record_id,)).fetchone()
+            if row is None:
+                raise StoryboardError("This review note is no longer in the project. Refresh the selector.")
+            return unpack(row)
+    if source in ("provenance_endpoints", "provenance_source", "provenance_target", "provenance_typed_endpoint"):
+        kind = values.get("source_type") or values.get("target_type") or values.get("kind") or values.get("endpoint_type")
+        if source == "provenance_source": kind = values.get("source_type")
+        elif source == "provenance_target": kind = values.get("target_type")
+        elif source == "provenance_typed_endpoint": kind = values.get("kind") or values.get("endpoint_type")
+        record = Provenance(service).endpoint(kind, record_id)
+        if kind == "node":
+            node = docs.node(record_id)
+            if values.get("document_id") and node["document_id"] != values["document_id"]:
+                raise NotFound("This source element belongs to a different document. Refresh the selector.")
+            if values.get("version_id") and node["version_id"] != values["version_id"]:
+                raise NotFound("This source element belongs to a different draft. Refresh the selector.")
+            record["revision"] = node["document_revision"]
+        elif kind == "version":
+            selected_document = values.get("document_id") or values.get("id")
+            if selected_document and record["document_id"] != selected_document:
+                raise NotFound("This draft belongs to a different document. Refresh the selector.")
+            record["revision"] = docs.show(record["document_id"])["revision"]
+        return record
+    return None
+
+
+def options_for(source, state, values=None, service=None):
+    values = values or {}
+    if source in _PAGED_SOURCES and service is not None:
+        page = source_options(service, source, values=values, limit=100, offset=0)
+        return [(record["id"], _source_label(record)) for record in page["items"]]
     entities = state.get("entities", [])
     by_id = {r["id"]: r for r in entities}
     if source == "scripts":

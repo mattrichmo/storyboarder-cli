@@ -74,6 +74,27 @@ def get_service(args):
     return Service(discover())
 
 
+def get_doctor_service(args):
+    """Reach doctor without Project's migration or canonical-row open checks."""
+    if getattr(args, "project", None):
+        root = args.project
+    elif getattr(args, "workspace", None):
+        entries = Workspace(args.workspace).list()
+        recent = next((row for row in entries if row.get("recent")), None)
+        available = [row for row in entries if row.get("available")]
+        if recent:
+            root = recent["path"]
+        elif len(available) == 1:
+            root = available[0]["path"]
+        elif len(entries) == 1:
+            root = entries[0]["path"]
+        else:
+            raise NotFound("Choose a workspace project with project switch, or pass --project PATH.")
+    else:
+        root = discover()
+    return Service(Project.diagnostic(root))
+
+
 def build_parser():
     parser = ArgumentParser(prog="storyboarder", description="A local story production desk. No arguments opens the TUI in an interactive terminal.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--version", action="version", version=__version__)
@@ -234,7 +255,7 @@ def main(argv=None):
             if workspace:
                 workspace.register(result["path"])
         else:
-            service = get_service(args)
+            service = get_doctor_service(args) if command == "doctor" else get_service(args)
             if command == "doctor":
                 result = service.doctor(args.hashes)
             elif command == "backup":

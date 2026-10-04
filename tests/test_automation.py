@@ -2,6 +2,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 import json
 import os
+import signal
 import sys
 import time
 import pytest
@@ -97,6 +98,61 @@ def test_active_cancel_retry_serializes_old_worker(service,tmp_path):
     retried=jobs.retry(finished['id'],finished['revision'])
     stale=jobs._finish(finished['id'],'failed',{'attempt':1,'error':'old worker'})
     assert stale['status']=='queued' and stale['revision']==retried['revision']
+
+
+@pytest.mark.skipif(os.name != 'posix', reason='process-group descendant cleanup requires POSIX')
+def test_exited_script_parent_does_not_leave_term_ignoring_descendant(service,tmp_path):
+    pid_file=tmp_path/'descendant.pid'
+    script=tmp_path/'parent_exits.py'
+    child_code=(
+        'import os,signal,sys,time\n'
+        'signal.signal(signal.SIGTERM, signal.SIG_IGN)\n'
+        'with open(sys.argv[1], "w") as f: f.write(str(os.getpid()))\n'
+        'time.sleep(60)\n'
+    )
+    script.write_text(
+        'import pathlib,subprocess,sys,time\n'
+        f'pid_file=pathlib.Path({str(pid_file)!r})\n'
+        f'child_code={child_code!r}\n'
+        'subprocess.Popen([sys.executable,"-c",child_code,str(pid_file)], '
+        'stdin=subprocess.DEVNULL,stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)\n'
+        'deadline=time.monotonic()+5\n'
+        'while not pid_file.exists() and time.monotonic()<deadline: time.sleep(.01)\n'
+        'if not pid_file.exists(): raise RuntimeError("descendant did not start")\n'
+    )
+    ScriptRegistry().register('parent-exits',[sys.executable,str(script)],timeout=10)
+    jobs=Jobs(service)
+    queued=jobs.create('parent-exits')
+    started=time.monotonic()
+    try:
+        result=jobs.run(queued['id'],queued['revision'])
+        elapsed=time.monotonic()-started
+        assert result['status']=='failed'
+        descendant_pid=int(pid_file.read_text())
+
+        def descendant_running():
+            stat_file=Path(f'/proc/{descendant_pid}/stat')
+            if stat_file.is_file():
+                state=stat_file.read_text().rsplit(')',1)[1].split()[0]
+                return state not in ('Z','X')
+            try:
+                os.kill(descendant_pid,0)
+                return True
+            except ProcessLookupError:
+                return False
+
+        for _ in range(50):
+            if not descendant_running():
+                break
+            time.sleep(.02)
+        assert not descendant_running(), 'the TERM-ignoring descendant survived job cleanup'
+        assert elapsed < 8, 'job cleanup should remain bounded'
+    finally:
+        if pid_file.exists():
+            try:
+                os.kill(int(pid_file.read_text()), signal.SIGKILL)
+            except (ProcessLookupError, ValueError):
+                pass
 
 
 def test_registered_output_limit_enforced(service):
