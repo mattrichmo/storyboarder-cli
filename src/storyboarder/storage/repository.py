@@ -1,10 +1,10 @@
-from contextlib import closing
 """Small SQLite repository. Services own transactions; no interface owns SQL."""
-from contextlib import contextmanager
+from contextlib import closing, contextmanager
 from pathlib import Path
 import hashlib
 import json
 import sqlite3
+from filelock import FileLock, Timeout
 from storyboarder import SCHEMA_VERSION
 from storyboarder.domain.models import now, dumps
 from storyboarder.domain.errors import Conflict, NotFound, StoryboardError
@@ -91,6 +91,15 @@ class Repository:
 
     def migrate(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        # Serialize the version check, backup and all migration commits across launchers.
+        # Resolve aliases so the same database always uses the same advisory lock.
+        try:
+            with FileLock(str(self.path.resolve()) + ".migrate.lock", timeout=10):
+                self._migrate()
+        except Timeout as exc:
+            raise StoryboardError("Another launcher is migrating this project. Retry after it finishes.") from exc
+
+    def _migrate(self):
         conn = self.connect()
         try:
             current = conn.execute("PRAGMA user_version").fetchone()[0]
