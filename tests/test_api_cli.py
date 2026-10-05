@@ -1,4 +1,5 @@
 from pathlib import Path
+import argparse
 import json
 import subprocess
 import sys
@@ -7,6 +8,8 @@ from fastapi.testclient import TestClient
 from storyboarder.api.server import create_app
 from storyboarder.application.projects import Project
 from storyboarder.application.service import Service
+from storyboarder.application.commands import COMMANDS
+from storyboarder.cli.main import COMMAND_GROUP_HELP, CONVENIENCE_HELP, build_parser
 
 @pytest.fixture
 def client(workspace):
@@ -100,6 +103,56 @@ def test_packaged_frontend_no_remote_assets_and_security_headers(client):
 
 def cli(*args,cwd=None):
     return subprocess.run([sys.executable,'-m','storyboarder',*map(str,args)],cwd=cwd,text=True,capture_output=True,timeout=20)
+
+
+def _leaf_parser(parser, group, action):
+    group_subparsers = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    action_subparsers = next(
+        a for a in group_subparsers.choices[group]._actions
+        if isinstance(a, argparse._SubParsersAction)
+    )
+    return action_subparsers.choices[action]
+
+
+def test_catalog_cli_help_shows_field_rules_and_all_commands_parse():
+    parser = build_parser()
+    catalog_groups = {name.split('.', 1)[0] for name in COMMANDS}
+    assert catalog_groups <= COMMAND_GROUP_HELP.keys()
+    root_help = parser.format_help()
+    for description in (*COMMAND_GROUP_HELP.values(), *CONVENIENCE_HELP.values()):
+        assert description in root_help
+    for name, command in COMMANDS.items():
+        group, action = name.split('.', 1)
+        leaf = _leaf_parser(parser, group, action)
+        help_text = leaf.format_help()
+        named_args = [group, action]
+        for field in command.fields:
+            option = '--' + field.name.replace('_', '-')
+            argument = leaf._option_string_actions[option]
+            assert argument.default is argparse.SUPPRESS
+            assert argument.choices == (field.options or None)
+            assert option in help_text
+            if field.required:
+                assert '[required]' in argument.help
+                if field.type != 'boolean':
+                    if field.options:
+                        value = field.options[0]
+                    elif field.type in ('integer', 'number'):
+                        value = '1'
+                    elif field.type == 'json':
+                        value = '{}'
+                    else:
+                        value = 'sample'
+                    named_args.extend((option, value))
+                else:
+                    named_args.append(option)
+            if field.default is not None:
+                marker = '[default: ' + json.dumps(field.default, ensure_ascii=False) + ']'
+                assert marker in argument.help
+
+        # Payloads and named flags both remain valid ways to invoke every catalog command.
+        assert parser.parse_args([group, action, '--payload', '{}']).command == name
+        assert parser.parse_args(named_args).command == name
 
 
 def test_bare_cli_noninteractive_help_not_tui():

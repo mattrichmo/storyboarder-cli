@@ -4,11 +4,11 @@ Run `storyboarder tui --workspace PATH` or `storyboarder tui --project PATH`.
 Bare `storyboarder` starts this interface when stdin/stdout are interactive.
 The implementation uses prompt_toolkit; it is not a command-line setup wizard.
 
-The left navigation contains 12 pages: workspace; overview; intake; asset library;
-connections; outline; story guide; scene/shot editor; frames; composition/export;
-external scripts; settings/health. Pages share a searchable record list, inspector,
-visible focus, contextual actions and status/error messages. Tables and inspectors
-read the same service state as the React app.
+The left navigation contains 12 pages: Workspace; Project overview; Image intake;
+Reference library; Connections; Story outline; Story guide; Scene & shot editor;
+Storyboard frames; Board & exports; Image tools; and Project care. Pages share a
+searchable record list, inspector, visible focus, contextual actions and status/error
+messages. Tables and inspectors read the same service state as the React app.
 
 | Key | Action |
 |---|---|
