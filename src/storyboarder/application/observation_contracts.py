@@ -270,6 +270,24 @@ class ObservationContracts:
         cached = artifact_cache[artifact_id]
         return cached if cached["content_sha256"] == version["content_sha256"] else None
 
+    @staticmethod
+    def _source_endpoint_projection(node, version, document):
+        """Return all immutable fields emitted by provenance's node endpoint."""
+        projection = {key: node[key] for key in (
+            "id", "version_id", "logical_id", "parent_id", "node_type", "position",
+            "title", "source_pointer", "content_sha256", "identity",
+        )}
+        projection.update({
+            "document_id": version["document_id"], "document_kind": document["kind"],
+            "version_label": version["label"], "type": "node", "key": f"node:{node['id']}",
+            "label": node["title"],
+        })
+        return projection
+
+    @staticmethod
+    def _immutable_source_snapshot(snapshot):
+        return {key: value for key, value in snapshot.items() if key not in ("is_current", "archived")}
+
     def _pin_artifact_check(self, conn, node, pin, cache):
         artifact_id = node.get("source_artifact_id")
         if not artifact_id:
@@ -354,6 +372,8 @@ class ObservationContracts:
                 or source_snapshot.get("version_id") != version["id"]
                 or source_snapshot.get("logical_id") != node["logical_id"]
                 or source_snapshot.get("content_sha256") != node["content_sha256"]
+                or self._immutable_source_snapshot(source_snapshot)
+                    != self._source_endpoint_projection(node, version, document)
                 or target_snapshot.get("id") != edge["target_id"]):
             raise ObservationContractError("contract_source_hash_mismatch", "The provenance snapshot does not match its exact source identity.",
                                            {"edge_id": edge_id})
@@ -505,6 +525,82 @@ class ObservationContracts:
             "referenced_assets": assets,
         }
 
+    @staticmethod
+    def _review_value(value, *, max_string=1200, max_items=30):
+        if isinstance(value, str) and len(value) > max_string:
+            return value[:max_string] + "…"
+        if isinstance(value, list) and len(value) > max_items:
+            return [ObservationContracts._review_value(item, max_string=max_string, max_items=max_items)
+                    for item in value[:max_items]] + [{"truncated": True, "remaining": len(value) - max_items}]
+        if isinstance(value, dict) and len(value) > max_items:
+            keys = sorted(value)[:max_items]
+            return {key: ObservationContracts._review_value(value[key], max_string=max_string, max_items=max_items)
+                    for key in keys} | {"_truncated": len(value) - max_items}
+        if isinstance(value, dict):
+            return {key: ObservationContracts._review_value(item, max_string=max_string, max_items=max_items)
+                    for key, item in value.items()}
+        if isinstance(value, list):
+            return [ObservationContracts._review_value(item, max_string=max_string, max_items=max_items) for item in value]
+        return value
+
+    @classmethod
+    def _basis_changes(cls, saved, current, *, maximum=100):
+        changes = []
+        truncated = False
+        missing = object()
+
+        def walk(path, before, after):
+            nonlocal truncated
+            if before is not missing and after is not missing and before == after:
+                return
+            if isinstance(before, dict) and isinstance(after, dict):
+                for key in sorted(before.keys() | after.keys()):
+                    segment = str(key).replace("~", "~0").replace("/", "~1")
+                    walk(path + "/" + segment, before.get(key, missing), after.get(key, missing))
+                return
+            if len(changes) >= maximum:
+                truncated = True
+                return
+            changes.append({
+                "path": path or "/",
+                "saved_value": {"missing": True} if before is missing else cls._review_value(before),
+                "current_value": {"missing": True} if after is missing else cls._review_value(after),
+            })
+
+        walk("", saved, current)
+        return changes, truncated
+
+    def review_rebase(self, contract_id, requested_body):
+        """Read-only preview token and bounded authored-basis change report."""
+        body = _validate_body(requested_body)
+        artifact_cache = {}
+        with self.repo.readonly_transaction() as conn:
+            header, version = self._version(conn, contract_id)
+            saved_basis = self._safe_json(version["basis_json"], code="contract_basis_invalid", label="saved basis")
+            current_basis = self._basis(conn, header["shot_id"], body)
+            expected_basis_sha256 = content_hash(current_basis)
+            changes, changes_truncated = self._basis_changes(saved_basis, current_basis)
+            validation = self._validate(conn, header, version, artifact_cache)
+            return {
+                "contract_id": contract_id,
+                "shot_id": header["shot_id"],
+                "revision": header["revision"],
+                "saved_version_id": version["id"],
+                "saved_basis_sha256": version["basis_sha256"],
+                "current_basis_sha256": expected_basis_sha256,
+                "expected_basis_sha256": expected_basis_sha256,
+                "basis_changed": expected_basis_sha256 != version["basis_sha256"],
+                "changes": changes,
+                "changes_truncated": changes_truncated,
+                "requested_source_pins": sorted(
+                    ({"edge_id": pin["edge_id"], "source_scope": pin["source_scope"]} for pin in body["source_pins"]),
+                    key=lambda pin: pin["edge_id"],
+                ),
+                "requested_references": list(body["references"]),
+                "requested_continuity_ids": sorted(note["id"] for note in body["continuity"]),
+                "validation_context": validation,
+            }
+
     def _reference_for_write(self, conn, reference_id):
         row = self._entity_row(conn, reference_id)
         if row is None or row["kind"] != "asset":
@@ -579,7 +675,7 @@ class ObservationContracts:
                             {"shot_id": shot["id"], "version_id": version["id"]})
             return self._show(conn, header["id"], version["id"], artifact_cache)
 
-    def _revise(self, contract_id, revision, contract, operation):
+    def _revise(self, contract_id, revision, contract, operation, expected_basis_sha256=None):
         body = _validate_body(contract)
         with self.repo.transaction() as conn:
             header = self._header(conn, contract_id)
@@ -588,6 +684,26 @@ class ObservationContracts:
             _, current = self._version(conn, contract_id)
             current_body = _validate_body(self._safe_json(current["contract_json"]))
             artifact_cache = {}
+            if operation == "rebase":
+                if not isinstance(expected_basis_sha256, str) or not re.fullmatch(r"[0-9a-f]{64}", expected_basis_sha256):
+                    raise ObservationContractError(
+                        "contract_basis_review_required",
+                        "Review the current authored basis before rebasing this contract.",
+                        {"contract_id": contract_id, "revision": header["revision"]}, 409,
+                    )
+                reviewed_basis = self._basis(conn, shot["id"], body)
+                current_basis_sha256 = content_hash(reviewed_basis)
+                if current_basis_sha256 != expected_basis_sha256:
+                    saved_basis = self._safe_json(current["basis_json"], code="contract_basis_invalid", label="saved basis")
+                    changes, changes_truncated = self._basis_changes(saved_basis, reviewed_basis)
+                    raise ObservationContractError(
+                        "contract_basis_changed",
+                        "The authored basis changed after review. Review the rebase again before saving.",
+                        {"expected_basis_sha256": expected_basis_sha256,
+                         "current_basis_sha256": current_basis_sha256,
+                         "saved_basis_sha256": current["basis_sha256"],
+                         "changes": changes, "changes_truncated": changes_truncated}, 409,
+                    )
             requested_pins = {pin["edge_id"]: pin["source_scope"] for pin in body["source_pins"]}
             current_pins = {pin["edge_id"]: pin["source_scope"] for pin in current_body["source_pins"]}
             if operation == "revise":
@@ -613,9 +729,9 @@ class ObservationContracts:
     def revise(self, contract_id, revision, contract):
         return self._revise(contract_id, revision, contract, "revise")
 
-    def rebase(self, contract_id, revision, contract):
+    def rebase(self, contract_id, revision, contract, expected_basis_sha256=None):
         # A complete v1 body is required, including the caller's exact edge IDs.
-        return self._revise(contract_id, revision, contract, "rebase")
+        return self._revise(contract_id, revision, contract, "rebase", expected_basis_sha256)
 
     def _pin_integrity_reasons(self, conn, pin, shot_id, artifact_cache=None):
         """Check a saved pin against its exact immutable rows, independent of live status."""
@@ -633,7 +749,7 @@ class ObservationContracts:
         elif (edge["relation"] != "visualizes" or edge["source_type"] != "node"
               or edge["source_id"] != pin["node_id"] or edge["target_type"] != "entity"):
             reasons.append("edge_identity_changed")
-        node = conn.execute("""SELECT n.*,v.document_id,v.content_sha256 AS version_sha256,
+        node = conn.execute("""SELECT n.*,v.document_id,v.label AS version_label,v.content_sha256 AS version_sha256,
             v.source_artifact_id,d.kind AS document_kind FROM document_nodes n
             JOIN document_versions v ON v.id=n.version_id JOIN documents d ON d.id=v.document_id
             WHERE n.id=?""", (pin["node_id"],)).fetchone()
@@ -675,13 +791,14 @@ class ObservationContracts:
             try:
                 edge_source = self._safe_json(pin["edge_source_snapshot"], label="edge source snapshot")
                 edge_target = self._safe_json(pin["edge_target_snapshot"], label="edge target snapshot")
-                if node is not None and (edge_source.get("id") != node["id"]
-                        or edge_source.get("type") != "node" or edge_source.get("version_id") != node["version_id"]
-                        or edge_source.get("document_id") != node["document_id"]
-                        or edge_source.get("logical_id") != node["logical_id"]
-                        or edge_source.get("node_type") != node["node_type"]
-                        or edge_source.get("content_sha256") != node["content_sha256"]):
-                    reasons.append("edge_source_snapshot_mismatch")
+                if node is not None:
+                    expected_source = self._source_endpoint_projection(
+                        node,
+                        {"document_id": node["document_id"], "label": node["version_label"]},
+                        {"kind": node["document_kind"]},
+                    )
+                    if self._immutable_source_snapshot(edge_source) != expected_source:
+                        reasons.append("edge_source_snapshot_mismatch")
                 target_id = (shot_id if pin["source_scope"] == "direct-element" else saved_parent)
                 target = conn.execute("SELECT kind FROM entities WHERE id=?", (edge["target_id"],)).fetchone()
                 expected_kind = "shot" if pin["source_scope"] == "direct-element" else "scene"
@@ -755,17 +872,34 @@ class ObservationContracts:
 
     def _reference_states(self, conn, version_id, body):
         items = []
+        pins = {row["reference_id"]: dict(row) for row in conn.execute(
+            "SELECT reference_id,snapshot_json FROM observation_reference_pins WHERE version_id=? ORDER BY reference_id",
+            (version_id,),
+        )}
         for reference_id in body["references"]:
-            row = conn.execute("SELECT id,kind,archived FROM entities WHERE id=?", (reference_id,)).fetchone()
-            if row is None or row["kind"] != "asset":
+            entity = conn.execute("SELECT id,kind,archived FROM entities WHERE id=?", (reference_id,)).fetchone()
+            pin = pins.get(reference_id)
+            if pin is None:
+                items.append({"reference_id": reference_id, "state": "conflict", "reason": "reference_pin_mismatch"})
+                continue
+            try:
+                snapshot = self._safe_json(pin["snapshot_json"], label="reference snapshot")
+            except ObservationContractError:
+                items.append({"reference_id": reference_id, "state": "conflict", "reason": "reference_snapshot_invalid"})
+                continue
+            if (snapshot.get("reference_id") != pin["reference_id"]
+                    or snapshot.get("reference_id") != reference_id
+                    or snapshot.get("kind") != "asset"
+                    or entity is not None and (entity["id"] != pin["reference_id"] or entity["kind"] != "asset")):
+                items.append({"reference_id": reference_id, "state": "conflict", "reason": "reference_snapshot_mismatch"})
+            elif entity is None or entity["kind"] != "asset":
                 items.append({"reference_id": reference_id, "state": "dangling", "reason": "reference_missing"})
-            elif row["archived"]:
+            elif entity["archived"]:
                 items.append({"reference_id": reference_id, "state": "unresolved", "reason": "reference_archived"})
             else:
                 items.append({"reference_id": reference_id, "state": "available"})
-        actual = {row[0] for row in conn.execute("SELECT reference_id FROM observation_reference_pins WHERE version_id=?", (version_id,))}
-        if actual != set(body["references"]):
-            items.append({"reference_id": None, "state": "conflict", "reason": "reference_pin_mismatch"})
+        for pin_id in sorted(pins.keys() - set(body["references"])):
+            items.append({"reference_id": pin_id, "state": "conflict", "reason": "reference_pin_mismatch"})
         return items
 
     def _validate(self, conn, header, version, artifact_cache=None):
@@ -867,6 +1001,8 @@ class ObservationContracts:
                                  "source_mappings": mappings})
         references = self._reference_states(conn, version["id"], body)
         for reference in references:
+            if reference.get("reason") in ("reference_snapshot_invalid", "reference_snapshot_mismatch", "reference_pin_mismatch"):
+                conflicts = True
             if reference["state"] in ("dangling", "unresolved", "conflict"):
                 unresolved = True
                 findings.append({"code": reference["reason"], "reference_id": reference["reference_id"]})
@@ -893,6 +1029,8 @@ class ObservationContracts:
         artifact_cache = artifact_cache if artifact_cache is not None else {}
         header, version = self._version(conn, contract_id, version_id)
         body = self._safe_json(version["contract_json"])
+        validation = self._validate(conn, header, version, artifact_cache)
+        reference_status = {item.get("reference_id"): item for item in validation["references"]}
         pins = []
         for row in conn.execute("SELECT * FROM observation_source_pins WHERE version_id=? ORDER BY edge_id", (version["id"],)):
             item = dict(row)
@@ -901,14 +1039,20 @@ class ObservationContracts:
             pins.append(item)
         references = []
         for row in conn.execute("SELECT reference_id,snapshot_json FROM observation_reference_pins WHERE version_id=? ORDER BY reference_id", (version["id"],)):
-            references.append({"reference_id": row["reference_id"], "snapshot": self._safe_json(row["snapshot_json"], label="reference snapshot")})
+            state = reference_status.get(row["reference_id"], {"state": "conflict", "reason": "reference_pin_mismatch"})
+            try:
+                snapshot = self._safe_json(row["snapshot_json"], label="reference snapshot")
+            except ObservationContractError:
+                snapshot = None
+            references.append({"reference_id": row["reference_id"], "snapshot": snapshot,
+                               "state": state["state"], "reason": state.get("reason")})
         history = [dict(row) for row in conn.execute("SELECT id,number,parent_version_id,schema_version,content_sha256,basis_sha256,operation,created_at FROM observation_contract_versions WHERE contract_id=? ORDER BY number", (contract_id,))]
         return {"id": header["id"], "shot_id": header["shot_id"], "revision": header["revision"],
                 "current_version_id": header["current_version_id"], "created_at": header["created_at"],
                 "updated_at": header["updated_at"], "selected_version_id": version["id"],
                 "version": {k: version[k] for k in ("id", "contract_id", "parent_version_id", "number", "schema_version", "content_sha256", "basis_sha256", "operation", "created_at")},
                 "contract": body, "source_pins": pins, "reference_pins": references,
-                "history": history, "validation": self._validate(conn, header, version, artifact_cache)}
+                "history": history, "validation": validation}
 
     def show(self, contract_id, version_id=None):
         with self.repo.transaction(False) as conn:
@@ -1002,8 +1146,10 @@ class ObservationContracts:
                         refs = {row[0] for row in conn.execute("SELECT reference_id FROM observation_reference_pins WHERE version_id=?", (version["id"],))}
                         if refs != set(body["references"]):
                             raise ValueError("contract_reference_pins_mismatch")
-                        for ref in conn.execute("SELECT snapshot_json FROM observation_reference_pins WHERE version_id=?", (version["id"],)):
-                            self._safe_json(ref[0], label="reference snapshot")
+                        reference_issues = [item for item in self._reference_states(conn, version["id"], body)
+                                            if item.get("reason") in ("reference_snapshot_invalid", "reference_snapshot_mismatch")]
+                        if reference_issues:
+                            raise ValueError("contract_reference_snapshot_integrity_mismatch:" + dumps(reference_issues))
                 except Exception as exc:
                     issues.append({"severity": "error", "code": "observation_contract_integrity", "contract_id": header["id"],
                                    "message": "An observation contract version or exact pin is inconsistent. Preserve the project folder and inspect a verified backup.",
