@@ -79,6 +79,18 @@ UI interactions and HTTP effects, but not ordinary page navigation, browser CSP 
 or browser-download behavior. Independent API tests cover returned files and headers.
 The normal-navigation test still needs to be run on an unrestricted target machine.
 
+Canvas navigation regression (issue #19) uses its own disposable workspace and
+loopback server, so no running app or demo preparation is required:
+
+```sh
+python clients/web/e2e/canvas_navigation.py --output artifacts/canvas-navigation
+```
+
+It checks page/hash/history navigation, per-project draft isolation, restored
+filters/viewport, failed saves, layout revisions after returning, and unload warnings
+for dirty drafts on inactive pages/projects. The same `--chromium` and
+`--transport-bridge` options are available.
+
 ## Platform and operational caveats
 
 Linux/Python 3.13 was executed here. The project includes platform-neutral Python paths,

@@ -46,9 +46,12 @@ visual proximity or a drag never changes narrative order.
 
 Save a name for each view. Positions, hidden/collapsed IDs, filters and viewport are
 stored independently from story records with their own revision. Tidy is deterministic
-and does not rewrite canonical order. Save before leaving a page; unsaved arrangements
-are temporary. Switching canvas modes/loading another layout warns before replacing
-unsaved positions. Closing the browser warns while a layout is dirty.
+and does not rewrite canonical order. Unsaved arrangements are kept per project for
+the open app session: navigating to another page or project and returning restores
+positions, viewport, filters, hidden/collapsed cards and the selected layout's save
+revision. Save the arrangement to keep it across app sessions. Switching canvas
+modes/loading another layout warns before replacing unsaved positions. Closing or
+reloading the app warns if any project has a dirty arrangement, even on another page.
 
 Delete/Backspace opens usage review. **Hide** changes this layout only. **Archive**
 changes the record's lifecycle across all interfaces. **Delete** is available only
