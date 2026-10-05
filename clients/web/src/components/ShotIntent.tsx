@@ -10,7 +10,7 @@ type Continuity={id:string;related_shot_ids:string[];statement:string};
 type ContractBody={schema:'storyboarder.observation-contract/v1';source_pins:SourcePin[];script_intents:ScriptIntent[];requirements:Requirement[];references:string[];continuity:Continuity[];notes:string};
 type SourceRow={edge_id:string;target_id:string;node_id:string;version_id:string;logical_id:string;node_type:string;title:string;document_id:string;version_label:string;current_version_id:string;content_sha256?:string;stale:boolean;inherited:boolean};
 type ContractVersion={id:string;number:number;parent_version_id:string|null;schema_version:number;content_sha256:string;basis_sha256:string;operation:string;created_at:string};
-type Validation={status:string;findings:Array<Record<string,any>>;requirements:Array<Record<string,any>>;source_pins:Array<Record<string,any>>;references:Array<Record<string,any>>;basis_current:boolean};
+type Validation={status:string;revision?:number;version_id?:string;findings:Array<Record<string,any>>;requirements:Array<Record<string,any>>;source_pins:Array<Record<string,any>>;references:Array<Record<string,any>>;basis_current:boolean};
 type ContractRecord={id:string;shot_id:string;revision:number;current_version_id:string;selected_version_id:string;version:ContractVersion;contract:ContractBody;source_pins:Array<Record<string,any>>;history:ContractVersion[];validation:Validation};
 type ContractListItem={id:string;shot_id:string;current_version_id:string;revision:number;shot_title:string;version_number:number};
 type SourceDetails={documentTitle?:string;versionNumber?:number;versionLabel?:string;nodeTitle?:string;nodeType?:string;currentVersionId?:string;contentSha256?:string;error?:string};
@@ -24,6 +24,9 @@ const draftCache=new Map<string,DraftCache>();
 const pendingDrafts=new Set<string>();
 const draftListeners=new Map<string,Set<(event:DraftEvent,origin:object)=>void>>();
 const dirtyDraftOwners=new Set<string>();
+const acceptedRecordEpochs=new Map<string,number>();
+function acceptedRecordEpoch(key:string){return acceptedRecordEpochs.get(key)||0;}
+function noteAcceptedRecordWrite(key:string){acceptedRecordEpochs.set(key,acceptedRecordEpoch(key)+1);}
 function guardUnsavedUnload(event:BeforeUnloadEvent){if(!dirtyDraftOwners.size&&!pendingDrafts.size)return;event.preventDefault();event.returnValue='';}
 function updateUnloadGuard(){if(typeof window==='undefined')return;if(dirtyDraftOwners.size||pendingDrafts.size)window.addEventListener('beforeunload',guardUnsavedUnload);else window.removeEventListener('beforeunload',guardUnsavedUnload);}
 function setDraftDirty(key:string,dirty:boolean){if(dirty)dirtyDraftOwners.add(key);else dirtyDraftOwners.delete(key);updateUnloadGuard();}
@@ -74,13 +77,13 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
  }
 
  async function initialLoad(){
-  const sequence=++loadSequence.current;const cachedAtStart=draftCache.get(ownerKey);editGeneration.current=cachedAtStart?.generation||0;initialShotRevision.current=cachedAtStart?.shotRevision??shot.revision;setLatestShotRevision(shot.revision);setOwnerPending(pendingDrafts.has(ownerKey));
+  const sequence=++loadSequence.current,acceptedEpoch=acceptedRecordEpoch(ownerKey);const stillCurrent=()=>loadSequence.current===sequence&&acceptedRecordEpoch(ownerKey)===acceptedEpoch;const stopStaleLoad=()=>{if(loadSequence.current===sequence){setReady(true);setLoading(false);}};const cachedAtStart=draftCache.get(ownerKey);editGeneration.current=cachedAtStart?.generation||0;initialShotRevision.current=cachedAtStart?.shotRevision??shot.revision;setLatestShotRevision(shot.revision);setOwnerPending(pendingDrafts.has(ownerKey));
   setLoading(true);setReady(false);setError('');setSourceError('');setNotice('');setSaved(null);setLatest(null);setValidation(null);setDraft(copy(cachedAtStart?.body||emptyBody()));setItems([]);setSelectedContract('');setReview(null);setRemoteDiff(null);setHistoryDiff(null);setConflicted(false);setRebaseNeedsReview(false);
   const [sourceResult,listResult]=await Promise.allSettled([
    runCommand<{items:SourceRow[]}>(projectId,'shot.sources',{id:shot.id}),
    runCommand<{items:ContractListItem[]}>(projectId,'observation.list',{shot_id:shot.id,limit:100,offset:0}),
   ]);
-  if(loadSequence.current!==sequence)return;
+  if(!stillCurrent()){stopStaleLoad();return;}
   if(sourceResult.status==='fulfilled')void hydrateSources(sourceResult.value.items||[],()=>loadSequence.current===sequence);
   else setSourceError(messageOf(sourceResult.reason));
   if(listResult.status==='rejected'){setError(messageOf(listResult.reason));setLoading(false);return;}
@@ -90,25 +93,25 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
   setSelectedContract(first.id);
   try{
    const record=await runCommand<ContractRecord>(projectId,'observation.show',{contract_id:first.id});
-   if(loadSequence.current!==sequence)return;
+   if(!stillCurrent())return;
    const checked=await runCommand<Validation>(projectId,'observation.validate',{contract_id:first.id,version_id:record.selected_version_id});
-   if(loadSequence.current!==sequence)return;
+   if(!stillCurrent())return;
    const cached=draftCache.get(ownerKey);
    if(cached){
     const base=cached.baseRecord;const pendingOwnCreate=!cached.baseRecord&&pendingDrafts.has(ownerKey);const hasExternal=(!cached.baseRecord&&!pendingOwnCreate)||!!cached.baseRecord&&(cached.baseRecord.revision!==record.revision||cached.baseRecord.current_version_id!==record.current_version_id);
     setSaved(base);setLatest(record);setDraft(copy(cached.body));setValidation(checked);setConflicted(hasExternal||cached.conflicted);
     let difference:ContractDiff|null=null;
-    if(cached.baseRecord&&hasExternal){try{difference=await runCommand<ContractDiff>(projectId,'observation.diff',{contract_id:record.id,before_version_id:cached.baseRecord.current_version_id,after_version_id:record.current_version_id});}catch(reason){if(loadSequence.current===sequence)setError(messageOf(reason));}}
-    if(loadSequence.current!==sequence)return;
+    if(cached.baseRecord&&hasExternal){try{difference=await runCommand<ContractDiff>(projectId,'observation.diff',{contract_id:record.id,before_version_id:cached.baseRecord.current_version_id,after_version_id:record.current_version_id});}catch(reason){if(stillCurrent())setError(messageOf(reason));}}
+    if(!stillCurrent())return;
     setRemoteDiff(difference);storeDraft(ownerKey,{...cached,baseRecord:base,latestRecord:record,conflicted:hasExternal||cached.conflicted},instance.current);
    }else{setSaved(record);setLatest(record);setDraft(copy(record.contract));setValidation(checked);storeDraft(ownerKey,{body:copy(record.contract),baseRecord:record,latestRecord:record,shotRevision:initialShotRevision.current,generation:editGeneration.current,conflicted:false},instance.current);}
-  }catch(reason){if(loadSequence.current===sequence)setError(messageOf(reason));}
+  }catch(reason){if(stillCurrent())setError(messageOf(reason));}
   finally{if(loadSequence.current===sequence)setLoading(false);}
  }
 
  useEffect(()=>{
   let listeners=draftListeners.get(ownerKey);if(!listeners){listeners=new Set();draftListeners.set(ownerKey,listeners);}
-  const listener=(event:DraftEvent,origin:object)=>{if(origin===instance.current)return;setOwnerPending(event.pending);if(event.entry){editGeneration.current=event.entry.generation;initialShotRevision.current=event.entry.shotRevision;setDraft(copy(event.entry.body));setSaved(event.entry.baseRecord);setLatest(event.entry.latestRecord);setConflicted(event.entry.conflicted);}};
+ const listener=(event:DraftEvent,origin:object)=>{if(origin===instance.current)return;setOwnerPending(event.pending);if(event.entry){editGeneration.current=event.entry.generation;initialShotRevision.current=event.entry.shotRevision;setDraft(copy(event.entry.body));setSaved(event.entry.baseRecord);setLatest(event.entry.latestRecord);setConflicted(event.entry.conflicted);const record=event.entry.latestRecord||event.entry.baseRecord;if(record){const listItem={id:record.id,shot_id:record.shot_id,current_version_id:record.current_version_id,revision:record.revision,shot_title:shot.title,version_number:record.version.number};setItems(old=>old.some(item=>item.id===record.id)?old.map(item=>item.id===record.id?listItem:item):[...old,listItem]);setSelectedContract(record.id);setValidation(record.validation);}}};
   listeners.add(listener);setOwnerPending(pendingDrafts.has(ownerKey));void initialLoad();
   return()=>{listeners?.delete(listener);if(!listeners?.size)draftListeners.delete(ownerKey);loadSequence.current+=1;};
  },[projectId,shot.id]);
@@ -181,6 +184,7 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
     if(!review||reviewGeneration!==generation)throw new Error('Review this exact draft again before rebasing.');
     record=await runCommand<ContractRecord>(projectId,'observation.rebase',{contract_id:saved!.id,revision:review.revision,contract:body,expected_basis_sha256:review.expected_basis_sha256});
    }else record=await runCommand<ContractRecord>(projectId,'observation.revise',{contract_id:saved!.id,revision:saved!.revision,contract:body});
+   noteAcceptedRecordWrite(ownerKey);
    setItems(old=>old.some(item=>item.id===record.id)?old.map(item=>item.id===record.id?{...item,revision:record.revision,current_version_id:record.current_version_id}:item):[...old,{id:record.id,shot_id:record.shot_id,current_version_id:record.current_version_id,revision:record.revision,shot_title:shot.title,version_number:record.version.number}]);
    setSelectedContract(record.id);setSaved(record);setLatest(record);setValidation(record.validation);setConflicted(false);setRemoteDiff(null);setReview(null);setReviewGeneration(-1);
    const cached=draftCache.get(ownerKey);const newer=cached&&cached.generation!==generation;const nextBody=newer?copy(cached.body):copy(record.contract);const nextGeneration=newer?cached.generation:generation;
@@ -212,7 +216,11 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
  }
 
  const sourceByEdge=new Map(sources.map(row=>[row.edge_id,row]));
- const validationStatus=validation?.status||saved?.validation?.status||'not checked';
+ const validationStatus=validation?.status||latest?.validation?.status||saved?.validation?.status||'not checked';
+ const validationRevision=validation?.revision??latest?.revision??saved?.revision;
+ const draftNeedsValidationDisclaimer=dirty||conflicted;
+ const validationLabel=draftNeedsValidationDisclaimer?`Saved revision ${validationRevision} validation: ${validationStatus}`:`Current saved revision ${validationRevision}: ${validationStatus}`;
+ const validationScope=draftNeedsValidationDisclaimer?`This status covers saved revision ${validationRevision} only; the current local draft has not been checked.`:'This status covers the current saved contract revision.';
  const missingSourcePins=draft.source_pins.filter(pin=>!sourceByEdge.has(pin.edge_id)||!!validation?.source_pins?.find(item=>item.edge_id===pin.edge_id&&item.stale));
  const canSubmit=ready&&!busy&&!ownerPending&&!loading&&!refreshing&&!!draft.script_intents.length&&draft.source_pins.length>0;
 
@@ -226,7 +234,7 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
   {notice&&<p role="status" className="shot-intent-status">{notice}</p>}
   {rebaseNeedsReview&&<div role="alert" className="notice warning"><strong>The reviewed basis changed.</strong><p>Your draft, exact pins, and previous header CAS are retained. The prior review token is invalid. Review the current proposal again before any rebase.</p><button type="button" onClick={()=>void reviewRebase()} disabled={busy||loading}>Review this draft again</button></div>}
   {conflicted&&!latest&&!saved&&latestShotRevision!==initialShotRevision.current&&<div role="alert" className="notice warning"><strong>The selected shot revision changed.</strong><p>Create still uses shot revision {initialShotRevision.current}; the latest saved shot revision is {latestShotRevision}. Your local draft and exact pins are retained.</p><button type="button" onClick={useLatestShotRevision} disabled={busy}>Use shot revision {latestShotRevision} for create</button></div>}
-  {saved&&<div className={`notice ${validationStatus==='consistent'?'':'warning'}`}><strong>Validation: {validationStatus}</strong><p>{validation?.findings?.length?`${validation.findings.length} finding${validation.findings.length===1?'':'s'} · authored basis ${validation.basis_current?'current':'changed'}`:'Deterministic source, identity, and authored-basis checks.'}</p><div className="shot-intent-meta"><span>Contract ID <code>{saved.id}</code></span><span>Header revision <code>{saved.revision}</code></span><span>Current version <code>{saved.current_version_id}</code></span></div></div>}
+  {saved&&<div className={`notice ${validationStatus==='consistent'?'':'warning'}`}><strong>{validationLabel}</strong><p>{validationScope}</p><p>{validation?.findings?.length?`${validation.findings.length} finding${validation.findings.length===1?'':'s'} · authored basis ${validation.basis_current?'current':'changed'}`:'Deterministic source, identity, and authored-basis checks.'}</p><div className="shot-intent-meta"><span>Contract ID <code>{saved.id}</code></span><span>Header revision <code>{saved.revision}</code></span><span>Current version <code>{saved.current_version_id}</code></span></div></div>}
   {conflicted&&latest&&<div role="alert" className="notice warning"><strong>A newer saved revision is available.</strong><p>The editor still uses header revision {saved?.revision||'not saved'}; latest is revision {latest.revision}. Your local draft and exact pins are retained.</p><div className="button-row"><button type="button" onClick={()=>void refreshStatus()} disabled={refreshing||busy||ownerPending}>Refresh comparison</button><button type="button" onClick={loadLatestIntoDraft} disabled={busy||ownerPending}>Discard draft and load revision {latest.revision}</button></div></div>}
   {remoteDiff&&<DiffView title="Saved revision changes" changes={remoteDiff.changes.map(change=>({path:change.path,before:change.before,after:change.after}))}/>}
   {ready&&!loading&&<fieldset className="shot-intent-fields" disabled={busy||ownerPending}>
