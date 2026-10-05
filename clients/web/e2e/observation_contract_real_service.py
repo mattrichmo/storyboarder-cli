@@ -33,6 +33,7 @@ async def run(args):
         "real_create_survives_a_to_b_to_a_and_syncs_contract_selector",
         "clean_saved_validation_is_restored_after_reload",
         "mismatched_show_and_validate_tuple_reconciles_without_losing_draft_or_pins",
+        "two_mismatches_leave_status_unchecked_without_a_false_newer_revision_alert",
     ]
     report = {
         "url": args.url,
@@ -57,6 +58,11 @@ async def run(args):
     capture_tuple_validation = {"value": False}
     tuple_show_held = asyncio.Event()
     release_tuple_show = asyncio.Event()
+    arm_double_show = {"value": False}
+    double_show_count = {"value": 0}
+    double_show_held = [asyncio.Event(), asyncio.Event()]
+    release_double_show = [asyncio.Event(), asyncio.Event()]
+    capture_double_validation = {"value": False}
     try:
         async with async_playwright() as playwright:
             launch = {"headless": True, "args": ["--no-sandbox"]}
@@ -145,6 +151,23 @@ async def run(args):
                     report["held_validation_response"] = await response.json()
                     old_validation_held.set()
                     await release_old_validation.wait()
+                    await route.fulfill(response=response)
+                    return
+                if (route.request.method == "POST" and path == "observation.show"
+                        and arm_double_show["value"] and payload.get("contract_id") == record["id"]
+                        and double_show_count["value"] < 2):
+                    index = double_show_count["value"]
+                    double_show_count["value"] += 1
+                    response = await route.fetch()
+                    report.setdefault("double_show_responses", []).append(await response.json())
+                    double_show_held[index].set()
+                    await release_double_show[index].wait()
+                    await route.fulfill(response=response)
+                    return
+                if (route.request.method == "POST" and path == "observation.validate"
+                        and capture_double_validation["value"] and payload.get("contract_id") == record["id"]):
+                    response = await route.fetch()
+                    report.setdefault("double_validation_responses", []).append(await response.json())
                     await route.fulfill(response=response)
                     return
                 if (route.request.method == "POST" and path == "observation.show"
@@ -380,6 +403,62 @@ async def run(args):
                 "draft_pins": checked_edges,
             }
             mark_passed(cases[5])
+            capture_tuple_validation["value"] = False
+
+            # Force two successive real header advances between show and
+            # validate. After the bounded retry the UI must show unchecked
+            # status and an explicit recovery alert, without claiming that the
+            # record it just read is a newer revision than itself.
+            await page.get_by_role("button", name=f'Discard draft and load revision {external["revision"]}', exact=True).click()
+            clean_external_label = f'Current saved revision {external["revision"]}: {external["validation"]["status"]}'
+            await panel.get_by_text(clean_external_label, exact=True).wait_for()
+            await page.reload(wait_until="networkidle")
+            await page.get_by_role("button", name="Story canvas", exact=True).click()
+            arm_double_show["value"] = True
+            capture_double_validation["value"] = True
+            panel = await open_shot(shot_a["id"])
+            await asyncio.wait_for(double_show_held[0].wait(), timeout=15)
+            first_show = report["double_show_responses"][0]
+            assert first_show["revision"] == external["revision"]
+            first_external_body = json.loads(json.dumps(external["contract"]))
+            first_external_body["notes"] = (first_external_body.get("notes") or "") + " First delayed writer."
+            first_external = await command("observation.revise", {
+                "contract_id": external["id"], "revision": external["revision"], "contract": first_external_body,
+            })
+            assert first_external["revision"] == external["revision"] + 1
+            release_double_show[0].set()
+            await asyncio.wait_for(double_show_held[1].wait(), timeout=15)
+            second_show = report["double_show_responses"][1]
+            assert second_show["revision"] == first_external["revision"]
+            second_external_body = json.loads(json.dumps(first_external["contract"]))
+            second_external_body["notes"] = (second_external_body.get("notes") or "") + " Second delayed writer."
+            second_external = await command("observation.revise", {
+                "contract_id": first_external["id"], "revision": first_external["revision"], "contract": second_external_body,
+            })
+            assert second_external["revision"] == first_external["revision"] + 1
+            release_double_show[1].set()
+            stable_alert = panel.get_by_role("alert").filter(has_text="The saved header could not be matched to validation.")
+            await stable_alert.wait_for()
+            unchecked_label = f'Saved revision {first_external["revision"]} validation: not checked'
+            await panel.get_by_text(unchecked_label, exact=True).wait_for()
+            assert await panel.get_by_text("A newer saved revision is available.", exact=True).count() == 0
+            assert await panel.get_by_role("button", name="Retry status refresh", exact=True).is_visible()
+            assert len(report.get("double_validation_responses", [])) == 2
+            assert report["double_validation_responses"][0]["revision"] == first_external["revision"]
+            assert report["double_validation_responses"][0]["version_id"] == first_show["selected_version_id"]
+            assert report["double_validation_responses"][1]["revision"] == second_external["revision"]
+            assert report["double_validation_responses"][1]["version_id"] == second_show["selected_version_id"]
+            assert await page.get_by_label("Observation contract", exact=True).locator("option:checked").inner_text() == f'Revision {first_external["revision"]} · {record["id"]}'
+            report["double_mismatch_result"] = {
+                "show_revisions": [first_show["revision"], second_show["revision"]],
+                "validation_tuples": [[value["revision"], value["version_id"]] for value in report["double_validation_responses"]],
+                "actual_latest_revision": second_external["revision"],
+                "displayed_record_revision": first_external["revision"],
+                "visible_label": unchecked_label,
+                "newer_revision_alert_count": 0,
+                "retry_available": True,
+            }
+            mark_passed(cases[6])
             if report["page_errors"] or report["console_errors"]:
                 raise AssertionError("Browser recorded page or console errors.")
             await page.screenshot(path=str(output / "final.png"), full_page=True)
@@ -389,6 +468,7 @@ async def run(args):
     finally:
         # A failed assertion must not strand a paused browser request.
         release_revise.set(); release_old_validation.set(); release_create.set(); release_old_empty_list.set(); release_tuple_show.set()
+        release_double_show[0].set(); release_double_show[1].set()
         if browser:
             try:
                 await browser.close()
