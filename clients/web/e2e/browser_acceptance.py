@@ -14,6 +14,7 @@ import base64
 import json
 import os
 import re
+import math
 import time
 import uuid
 import httpx
@@ -75,7 +76,7 @@ async def load_bridge(page,url):
 
 async def main(args):
     output=Path(args.output);output.mkdir(parents=True,exist_ok=True)
-    report={'transport':'HTTP transport bridge' if args.transport_bridge else 'normal loopback navigation','url':args.url,'checks':[],'page_errors':[],'console_errors':[]}
+    report={'transport':'HTTP transport bridge' if args.transport_bridge else 'normal loopback navigation','url':args.url,'checks':[],'page_errors':[],'console_errors':[],'expected_conflict_console':[]}
     async with async_playwright() as playwright:
         options={'headless':True}
         if args.chromium:options['executable_path']=args.chromium
@@ -83,7 +84,11 @@ async def main(args):
         page=await browser.new_page(viewport={'width':1440,'height':1024},device_scale_factor=1)
         page.set_default_timeout(7000)
         page.on('pageerror',lambda error:report['page_errors'].append(str(error)))
-        page.on('console',lambda message:report['console_errors'].append(message.text) if message.type=='error' else None)
+        def record_console(message):
+            if message.type!='error':return
+            if re.search(r'server responded with a status of 409 \(Conflict\)',message.text,re.I):report['expected_conflict_console'].append(message.text)
+            else:report['console_errors'].append(message.text)
+        page.on('console',record_console)
         client=None
         try:
             if args.transport_bridge:client=await load_bridge(page,args.url)
@@ -117,6 +122,8 @@ async def main(args):
             # More detailed assertions are appended below after the first visual pass.
             await exercise_authoring(page,report,output,args.url)
             assert not report['page_errors'],report['page_errors']
+            assert len(report['expected_conflict_console'])==2,report['expected_conflict_console']
+            assert not report['console_errors'],report['console_errors']
             report['passed']=True
         except Exception as exc:
             report['failure']=str(exc)
@@ -210,13 +217,75 @@ async def exercise_authoring(page,report,output,url):
         await page.get_by_role('button',name='Reference library',exact=True).click()
         await page.get_by_role('button',name='New library item',exact=True).click()
         modal=page.get_by_role('dialog')
-        await modal.get_by_label('Title',exact=False).fill('Acceptance prop '+stamp)
-        await modal.get_by_label('Asset type',exact=False).select_option('prop')
+        draft_title='Draft retained after rejected write '+stamp
+        await modal.get_by_label('Title',exact=False).fill(draft_title)
+        await modal.get_by_label('Item type',exact=False).select_option('prop')
+        await page.evaluate('''() => {
+          const original=window.fetch.bind(window),stats={posts:0,reject:true,release:null};
+          window.__pendingActionRegression=stats;
+          window.fetch=async (input,init={})=>{
+            const url=typeof input==='string'?input:input.url,method=(init.method||input.method||'GET').toUpperCase();
+            if(method==='POST'&&url.endsWith('/commands/asset.create')){
+              stats.posts++;
+              if(stats.reject){await new Promise(resolve=>stats.release=resolve);return new Response(JSON.stringify({error:{code:'revision_conflict',message:'simulated conflict'}}),{status:409,headers:{'Content-Type':'application/json'}});}
+            }
+            return original(input,init);
+          };
+        }''')
+        await modal.get_by_role('button',name='New library item',exact=True).click()
+        await wait_for_page_state(page,"window.__pendingActionRegression.posts===1&&typeof window.__pendingActionRegression.release==='function'","the form mutation to pause in flight")
+        title_field=modal.get_by_label('Title',exact=False)
+        assert await title_field.is_disabled()
+        assert await modal.locator('input:not([type="hidden"]),select,textarea').evaluate_all('(els)=>els.length>0&&els.every(el=>el.matches(\':disabled\'))'), 'A mutation input remained editable while its write was pending.'
+        await modal.get_by_role('status').filter(has_text='Editing is paused until the request finishes').wait_for()
+        await modal.locator('form').evaluate('(form)=>form.requestSubmit()')
+        assert (await page.evaluate('window.__pendingActionRegression.posts'))==1,'Keyboard/form resubmission duplicated a pending mutation.'
+        await page.evaluate('window.__pendingActionRegression.release()')
+        await modal.get_by_role('alert').filter(has_text='changed elsewhere').wait_for()
+        assert await title_field.is_enabled() and await title_field.input_value()==draft_title
+        await page.evaluate('window.__pendingActionRegression.reject=false')
+        await title_field.fill('Acceptance prop '+stamp)
+        await modal.get_by_label('Item type',exact=False).select_option('prop')
+        await page.evaluate('''() => {
+          const original=window.fetch.bind(window),stats={assetPosts:0,stateGets:0,failNextState:true};
+          window.__writeRefreshRegression=stats;
+          window.fetch=async (input,init={})=>{
+            const url=typeof input==='string'?input:input.url,method=(init.method||input.method||'GET').toUpperCase();
+            if(method==='POST'&&url.endsWith('/commands/asset.create'))stats.assetPosts++;
+            if(method==='GET'&&url.endsWith('/state')){stats.stateGets++;if(stats.failNextState){stats.failNextState=false;throw new TypeError('simulated follow-up refresh failure');}}
+            return original(input,init);
+          };
+        }''')
         await modal.get_by_role('button',name='New library item',exact=True).click()
         await modal.wait_for(state='hidden')
+        await page.locator('.external-change').get_by_role('button',name='Retry project refresh',exact=True).wait_for()
+        write_stats=await page.evaluate('window.__writeRefreshRegression')
+        assert write_stats['assetPosts']==1 and write_stats['stateGets']==1,write_stats
+        await page.locator('.external-change').get_by_role('button',name='Retry project refresh',exact=True).click()
+        await page.locator('.external-change').wait_for(state='hidden')
+        write_stats=await page.evaluate('window.__writeRefreshRegression')
+        assert write_stats['assetPosts']==1 and write_stats['stateGets']==2,write_stats
         asset=next(e for e in (await state())['entities'] if e['title']=='Acceptance prop '+stamp)
+        assert sum(e['title']=='Acceptance prop '+stamp for e in (await state())['entities'])==1
         assert asset['fields']['type']=='prop'
-        report['checks'].append('Typed asset authored in browser and confirmed through independent HTTP read.')
+        report['checks'].append('Submitted ActionDialog fields lock while a mutation is pending and the original draft remains editable after a rejected write.')
+        # Editing against a stale revision and refreshing details must retain the newer typed value.
+        card=page.locator('.asset-card').filter(has_text=asset['title'])
+        await card.get_by_role('button',name='Edit',exact=True).click()
+        edit=page.get_by_role('dialog',name='Edit library item')
+        fresh_draft='Fresh typed draft '+stamp
+        title_field=edit.get_by_label('Title',exact=False)
+        await title_field.fill(fresh_draft)
+        external_update=await verify.post(f'/api/v1/projects/{pid}/commands/asset.update',headers={'X-Storyboarder-Token':session['token']},json={'id':asset['id'],'revision':asset['revision'],'title':asset['title']+' updated elsewhere'})
+        assert external_update.status_code==200,external_update.text
+        await edit.get_by_role('button',name='Edit library item',exact=True).click()
+        await edit.get_by_role('alert').filter(has_text='changed elsewhere').wait_for()
+        await edit.get_by_role('button',name='Refresh project details',exact=True).click()
+        await edit.get_by_role('alert').wait_for(state='hidden')
+        assert await title_field.input_value()==fresh_draft
+        await edit.get_by_role('button',name='Cancel',exact=True).click()
+        report['checks'].append('Refreshing details after a real revision conflict updates its revision while preserving the freshly typed draft.')
+        report['checks'].append('A successful write stays successful when its state refresh fails; retry performs only a GET and the record is not duplicated.')
         # Use native canvas keyboard interaction to open a validated link form.
         await page.get_by_role('button',name='Story canvas',exact=True).click()
         await page.get_by_role('button',name='Reference map',exact=True).click()
@@ -226,7 +295,7 @@ async def exercise_authoring(page,report,output,url):
         target=page.locator(f'[data-node-id="{location["id"]}"]')
         await source.focus();await source.press('l');await page.get_by_role('button',name='Cancel link',exact=True).wait_for();await target.focus();await target.press('Enter')
         modal=page.get_by_role('dialog')
-        await modal.get_by_label('How they are connected',exact=True).select_option('appears-at')
+        await modal.get_by_label('How they are connected',exact=False).select_option('appears-at')
         await modal.get_by_role('button',name='Connect library items',exact=True).click()
         await modal.wait_for(state='hidden')
         assert any(l['source_id']==asset['id'] and l['target_id']==location['id'] for l in (await state())['links'])
@@ -239,10 +308,169 @@ async def exercise_authoring(page,report,output,url):
         await page.mouse.move(box['x']+box['width']/2,box['y']+16)
         await page.mouse.down();await page.mouse.move(box['x']+box['width']/2+35,box['y']+35,steps=8);await page.mouse.up()
         await page.get_by_label('Arrangement name',exact=True).fill('Acceptance layout '+stamp)
-        async with page.expect_response(lambda response:response.url.endswith('/commands/canvas.save') and response.request.method=='POST') as save_response_info:
-            await page.get_by_role('button',name='Save arrangement',exact=True).click()
-        save_response=await save_response_info.value
-        assert save_response.ok,f'Canvas arrangement save failed with HTTP {save_response.status}.'
+        await page.evaluate('''() => {
+          const original=window.fetch.bind(window),metrics={posts:0,active:0,maxActive:0,delay:false,release:null};
+          window.__canvasSaveMetrics=metrics;
+          window.fetch=async (input,init={})=>{
+            const url=typeof input==='string'?input:input.url,method=(init.method||input.method||'GET').toUpperCase();
+            if(method==='POST'&&url.endsWith('/commands/canvas.save')){
+              metrics.posts++;metrics.active++;metrics.maxActive=Math.max(metrics.maxActive,metrics.active);
+              try{const response=await original(input,init);if(metrics.delay)await new Promise(resolve=>metrics.release=resolve);return response;}
+              finally{metrics.active--;}
+            }
+            return original(input,init);
+          };
+        }''')
+        await page.evaluate('window.__canvasSaveMetrics.delay=true')
+        save_button=page.get_by_role('button',name='Save arrangement',exact=True)
+        await save_button.click()
+        await wait_for_page_state(page,"window.__canvasSaveMetrics.posts===1&&typeof window.__canvasSaveMetrics.release==='function'","the layout save to pause in flight")
+        saving_button=page.get_by_role('button',name='Saving…',exact=True)
+        assert await saving_button.is_disabled()
+        await saving_button.evaluate('(el)=>el.click()')
+        assert (await page.evaluate('window.__canvasSaveMetrics.posts'))==1
+        committed_state=await state()
+        committed_layout=next(l for l in committed_state['layouts'] if l['name']=='Acceptance layout '+stamp)
+        first_snapshot_position=await source.evaluate("el=>el.style.transform")
+        assert committed_layout['positions'][asset['id']],committed_layout
+        await page.get_by_role('button',name='Fit canvas',exact=True).evaluate('(el)=>el.click()')
+        await source.focus();await source.press('ArrowRight')
+        edited_during_save=await source.evaluate("el=>el.style.transform")
+        assert edited_during_save!=first_snapshot_position
+        await page.evaluate('window.__canvasSaveMetrics.delay=false;window.__canvasSaveMetrics.release()')
+        await page.get_by_role('button',name='Save arrangement',exact=True).wait_for()
+        await page.locator('.canvas-layout-bar').get_by_text('Unsaved changes',exact=True).wait_for()
+        metrics=await page.evaluate('window.__canvasSaveMetrics')
+        assert metrics['posts']==1 and metrics['maxActive']==1,metrics
+        after=await state()
+        layout=next(l for l in after['layouts'] if l['name']=='Acceptance layout '+stamp)
+        saved_xy=(float(layout['positions'][asset['id']]['x']),float(layout['positions'][asset['id']]['y']))
+        edited_xy=tuple(float(part) for part in re.search(r'translate\(([-\d.]+)px,\s*([\-\d.]+)px\)',edited_during_save).groups())
+        assert saved_xy!=edited_xy
+        await page.get_by_role('button',name='Save arrangement',exact=True).click()
+        await wait_for_page_state(page,"window.__canvasSaveMetrics.posts===2&&window.__canvasSaveMetrics.active===0&&!document.querySelector('.canvas-layout-bar')?.textContent.includes('Unsaved changes')","the follow-up layout save to complete")
+        after=await state()
+        layout=next(l for l in after['layouts'] if l['name']=='Acceptance layout '+stamp)
+        metrics=await page.evaluate('window.__canvasSaveMetrics')
+        current_transform=await source.evaluate("el=>el.style.transform")
+        current_xy=[float(part) for part in re.search(r'translate\(([-\d.]+)px,\s*([\-\d.]+)px\)',current_transform).groups()]
+        saved_current=layout['positions'][asset['id']]
+        deltas=(saved_current['x']-current_xy[0],saved_current['y']-current_xy[1])
+        assert all(math.isclose(a,b,abs_tol=0.02) for a,b in zip((saved_current['x'],saved_current['y']),current_xy)),f'CSSOM coordinate deltas: {deltas}; saved={saved_current}; DOM={current_xy}'
+        assert layout['revision']==2 and metrics['posts']==2 and metrics['maxActive']==1,(layout['revision'],metrics)
+        report['checks'].append('Canvas saves never overlap, preserve a move made while a save is pending, and use the returned revision on the next save.')
+        # Change the stored revision from a second client, then verify a genuine conflict leaves local geometry available.
+        external_positions={key:dict(value) for key,value in layout['positions'].items()}
+        external_positions[asset['id']]['x']+=37
+        external=await verify.post(f'/api/v1/projects/{pid}/commands/canvas.save',headers={'X-Storyboarder-Token':session['token']},json={'name':layout['name'],'mode':layout['mode'],'positions':external_positions,'settings':layout['settings'],'revision':layout['revision']})
+        assert external.status_code==200,external.text
+        await source.focus();await source.press('ArrowRight')
+        conflict_transform=await source.evaluate("el=>el.style.transform")
+        await page.get_by_role('button',name='Save arrangement',exact=True).click()
+        await page.get_by_role('alert').filter(has_text='changed elsewhere').wait_for()
+        assert await source.evaluate("el=>el.style.transform")==conflict_transform
+        assert await page.locator('.canvas-layout-bar').get_by_text('Unsaved changes',exact=True).count()==1
+        external_state=await state()
+        externally_saved=next(l for l in external_state['layouts'] if l['name']==layout['name'])
+        assert externally_saved['positions'][asset['id']]['x']==external_positions[asset['id']]['x']
+        await page.get_by_role('button',name='Refresh latest saved revision',exact=True).click()
+        await page.get_by_role('button',name='Reapply local draft',exact=True).wait_for()
+        assert await source.evaluate("el=>el.style.transform")==conflict_transform
+        await page.get_by_role('button',name='Reapply local draft',exact=True).click()
+        await wait_for_page_state(page,"window.__canvasSaveMetrics.posts===4&&window.__canvasSaveMetrics.active===0&&!document.querySelector('.canvas-layout-bar')?.textContent.includes('Unsaved changes')","the explicitly reapplied layout draft to save")
+        recovered_state=await state()
+        recovered_layout=next(l for l in recovered_state['layouts'] if l['name']==layout['name'])
+        recovered_transform=await source.evaluate("el=>el.style.transform")
+        recovered_xy=[float(part) for part in re.search(r'translate\(([-\d.]+)px,\s*([\-\d.]+)px\)',recovered_transform).groups()]
+        recovered_position=recovered_layout['positions'][asset['id']]
+        assert recovered_layout['revision']==4
+        assert all(math.isclose(a,b,abs_tol=0.02) for a,b in zip((recovered_position['x'],recovered_position['y']),recovered_xy))
+        report['checks'].append('A real external layout 409 keeps local geometry and external data intact; one explicit refreshed retry succeeds (4 attempted saves total, saved revision 4).')
+        await source.focus();await source.press('ArrowRight')
+        post_recovery_transform=await source.evaluate("el=>el.style.transform")
+        await page.get_by_role('button',name='Story outline',exact=True).click()
+        navigation=page.get_by_role('dialog',name='Unsaved canvas arrangement')
+        await navigation.wait_for()
+        assert await source.evaluate("el=>el.style.transform")==post_recovery_transform
+        await navigation.get_by_role('button',name='Stay',exact=True).click()
+        await navigation.wait_for(state='hidden')
+        assert await page.get_by_role('heading',name='Canvas',exact=True).count()==1
+        assert await source.evaluate("el=>el.style.transform")==post_recovery_transform
+        report['checks'].append('Stay closes the navigation prompt while keeping the edited card geometry in Canvas.')
+        await page.get_by_role('button',name='Story outline',exact=True).click()
+        navigation=page.get_by_role('dialog',name='Unsaved canvas arrangement')
+        await navigation.get_by_role('button',name='Discard changes',exact=True).click()
+        await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
+        await page.get_by_role('button',name='Story canvas',exact=True).click()
+        await page.wait_for_selector('.graph-node')
+        await page.get_by_role('button',name='Story outline',exact=True).click()
+        assert await page.get_by_role('dialog',name='Unsaved canvas arrangement').count()==0
+        await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
+        report['checks'].append('Discard leaves Canvas; clean Canvas navigation proceeds without a prompt.')
+        await page.get_by_role('button',name='Story canvas',exact=True).click()
+        await page.wait_for_selector('.graph-node')
+        history_node=page.locator('.graph-node').first
+        await history_node.focus();await history_node.press('ArrowRight')
+        history_transform=await history_node.evaluate('el=>el.style.transform')
+        await page.evaluate('history.back()')
+        history_prompt=page.get_by_role('dialog',name='Unsaved canvas arrangement')
+        await history_prompt.wait_for()
+        assert await page.evaluate('location.hash')=='#canvas'
+        assert await history_node.evaluate('el=>el.style.transform')==history_transform
+        await history_prompt.get_by_role('button',name='Stay',exact=True).click()
+        assert await history_node.evaluate('el=>el.style.transform')==history_transform
+        await page.get_by_role('button',name='Story outline',exact=True).click()
+        await page.get_by_role('dialog',name='Unsaved canvas arrangement').get_by_role('button',name='Discard changes',exact=True).click()
+        await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
+        report['checks'].append('Browser Back to a different hash is blocked while dirty, restores the Canvas URL, and preserves geometry through Stay.')
+        await page.get_by_role('button',name='Story canvas',exact=True).click()
+        await page.get_by_role('button',name='Reference map',exact=True).click()
+        await page.wait_for_selector(f'[data-node-id="{asset["id"]}"]')
+        nav_layout_name='Acceptance navigation layout '+stamp
+        await page.get_by_label('Arrangement name',exact=True).fill(nav_layout_name)
+        nav_node=page.locator(f'[data-node-id="{asset["id"]}"]')
+        await nav_node.focus();await nav_node.press('ArrowRight')
+        nav_transform=await nav_node.evaluate("el=>el.style.transform")
+        await page.get_by_role('button',name='Story outline',exact=True).click()
+        navigation=page.get_by_role('dialog',name='Unsaved canvas arrangement')
+        await navigation.get_by_role('button',name='Save and continue',exact=True).click()
+        await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
+        nav_layout=next(l for l in (await state())['layouts'] if l['name']==nav_layout_name)
+        nav_xy=[float(part) for part in re.search(r'translate\(([-\d.]+)px,\s*([\-\d.]+)px\)',nav_transform).groups()]
+        nav_saved=nav_layout['positions'][asset['id']]
+        nav_deltas=(nav_saved['x']-nav_xy[0],nav_saved['y']-nav_xy[1])
+        assert all(math.isclose(a,b,abs_tol=0.02) for a,b in zip((nav_saved['x'],nav_saved['y']),nav_xy)),f'Save-and-continue CSSOM coordinate deltas: {nav_deltas}'
+        report['checks'].append('Save and continue persists Canvas geometry before completing in-app navigation.')
+        await page.get_by_role('button',name='Story canvas',exact=True).click()
+        await page.get_by_role('button',name='Reference map',exact=True).click()
+        await page.wait_for_selector(f'[data-node-id="{asset["id"]}"]')
+        layouts=page.get_by_label('Saved arrangement',exact=True)
+        await layouts.select_option(label='Acceptance layout '+stamp)
+        layout_node=page.locator(f'[data-node-id="{asset["id"]}"]')
+        await layout_node.focus();await layout_node.press('ArrowRight')
+        layout_transform=await layout_node.evaluate('el=>el.style.transform')
+        await layouts.select_option(label=nav_layout_name)
+        layout_prompt=page.get_by_role('dialog',name='Unsaved canvas arrangement')
+        await layout_prompt.wait_for()
+        await layout_prompt.get_by_role('button',name='Stay',exact=True).click()
+        assert await layout_node.evaluate('el=>el.style.transform')==layout_transform
+        await layouts.select_option(label=nav_layout_name)
+        await page.get_by_role('dialog',name='Unsaved canvas arrangement').get_by_role('button',name='Discard changes',exact=True).click()
+        await page.locator('.canvas-layout-bar').get_by_text('Unsaved changes',exact=True).wait_for(state='hidden')
+        await page.get_by_role('button',name='Reference map',exact=True).click()
+        mode_node=page.locator(f'[data-node-id="{asset["id"]}"]')
+        await mode_node.focus();await mode_node.press('ArrowRight')
+        mode_transform=await mode_node.evaluate('el=>el.style.transform')
+        await page.get_by_role('button',name='Scene board',exact=True).click()
+        mode_prompt=page.get_by_role('dialog',name='Unsaved canvas arrangement')
+        await mode_prompt.wait_for()
+        await mode_prompt.get_by_role('button',name='Stay',exact=True).click()
+        assert await mode_node.evaluate('el=>el.style.transform')==mode_transform
+        await page.get_by_role('button',name='Scene board',exact=True).click()
+        await page.get_by_role('dialog',name='Unsaved canvas arrangement').get_by_role('button',name='Discard changes',exact=True).click()
+        await page.get_by_role('button',name='Scene board',exact=True).wait_for()
+        await page.get_by_role('button',name='Reference map',exact=True).click()
+        report['checks'].append('Changing saved arrangements and Canvas mode uses the same Save/Discard/Stay protection and preserves geometry on Stay.')
         after=await state()
         assert after['entities']==before
         assert any(l['name']=='Acceptance layout '+stamp and asset['id'] in l['positions'] for l in after['layouts'])
