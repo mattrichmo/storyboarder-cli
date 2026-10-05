@@ -6,6 +6,7 @@ import sqlite3
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Barrier
 
 import pytest
@@ -78,7 +79,7 @@ def _created(story, screenplay, edges, *, requirements=(), references=(), contin
     return ObservationContracts(service).create(story["shot"]["id"], story["shot"]["revision"], body), body
 
 
-def test_schema_four_to_six_keeps_backup_and_existing_records_without_synthesis(tmp_path, monkeypatch, screenplay, image_factory):
+def test_schema_four_to_seven_keeps_backup_and_existing_records_without_synthesis(tmp_path, monkeypatch, screenplay, image_factory):
     import storyboarder.storage.repository as repository
 
     monkeypatch.setattr(repository, "SCHEMA_VERSION", 4)
@@ -99,16 +100,16 @@ def test_schema_four_to_six_keeps_backup_and_existing_records_without_synthesis(
             before[table] = conn.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
 
-    monkeypatch.setattr(repository, "SCHEMA_VERSION", 6)
+    monkeypatch.setattr(repository, "SCHEMA_VERSION", 7)
     upgraded = Project(project.root)
-    backup = upgraded.repo.path.with_name(upgraded.repo.path.name + ".before-v6.bak")
+    backup = upgraded.repo.path.with_name(upgraded.repo.path.name + ".before-v7.bak")
     assert backup.is_file()
     with sqlite3.connect(backup) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
         old_tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "observation_contracts" not in old_tables
     with sqlite3.connect(upgraded.repo.path) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
         for table in tables:
             assert conn.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall() == before[table]
         assert conn.execute("SELECT count(*) FROM observation_contracts").fetchone()[0] == 0
@@ -158,6 +159,99 @@ def test_schema_five_to_six_preserves_contract_history_and_backup(tmp_path, monk
     assert restored["history"] == records.show(created["id"])["history"]
     assert restored["current_version_id"] == revised["version"]["id"]
     assert not any(issue["code"].startswith("observation_contract") for issue in Service(upgraded).doctor()["issues"])
+
+
+def test_schema_six_to_seven_preserves_contract_history_and_rolls_back_failed_migration(tmp_path, monkeypatch, screenplay):
+    import storyboarder.storage.repository as repository
+
+    monkeypatch.setattr(repository, "SCHEMA_VERSION", 6)
+    project = Project.create(tmp_path / "schema-six", "Schema six")
+    service = Service(project)
+    sequence = service.create_entity("sequence", "Sequence")
+    scene = service.create_entity("scene", "Scene", sequence["id"])
+    shot = service.create_entity("shot", "Shot", scene["id"])
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], shot["id"])
+    records = ObservationContracts(service)
+    created = records.create(shot["id"], shot["revision"], _contract([(edge, "direct-element")]))
+    revised = records.revise(created["id"], created["revision"],
+                             _contract([(edge, "direct-element")], notes="Preserved through schema seven."))
+    db_path = service.repo.path
+    tables = ("observation_contracts", "observation_contract_versions", "observation_source_pins",
+              "observation_reference_pins")
+    before = {}
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        for table in tables:
+            before[table] = conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall()
+
+    monkeypatch.setattr(repository, "SCHEMA_VERSION", 7)
+    migration = next((Path(repository.__file__).with_name("migrations")).glob("007_*.sql"))
+    migration_sql = migration.read_text()
+    real_statements = repository.sql_statements
+
+    def interrupt_schema_seven(script):
+        if script == migration_sql:
+            statements = iter(real_statements(script))
+            yield next(statements)
+            raise sqlite3.OperationalError("simulated schema-seven interruption")
+        yield from real_statements(script)
+
+    monkeypatch.setattr(repository, "sql_statements", interrupt_schema_seven)
+    with pytest.raises(StoryboardError, match="migration failed"):
+        Project(project.root)
+
+    backup = Path(str(db_path) + ".before-v7.bak")
+    assert backup.is_file()
+    backup_bytes = backup.read_bytes()
+    with sqlite3.connect(db_path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        for table in tables:
+            assert conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall() == before[table]
+        assert conn.execute("SELECT 1 FROM sqlite_master WHERE type='trigger' AND name=?",
+                            ("observation_contract_published_head_cannot_clear",)).fetchone() is None
+    with sqlite3.connect(backup) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        assert conn.execute("SELECT * FROM observation_contract_versions ORDER BY rowid").fetchall() == before["observation_contract_versions"]
+
+    monkeypatch.setattr(repository, "sql_statements", real_statements)
+    upgraded = Project(project.root)
+    assert backup.read_bytes() == backup_bytes
+    with sqlite3.connect(upgraded.repo.path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 7
+        for table in tables:
+            assert conn.execute(f"SELECT * FROM {table} ORDER BY rowid").fetchall() == before[table]
+    restored = ObservationContracts(Service(upgraded)).show(created["id"])
+    assert restored["current_version_id"] == revised["version"]["id"]
+    assert [item["id"] for item in restored["history"]] == [created["version"]["id"], revised["version"]["id"]]
+    assert not any(issue["code"].startswith("observation_contract") for issue in Service(upgraded).doctor()["issues"])
+
+
+def test_published_contract_head_cannot_be_cleared_by_raw_sql(story, screenplay):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    records = ObservationContracts(service)
+    created = records.create(story["shot"]["id"], story["shot"]["revision"],
+                             _contract([(edge, "direct-element")]))
+    revised = records.revise(created["id"], created["revision"],
+                             _contract([(edge, "direct-element")], notes="Published child version."))
+
+    with service.repo.transaction() as conn:
+        before = dict(conn.execute("SELECT current_version_id,revision FROM observation_contracts WHERE id=?",
+                                   (created["id"],)).fetchone())
+        with pytest.raises(sqlite3.IntegrityError, match="published observation contract head cannot be cleared"):
+            conn.execute("UPDATE observation_contracts SET current_version_id=NULL,revision=revision+1 WHERE id=?",
+                         (created["id"],))
+        after = dict(conn.execute("SELECT current_version_id,revision FROM observation_contracts WHERE id=?",
+                                  (created["id"],)).fetchone())
+        assert after == before
+        assert after["current_version_id"] == revised["version"]["id"]
+        assert after["revision"] == 2
+        assert conn.execute("SELECT count(*) FROM observation_contract_versions WHERE contract_id=?",
+                            (created["id"],)).fetchone()[0] == 2
+    assert records.show(created["id"])["history"][-1]["id"] == revised["version"]["id"]
+    assert not any(issue["code"].startswith("observation_contract") for issue in service.doctor()["issues"])
 
 
 def test_contract_pins_are_many_to_many_and_keep_direct_and_context_scopes(story, screenplay):
@@ -883,14 +977,14 @@ def test_doctor_handles_missing_contract_table_and_schema_four_without_mutation(
     before = database.read_bytes()
     missing = service.doctor()
     after = database.read_bytes()
-    assert missing["schema_version"] == 6 and not missing["healthy"]
+    assert missing["schema_version"] == 7 and not missing["healthy"]
     assert any(issue["code"] == "observation_contract_integrity_check" for issue in missing["issues"])
     assert before == after
 
     monkeypatch.setattr(repository, "SCHEMA_VERSION", 4)
     old_project = Project.create(tmp_path / "schema-four-doctor", "Schema four")
     old_service = Service(old_project)
-    monkeypatch.setattr(repository, "SCHEMA_VERSION", 6)
+    monkeypatch.setattr(repository, "SCHEMA_VERSION", 7)
 
     def forbidden_contract_walk(self):
         raise AssertionError("schema 4 must not inspect schema 5 contract tables")
@@ -900,7 +994,7 @@ def test_doctor_handles_missing_contract_table_and_schema_four_without_mutation(
     old_report = old_service.doctor()
     after = old_service.repo.path.read_bytes()
     old_codes = {issue["code"] for issue in old_report["issues"]}
-    assert old_report["schema_version"] == 4 and old_report["supported_schema_version"] == 6
+    assert old_report["schema_version"] == 4 and old_report["supported_schema_version"] == 7
     assert "migration_state" in old_codes and "observation_contract_integrity_check" not in old_codes
     assert before == after
 
