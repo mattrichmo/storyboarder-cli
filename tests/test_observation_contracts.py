@@ -1,12 +1,12 @@
 """Persistent observation-contract history stays exact, advisory, and agent-facing."""
-import copy
 import hashlib
 import json
 import shutil
 import sqlite3
 import subprocess
 import sys
-import uuid
+from concurrent.futures import ThreadPoolExecutor
+from threading import Barrier
 
 import pytest
 from fastapi.testclient import TestClient
@@ -20,7 +20,9 @@ from storyboarder.application.projects import Project
 from storyboarder.application.provenance import Provenance
 from storyboarder.application.service import Service
 from storyboarder.application.source_workflows import SourceWorkflows
-from storyboarder.domain.errors import Conflict, StoryboardError
+from storyboarder.domain.documents import content_hash
+from storyboarder.domain.errors import Conflict, InUse, StoryboardError
+from storyboarder.domain.models import dumps
 from test_documents import uid
 
 
@@ -76,7 +78,7 @@ def _created(story, screenplay, edges, *, requirements=(), references=(), contin
     return ObservationContracts(service).create(story["shot"]["id"], story["shot"]["revision"], body), body
 
 
-def test_schema_four_to_five_keeps_backup_and_existing_records_without_synthesis(tmp_path, monkeypatch, screenplay, image_factory):
+def test_schema_four_to_six_keeps_backup_and_existing_records_without_synthesis(tmp_path, monkeypatch, screenplay, image_factory):
     import storyboarder.storage.repository as repository
 
     monkeypatch.setattr(repository, "SCHEMA_VERSION", 4)
@@ -97,16 +99,16 @@ def test_schema_four_to_five_keeps_backup_and_existing_records_without_synthesis
             before[table] = conn.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
 
-    monkeypatch.setattr(repository, "SCHEMA_VERSION", 5)
+    monkeypatch.setattr(repository, "SCHEMA_VERSION", 6)
     upgraded = Project(project.root)
-    backup = upgraded.repo.path.with_name(upgraded.repo.path.name + ".before-v5.bak")
+    backup = upgraded.repo.path.with_name(upgraded.repo.path.name + ".before-v6.bak")
     assert backup.is_file()
     with sqlite3.connect(backup) as conn:
         assert conn.execute("PRAGMA user_version").fetchone()[0] == 4
         old_tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
         assert "observation_contracts" not in old_tables
     with sqlite3.connect(upgraded.repo.path) as conn:
-        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
         for table in tables:
             assert conn.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall() == before[table]
         assert conn.execute("SELECT count(*) FROM observation_contracts").fetchone()[0] == 0
@@ -116,6 +118,46 @@ def test_schema_four_to_five_keeps_backup_and_existing_records_without_synthesis
     assert not any(key.startswith("observation_") for key in snapshot)
     assert frame["shot_id"] == shot["id"] and edge["source_id"] == nodes[uid(4)]["id"]
     assert imported["version"]["id"] in {row[0] for row in before["document_versions"]}
+
+
+def test_schema_five_to_six_preserves_contract_history_and_backup(tmp_path, monkeypatch, screenplay):
+    import storyboarder.storage.repository as repository
+
+    monkeypatch.setattr(repository, "SCHEMA_VERSION", 5)
+    project = Project.create(tmp_path / "schema-five", "Schema five")
+    service = Service(project)
+    sequence = service.create_entity("sequence", "Sequence")
+    scene = service.create_entity("scene", "Scene", sequence["id"])
+    shot = service.create_entity("shot", "Shot", scene["id"])
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], shot["id"])
+    records = ObservationContracts(service)
+    created = records.create(shot["id"], shot["revision"], _contract([(edge, "direct-element")]))
+    revised = records.revise(created["id"], 1, _contract([(edge, "direct-element")], notes="Exact old history."))
+    db_path = service.repo.path
+    names = ("observation_contracts", "observation_contract_versions", "observation_source_pins",
+             "observation_reference_pins")
+    before = {}
+    with sqlite3.connect(db_path) as conn:
+        for table in names:
+            before[table] = conn.execute(f"SELECT * FROM {table} ORDER BY 1,2").fetchall()
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+
+    monkeypatch.setattr(repository, "SCHEMA_VERSION", 6)
+    upgraded = Project(project.root)
+    backup = upgraded.repo.path.with_name(upgraded.repo.path.name + ".before-v6.bak")
+    assert backup.is_file()
+    with sqlite3.connect(backup) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 5
+        assert conn.execute("SELECT id FROM observation_contract_versions ORDER BY id").fetchall()
+    with sqlite3.connect(upgraded.repo.path) as conn:
+        assert conn.execute("PRAGMA user_version").fetchone()[0] == 6
+        for table in names:
+            assert conn.execute(f"SELECT * FROM {table} ORDER BY 1,2").fetchall() == before[table]
+    restored = ObservationContracts(Service(upgraded)).show(created["id"])
+    assert restored["history"] == records.show(created["id"])["history"]
+    assert restored["current_version_id"] == revised["version"]["id"]
+    assert not any(issue["code"].startswith("observation_contract") for issue in Service(upgraded).doctor()["issues"])
 
 
 def test_contract_pins_are_many_to_many_and_keep_direct_and_context_scopes(story, screenplay):
@@ -347,13 +389,13 @@ def test_title_number_order_are_excluded_but_relevant_shot_context_and_asset_cha
     changed_asset = records.validate(created["id"])
     assert changed_asset["status"] == "unresolved" and changed_asset["basis_current"] is False
     assert any(item["code"] == "authored_basis_changed" for item in changed_asset["findings"])
-    archived = service.lifecycle(ref["id"], ref["revision"], "archive")
+    service.lifecycle(ref["id"], ref["revision"], "archive")
     archived_result = records.validate(created["id"])
     assert archived_result["status"] == "unresolved"
     assert any(item["code"] == "basis_asset_archived" for item in archived_result["findings"])
 
     # A change to the authored scene context invalidates the same version.
-    scene = service.update_entity(story["scene"]["id"], story["scene"]["revision"], {"fields": {"summary": "A changed scene context."}})
+    service.update_entity(story["scene"]["id"], story["scene"]["revision"], {"fields": {"summary": "A changed scene context."}})
     scene_result = records.validate(created["id"])
     assert scene_result["status"] == "unresolved" and scene_result["basis_current"] is False
     assert second["kind"] == "shot"
@@ -417,7 +459,7 @@ def test_effective_location_asset_content_and_archive_state_are_in_basis(story, 
                                      {"description": "A different platform layout."})
     result = records.validate(created["id"])
     assert result["basis_current"] is False and result["status"] == "unresolved"
-    archived = service.lifecycle(location["id"], location["revision"], "archive")
+    service.lifecycle(location["id"], location["revision"], "archive")
     result = records.validate(created["id"])
     assert result["status"] == "unresolved"
     assert any(finding["code"] == "basis_asset_archived" for finding in result["findings"])
@@ -497,14 +539,14 @@ def test_doctor_handles_missing_contract_table_and_schema_four_without_mutation(
     before = database.read_bytes()
     missing = service.doctor()
     after = database.read_bytes()
-    assert missing["schema_version"] == 5 and not missing["healthy"]
+    assert missing["schema_version"] == 6 and not missing["healthy"]
     assert any(issue["code"] == "observation_contract_integrity_check" for issue in missing["issues"])
     assert before == after
 
     monkeypatch.setattr(repository, "SCHEMA_VERSION", 4)
     old_project = Project.create(tmp_path / "schema-four-doctor", "Schema four")
     old_service = Service(old_project)
-    monkeypatch.setattr(repository, "SCHEMA_VERSION", 5)
+    monkeypatch.setattr(repository, "SCHEMA_VERSION", 6)
 
     def forbidden_contract_walk(self):
         raise AssertionError("schema 4 must not inspect schema 5 contract tables")
@@ -514,7 +556,7 @@ def test_doctor_handles_missing_contract_table_and_schema_four_without_mutation(
     old_report = old_service.doctor()
     after = old_service.repo.path.read_bytes()
     old_codes = {issue["code"] for issue in old_report["issues"]}
-    assert old_report["schema_version"] == 4 and old_report["supported_schema_version"] == 5
+    assert old_report["schema_version"] == 4 and old_report["supported_schema_version"] == 6
     assert "migration_state" in old_codes and "observation_contract_integrity_check" not in old_codes
     assert before == after
 
@@ -632,3 +674,285 @@ def test_internal_restore_gate_preserves_exact_inactive_history_and_cannot_leak(
     with pytest.raises(ObservationContractError) as rejected_reference:
         ObservationContracts(destination).create(new_shot["id"], new_shot["revision"], archived_reference_body)
     assert rejected_reference.value.code == "contract_reference_archived"
+
+
+def test_exact_moved_scene_context_history_restores_only_against_saved_parent(story, screenplay, tmp_path):
+    source_service = story["service"]
+    sequence = source_service.create_entity("sequence", "Second sequence")
+    new_scene = source_service.create_entity("scene", "Later scene", sequence["id"])
+    _, source = _source_rows(source_service, screenplay)
+    edge = _new_edge(source_service, source[uid(3)]["id"], story["scene"]["id"])
+    body = _contract([(edge, "scene-context")])
+    destination_path = tmp_path / "moved-history-destination"
+    shutil.copytree(source_service.root, destination_path)
+    destination = Service(Project(destination_path))
+    created = ObservationContracts(source_service).create(story["shot"]["id"], story["shot"]["revision"], body)
+    with source_service.repo.readonly_transaction() as conn:
+        header = dict(conn.execute("SELECT * FROM observation_contracts WHERE id=?", (created["id"],)).fetchone())
+        version = dict(conn.execute("SELECT * FROM observation_contract_versions WHERE id=?", (created["version"]["id"],)).fetchone())
+        pin = dict(conn.execute("SELECT * FROM observation_source_pins WHERE version_id=?", (version["id"],)).fetchone())
+
+    moved = destination.move(story["shot"]["id"], story["shot"]["revision"], 0, new_scene["id"])
+    assert moved["parent_id"] == new_scene["id"]
+    with destination.repo.observation_restore_transaction() as conn:
+        conn.execute("INSERT INTO observation_contracts(id,shot_id,current_version_id,revision,created_at,updated_at) VALUES(?,?,NULL,1,?,?)",
+                     (header["id"], header["shot_id"], header["created_at"], header["updated_at"]))
+        conn.execute("""INSERT INTO observation_contract_versions
+          (id,contract_id,parent_version_id,number,schema_version,contract_json,content_sha256,basis_json,basis_sha256,operation,sealed,created_at)
+          VALUES(?,?,?,?,?,?,?,?,?,?,0,?)""",
+                     (version["id"], version["contract_id"], version["parent_version_id"], version["number"],
+                      version["schema_version"], version["contract_json"], version["content_sha256"], version["basis_json"],
+                      version["basis_sha256"], version["operation"], version["created_at"]))
+        conn.execute("""INSERT INTO observation_source_pins VALUES
+          (:version_id,:edge_id,:source_scope,:document_id,:source_version_id,:node_id,:logical_id,
+           :source_sha256,:scope_sha256,:document_sha256,:artifact_sha256,:source_snapshot,
+           :edge_source_snapshot,:edge_target_snapshot,:created_at)""", pin)
+        conn.execute("UPDATE observation_contract_versions SET sealed=1 WHERE id=?", (version["id"],))
+        conn.execute("UPDATE observation_contracts SET current_version_id=? WHERE id=?", (version["id"], header["id"]))
+
+    records = ObservationContracts(destination)
+    restored = records.show(header["id"])
+    assert restored["current_version_id"] == version["id"]
+    assert restored["validation"]["status"] == "unresolved"
+    assert any(finding["code"] == "source_pin_stale"
+               and "edge_target_mismatch" in finding["reasons"] for finding in restored["validation"]["findings"])
+    assert not any(issue["code"] == "observation_contract_integrity" for issue in destination.doctor()["issues"])
+
+    with pytest.raises(ObservationContractError) as stale_revise:
+        records.revise(header["id"], restored["revision"], body)
+    assert stale_revise.value.code == "contract_rebase_required"
+    with pytest.raises(ObservationContractError) as guarded_rebase:
+        records.rebase(header["id"], restored["revision"], body)
+    assert guarded_rebase.value.code == "contract_source_pin_target_mismatch"
+
+    def rejected_restore(*, forged_parent=False, forged_target_snapshot=False):
+        basis = json.loads(version["basis_json"])
+        if forged_parent:
+            basis["shot"]["parent_scene_id"] = new_scene["id"]
+        candidate = dict(version)
+        candidate.update(id=uid(9901 if forged_parent else 9902), parent_version_id=version["id"], number=2,
+                         basis_json=dumps(basis), basis_sha256=content_hash(basis), operation="rebase", sealed=0)
+        candidate_pin = dict(pin, version_id=candidate["id"])
+        if forged_target_snapshot:
+            target_snapshot = json.loads(candidate_pin["edge_target_snapshot"])
+            target_snapshot["id"] = new_scene["id"]
+            candidate_pin["edge_target_snapshot"] = dumps(target_snapshot)
+        with pytest.raises(StoryboardError, match="active exact screenplay edge"):
+            with destination.repo.observation_restore_transaction() as conn:
+                conn.execute("""INSERT INTO observation_contract_versions
+                  (id,contract_id,parent_version_id,number,schema_version,contract_json,content_sha256,basis_json,basis_sha256,operation,sealed,created_at)
+                  VALUES(?,?,?,?,?,?,?,?,?,?,0,?)""",
+                             (candidate["id"], candidate["contract_id"], candidate["parent_version_id"], candidate["number"],
+                              candidate["schema_version"], candidate["contract_json"], candidate["content_sha256"],
+                              candidate["basis_json"], candidate["basis_sha256"], candidate["operation"], candidate["created_at"]))
+                conn.execute("""INSERT INTO observation_source_pins VALUES
+                  (:version_id,:edge_id,:source_scope,:document_id,:source_version_id,:node_id,:logical_id,
+                   :source_sha256,:scope_sha256,:document_sha256,:artifact_sha256,:source_snapshot,
+                   :edge_source_snapshot,:edge_target_snapshot,:created_at)""", candidate_pin)
+
+    rejected_restore(forged_parent=True)
+    rejected_restore(forged_target_snapshot=True)
+
+
+@pytest.mark.parametrize("field,value", [("time", "Midnight"), ("location_id", None)])
+def test_related_continuity_shot_own_context_changes_invalidate_basis(story, screenplay, field, value):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    related = service.create_entity("shot", "Continuity shot", story["scene"]["id"], fields={"action": "Wait."})
+    continuity = {"id": uid(8801), "related_shot_ids": [related["id"]], "statement": "Keep the arrival continuous."}
+    result = ObservationContracts(service).create(story["shot"]["id"], story["shot"]["revision"],
+                                                  _contract([(edge, "direct-element")], continuity=[continuity]))
+    assert result["validation"]["status"] == "consistent"
+    changes = {"fields": {field: value}}
+    if field == "location_id":
+        location = service.create_entity("asset", "Alternate location", fields={"type": "location"})
+        changes["fields"][field] = location["id"]
+    service.update_entity(related["id"], related["revision"], changes)
+    validation = ObservationContracts(service).validate(result["id"], result["version"]["id"])
+    assert validation["status"] == "unresolved"
+    assert any(finding["code"] == "authored_basis_changed" for finding in validation["findings"])
+
+
+@pytest.mark.parametrize("change", ["description", "archive"])
+def test_related_continuity_location_asset_content_and_archive_are_in_basis(story, screenplay, change):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    location = service.create_entity("asset", "Related shot location", description="A narrow platform.",
+                                     fields={"type": "location", "notes": "Morning light."})
+    related = service.create_entity("shot", "Continuity shot", story["scene"]["id"],
+                                    fields={"action": "Wait.", "location_id": location["id"]})
+    note = {"id": uid(8810), "related_shot_ids": [related["id"]], "statement": "Keep the arrival continuous."}
+    result = ObservationContracts(service).create(story["shot"]["id"], story["shot"]["revision"],
+                                                  _contract([(edge, "direct-element")], continuity=[note]))
+    assert result["validation"]["status"] == "consistent"
+    if change == "description":
+        service.update_entity(location["id"], location["revision"], {"description": "A platform beside the river."})
+    else:
+        service.lifecycle(location["id"], location["revision"], "archive")
+    validation = ObservationContracts(service).validate(result["id"], result["version"]["id"])
+    assert validation["status"] == "unresolved"
+    assert any(finding["code"] == "authored_basis_changed" for finding in validation["findings"])
+
+
+def test_validation_and_doctor_recheck_artifact_and_cache_once_per_report(story, screenplay, monkeypatch):
+    service = story["service"]
+    imported, source = _source_rows(service, screenplay)
+    edge_a = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    edge_b = _new_edge(service, source[uid(6)]["id"], story["shot"]["id"])
+    records = ObservationContracts(service)
+    from pathlib import Path
+
+    original_read_bytes = Path.read_bytes
+    calls = []
+    with service.repo.readonly_transaction() as conn:
+        artifact = dict(conn.execute("SELECT * FROM source_artifacts WHERE id=?",
+                                     (imported["version"]["source_artifact_id"],)).fetchone())
+    artifact_path = (service.root / artifact["path"]).resolve()
+
+    def counted_read_bytes(path):
+        if path.resolve() == artifact_path:
+            calls.append(str(path))
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", counted_read_bytes)
+    created = records.create(story["shot"]["id"], story["shot"]["revision"],
+                             _contract([(edge_a, "direct-element"), (edge_b, "direct-element")]))
+    assert len(calls) == 1
+    calls.clear()
+    assert records.validate(created["id"])["status"] == "consistent"
+    assert len(calls) == 1
+
+    original_bytes = original_read_bytes(artifact_path)
+    altered = bytes([original_bytes[0] ^ 1]) + original_bytes[1:]
+    artifact_path.write_bytes(altered)
+    try:
+        calls.clear()
+        validation = records.validate(created["id"])
+        assert len(calls) == 1
+        assert validation["status"] == "unresolved"
+        assert sum("artifact_unavailable_or_changed" in pin["reasons"] for pin in validation["source_pins"]) == 2
+        calls.clear()
+        report = service.doctor(hashes=True)
+        assert any(issue["code"] == "observation_contract_integrity" for issue in report["issues"])
+        assert len(calls) == 1
+    finally:
+        artifact_path.write_bytes(original_bytes)
+
+
+def test_doctor_detects_parseable_source_and_edge_snapshot_tampering(story, screenplay):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    direct = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    context = _new_edge(service, source[uid(3)]["id"], story["scene"]["id"])
+    created = ObservationContracts(service).create(
+        story["shot"]["id"], story["shot"]["revision"],
+        _contract([(direct, "direct-element"), (context, "scene-context")]))
+    with service.repo.transaction() as conn:
+        conn.execute("DROP TRIGGER observation_source_pin_immutable_update")
+        direct_pin = dict(conn.execute("SELECT * FROM observation_source_pins WHERE version_id=? AND edge_id=?",
+                                       (created["version"]["id"], direct["id"])).fetchone())
+        source_snapshot = json.loads(direct_pin["source_snapshot"])
+        source_snapshot["scope_sha256"] = "0" * 64
+        conn.execute("UPDATE observation_source_pins SET source_snapshot=?,scope_sha256=? WHERE version_id=? AND edge_id=?",
+                     (dumps(source_snapshot), "0" * 64, created["version"]["id"], direct["id"]))
+        context_pin = dict(conn.execute("SELECT * FROM observation_source_pins WHERE version_id=? AND edge_id=?",
+                                        (created["version"]["id"], context["id"])).fetchone())
+        edge_target_snapshot = json.loads(context_pin["edge_target_snapshot"])
+        edge_target_snapshot["id"] = uid(8899)
+        conn.execute("UPDATE observation_source_pins SET edge_target_snapshot=? WHERE version_id=? AND edge_id=?",
+                     (dumps(edge_target_snapshot), created["version"]["id"], context["id"]))
+    validation = ObservationContracts(service).validate(created["id"])
+    assert validation["status"] == "unresolved"
+    assert any("source_snapshot_mismatch" in pin["reasons"] for pin in validation["source_pins"])
+    assert any("edge_target_snapshot_mismatch" in pin["reasons"] for pin in validation["source_pins"])
+    damaged = service.doctor()
+    issue = next(issue for issue in damaged["issues"] if issue["code"] == "observation_contract_integrity")
+    assert "scope_hash_mismatch" in issue["details"]["reason"]
+    assert "source_snapshot_mismatch" in issue["details"]["reason"]
+
+
+def test_contract_history_retains_owner_reference_and_past_continuity_targets(story, screenplay):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    related = service.create_entity("shot", "Historical continuity shot", story["scene"]["id"])
+    reference = service.create_entity("asset", "Referenced prop", fields={"type": "prop"})
+    note = {"id": uid(8821), "related_shot_ids": [related["id"]], "statement": "Preserve the same object."}
+    records = ObservationContracts(service)
+    first = records.create(story["shot"]["id"], story["shot"]["revision"],
+                           _contract([(edge, "direct-element")], references=[reference["id"]], continuity=[note]))
+    revised_body = _contract([(edge, "direct-element")])
+    second = records.revise(first["id"], first["revision"], revised_body)
+    assert second["validation"]["status"] == "consistent"
+
+    related_usage = service.usage(related["id"])
+    assert related_usage["can_delete"] is False
+    assert first["id"] in related_usage["observation_continuity"]
+    with pytest.raises(InUse) as related_delete:
+        service.lifecycle(related["id"], related["revision"], "delete")
+    assert related_delete.value.details["observation_continuity"] == [first["id"]]
+    service.lifecycle(related["id"], related["revision"], "archive")
+    with pytest.raises(StoryboardError, match="Shot has retained observation continuity history"):
+        with service.repo.transaction() as conn:
+            conn.execute("DELETE FROM entities WHERE id=?", (related["id"],))
+    historical = records.validate(first["id"], first["version"]["id"])
+    assert historical["status"] == "unresolved"
+    assert any(finding["code"] == "continuity_reference_archived" for finding in historical["findings"])
+
+    asset_usage = service.usage(reference["id"])
+    assert asset_usage["can_delete"] is False
+    assert first["id"] in asset_usage["observation_references"]
+    with pytest.raises(InUse) as asset_delete:
+        service.lifecycle(reference["id"], reference["revision"], "delete")
+    assert asset_delete.value.details["observation_references"] == [first["id"]]
+    with pytest.raises(StoryboardError, match="Asset has retained observation contract references"):
+        with service.repo.transaction() as conn:
+            conn.execute("DELETE FROM entities WHERE id=?", (reference["id"],))
+    service.lifecycle(reference["id"], reference["revision"], "archive")
+    historical = records.validate(first["id"], first["version"]["id"])
+    assert any(finding["code"] == "reference_archived" for finding in historical["findings"])
+
+    owner_usage = service.usage(story["shot"]["id"])
+    assert owner_usage["can_delete"] is False
+    assert first["id"] in owner_usage["observation_contracts"]
+    with pytest.raises(InUse) as owner_delete:
+        service.lifecycle(story["shot"]["id"], story["shot"]["revision"], "delete")
+    assert owner_delete.value.details["observation_contracts"] == [first["id"]]
+    with pytest.raises(StoryboardError, match="Shot has retained observation contract history"):
+        with service.repo.transaction() as conn:
+            conn.execute("DELETE FROM entities WHERE id=?", (story["shot"]["id"],))
+    service.lifecycle(story["shot"]["id"], story["shot"]["revision"], "archive")
+
+
+def test_two_connection_contract_revision_compare_and_swap_has_one_winner(story, screenplay):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    records = ObservationContracts(service)
+    created = records.create(story["shot"]["id"], story["shot"]["revision"], _contract([(edge, "direct-element")]))
+    competing = [ObservationContracts(Service(Project(service.root))) for _ in range(2)]
+    barrier = Barrier(2)
+
+    def revise(index):
+        barrier.wait(timeout=5)
+        body = _contract([(edge, "direct-element")], notes=f"writer-{index}")
+        try:
+            return competing[index].revise(created["id"], created["revision"], body)
+        except Exception as exc:  # return for stable outcome assertions in the parent thread
+            return exc
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(revise, range(2)))
+    successes = [item for item in outcomes if isinstance(item, dict)]
+    conflicts = [item for item in outcomes if isinstance(item, Conflict)]
+    assert len(successes) == 1
+    assert len(conflicts) == 1
+    assert conflicts[0].code == "revision_conflict"
+    with service.repo.readonly_transaction() as conn:
+        header = conn.execute("SELECT revision,current_version_id FROM observation_contracts WHERE id=?", (created["id"],)).fetchone()
+        versions = conn.execute("SELECT count(*) FROM observation_contract_versions WHERE contract_id=?", (created["id"],)).fetchone()[0]
+        events = conn.execute("SELECT count(*) FROM events WHERE entity_id=? AND action='observation_contract.revise'", (created["id"],)).fetchone()[0]
+    assert header["revision"] == 2 and header["current_version_id"] == successes[0]["version"]["id"]
+    assert versions == 2 and events == 1

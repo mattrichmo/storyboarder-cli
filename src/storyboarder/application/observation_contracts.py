@@ -10,13 +10,12 @@ import hashlib
 import json
 import re
 import uuid
-from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 from storyboarder.domain.documents import content_hash
-from storyboarder.domain.errors import Conflict, NotFound, StoryboardError
+from storyboarder.domain.errors import NotFound, StoryboardError
 from storyboarder.domain.models import dumps, now, uid
 from storyboarder.formats import parse
 from storyboarder.media.files import safe_path
@@ -237,26 +236,51 @@ class ObservationContracts:
                                            {"shot_id": shot_id}) from exc
         return row
 
-    def _artifact_check(self, conn, version):
+    def _artifact_check(self, conn, version, artifact_cache=None):
+        artifact_cache = artifact_cache if artifact_cache is not None else {}
+        artifact_id = version["source_artifact_id"]
+        if artifact_id in artifact_cache:
+            cached = artifact_cache[artifact_id]
+            return cached if cached is not None and cached["content_sha256"] == version["content_sha256"] else None
         artifact = conn.execute("""SELECT a.path,a.sha256,a.size FROM source_artifacts a
-          WHERE a.id=?""", (version["source_artifact_id"],)).fetchone()
+          WHERE a.id=?""", (artifact_id,)).fetchone()
         if artifact is None:
+            artifact_cache[artifact_id] = None
             return None
         try:
             path = safe_path(self.service.root, artifact["path"], must_exist=True)
             raw = path.read_bytes()
         except (OSError, StoryboardError):
+            artifact_cache[artifact_id] = None
             return None
         digest = hashlib.sha256(raw).hexdigest()
         if len(raw) != artifact["size"] or digest != artifact["sha256"]:
+            artifact_cache[artifact_id] = None
             return None
         try:
             parsed = parse(raw, "screenjson")
         except StoryboardError:
+            artifact_cache[artifact_id] = None
             return None
-        if parsed.kind != "screenplay" or content_hash(parsed.payload) != version["content_sha256"]:
+        if parsed.kind != "screenplay":
+            artifact_cache[artifact_id] = None
             return None
-        return {"sha256": digest, "path": artifact["path"], "size": artifact["size"]}
+        artifact_cache[artifact_id] = {"sha256": digest, "path": artifact["path"], "size": artifact["size"],
+                                       "content_sha256": content_hash(parsed.payload)}
+        cached = artifact_cache[artifact_id]
+        return cached if cached["content_sha256"] == version["content_sha256"] else None
+
+    def _pin_artifact_check(self, conn, node, pin, cache):
+        artifact_id = node.get("source_artifact_id")
+        if not artifact_id:
+            return False
+        if artifact_id not in cache:
+            cache[artifact_id] = self._artifact_check(conn, {
+                "id": node["version_id"], "source_artifact_id": artifact_id,
+                "content_sha256": node["version_sha256"],
+            }, cache)
+        checked = cache[artifact_id]
+        return checked is not None and checked["sha256"] == pin["artifact_sha256"]
 
     @staticmethod
     def _context_subtree_hash(conn, version_id, node_id):
@@ -271,7 +295,7 @@ class ObservationContracts:
                                   (node_id, version_id, version_id)).fetchall()
         return content_hash([dict(row) for row in rows])
 
-    def _pin_for_write(self, conn, shot, requested):
+    def _pin_for_write(self, conn, shot, requested, artifact_cache=None):
         edge_id = requested["edge_id"]
         edge = conn.execute("SELECT * FROM provenance_edges WHERE id=?", (edge_id,)).fetchone()
         if edge is None:
@@ -314,7 +338,7 @@ class ObservationContracts:
         if actual_node_hash != node["content_sha256"]:
             raise ObservationContractError("contract_source_hash_mismatch", "The source node no longer matches its stored content hash.",
                                            {"edge_id": edge_id, "node_id": node["id"], "expected": node["content_sha256"], "actual": actual_node_hash})
-        artifact = self._artifact_check(conn, version)
+        artifact = self._artifact_check(conn, version, artifact_cache)
         if artifact is None:
             raise ObservationContractError("contract_source_hash_mismatch", "The pinned screenplay bytes or version hash no longer match the imported source.",
                                            {"edge_id": edge_id, "version_id": version["id"]})
@@ -443,8 +467,7 @@ class ObservationContracts:
                 for key in SHOT_BASIS_FIELDS:
                     related_basis[key] = related["fields"].get(key)
                 related_basis["assignments"] = self._assignment_basis(conn, related_id)
-                parent = self._entity_row(conn, related["parent_id"]) if related.get("parent_id") else None
-                related_basis["effective_context"] = self._effective_context(conn, parent) if parent else None
+                related_basis["effective_context"] = self._effective_context(conn, related)
                 continuity_basis.append(related_basis)
         referenced_ids = set(body["references"])
         for basis_shot in [shot_basis, *continuity_basis]:
@@ -491,9 +514,10 @@ class ObservationContracts:
                                            {"reference_id": reference_id})
         return {"reference_id": reference_id, "kind": "asset", "type": row["fields"].get("type")}
 
-    def _insert_version(self, conn, header, body, operation):
+    def _insert_version(self, conn, header, body, operation, artifact_cache=None):
+        artifact_cache = artifact_cache if artifact_cache is not None else {}
         shot = self._shot(conn, header["shot_id"])
-        pin_rows = [self._pin_for_write(conn, shot, pin) for pin in body["source_pins"]]
+        pin_rows = [self._pin_for_write(conn, shot, pin, artifact_cache) for pin in body["source_pins"]]
         refs = [self._reference_for_write(conn, record_id) for record_id in body["references"]]
         for note in body["continuity"]:
             if shot["id"] in note["related_shot_ids"]:
@@ -547,11 +571,12 @@ class ObservationContracts:
                       "created_at": stamp, "updated_at": stamp}
             conn.execute("INSERT INTO observation_contracts(id,shot_id,current_version_id,revision,created_at,updated_at) VALUES(?,?,NULL,1,?,?)",
                          (header["id"], header["shot_id"], stamp, stamp))
-            version = self._insert_version(conn, header, body, "create")
+            artifact_cache = {}
+            version = self._insert_version(conn, header, body, "create", artifact_cache)
             conn.execute("UPDATE observation_contracts SET current_version_id=? WHERE id=?", (version["id"], header["id"]))
             self.repo.event(conn, "observation_contract.created", header["id"],
                             {"shot_id": shot["id"], "version_id": version["id"]})
-            return self._show(conn, header["id"], version["id"])
+            return self._show(conn, header["id"], version["id"], artifact_cache)
 
     def _revise(self, contract_id, revision, contract, operation):
         body = _validate_body(contract)
@@ -561,6 +586,7 @@ class ObservationContracts:
             shot = self._shot(conn, header["shot_id"])
             _, current = self._version(conn, contract_id)
             current_body = _validate_body(self._safe_json(current["contract_json"]))
+            artifact_cache = {}
             requested_pins = {pin["edge_id"]: pin["source_scope"] for pin in body["source_pins"]}
             current_pins = {pin["edge_id"]: pin["source_scope"] for pin in current_body["source_pins"]}
             if operation == "revise":
@@ -569,19 +595,19 @@ class ObservationContracts:
                                                    {"current_edge_ids": sorted(current_pins), "requested_edge_ids": sorted(requested_pins)})
                 current_basis = self._basis(conn, shot["id"], current_body)
                 saved_pins = [dict(row) for row in conn.execute("SELECT * FROM observation_source_pins WHERE version_id=? ORDER BY edge_id", (current["id"],))]
-                stale_pins = [self._pin_state(conn, pin, shot["id"]) for pin in saved_pins]
+                stale_pins = [self._pin_state(conn, pin, shot["id"], artifact_cache) for pin in saved_pins]
                 changed_basis = content_hash(current_basis) != current["basis_sha256"]
                 stale_edges = [pin["edge_id"] for pin in stale_pins if pin["stale"]]
                 if changed_basis or stale_edges:
                     raise ObservationContractError("contract_rebase_required", "The saved source or authored basis changed. Rebase with explicit source pins before revising.",
                                                    {"basis_changed": changed_basis, "stale_edge_ids": stale_edges,
                                                     "current_version_id": current["id"]})
-            version = self._insert_version(conn, header, body, operation)
+            version = self._insert_version(conn, header, body, operation, artifact_cache)
             conn.execute("UPDATE observation_contracts SET current_version_id=?,revision=revision+1,updated_at=? WHERE id=?",
                          (version["id"], now(), contract_id))
             self.repo.event(conn, "observation_contract." + operation, contract_id,
                             {"shot_id": header["shot_id"], "version_id": version["id"], "revision": revision + 1})
-            return self._show(conn, contract_id, version["id"])
+            return self._show(conn, contract_id, version["id"], artifact_cache)
 
     def revise(self, contract_id, revision, contract):
         return self._revise(contract_id, revision, contract, "revise")
@@ -590,16 +616,88 @@ class ObservationContracts:
         # A complete v1 body is required, including the caller's exact edge IDs.
         return self._revise(contract_id, revision, contract, "rebase")
 
-    def _pin_state(self, conn, pin, shot_id):
+    def _pin_integrity_reasons(self, conn, pin, shot_id, artifact_cache=None):
+        """Check a saved pin against its exact immutable rows, independent of live status."""
         reasons = []
-        edge = conn.execute("SELECT retired,relation,source_type,source_id,target_type,target_id FROM provenance_edges WHERE id=?", (pin["edge_id"],)).fetchone()
+        edge = conn.execute("SELECT * FROM provenance_edges WHERE id=?", (pin["edge_id"],)).fetchone()
+        version = conn.execute("SELECT * FROM observation_contract_versions WHERE id=?", (pin["version_id"],)).fetchone()
+        try:
+            basis = self._safe_json(version["basis_json"], code="contract_basis_invalid", label="saved basis") if version else {}
+        except ObservationContractError:
+            basis = {}
+            reasons.append("basis_snapshot_invalid")
+        saved_parent = basis.get("shot", {}).get("parent_scene_id") if isinstance(basis, dict) else None
         if edge is None:
             reasons.append("edge_missing")
+        elif (edge["relation"] != "visualizes" or edge["source_type"] != "node"
+              or edge["source_id"] != pin["node_id"] or edge["target_type"] != "entity"):
+            reasons.append("edge_identity_changed")
+        node = conn.execute("""SELECT n.*,v.document_id,v.content_sha256 AS version_sha256,
+            v.source_artifact_id,d.kind AS document_kind FROM document_nodes n
+            JOIN document_versions v ON v.id=n.version_id JOIN documents d ON d.id=v.document_id
+            WHERE n.id=?""", (pin["node_id"],)).fetchone()
+        if node is None:
+            reasons.append("node_missing")
         else:
+            node = dict(node)
+            if (node["document_id"] != pin["document_id"] or node["version_id"] != pin["source_version_id"]
+                    or node["logical_id"] != pin["logical_id"] or node["content_sha256"] != pin["source_sha256"]
+                    or node["version_sha256"] != pin["document_sha256"]):
+                reasons.append("pin_identity_mismatch")
+            if node["identity"] != "explicit" or node["document_kind"] != "screenplay" or node["node_type"] == "screenplay":
+                reasons.append("source_identity_invalid")
+            try:
+                payload = json.loads(node["payload"])
+                if content_hash(payload) != node["content_sha256"] or content_hash(payload) != pin["source_sha256"]:
+                    reasons.append("source_hash_mismatch")
+                expected_scope = (node["content_sha256"] if pin["source_scope"] == "direct-element"
+                                  else self._context_subtree_hash(conn, node["version_id"], node["id"]))
+                if expected_scope != pin["scope_sha256"]:
+                    reasons.append("scope_hash_mismatch")
+                source_snapshot = self._safe_json(pin["source_snapshot"], label="source pin snapshot")
+                expected_snapshot = {
+                    "document_id": node["document_id"], "document_version_id": node["version_id"],
+                    "document_sha256": node["version_sha256"], "artifact_sha256": pin["artifact_sha256"],
+                    "node_id": node["id"], "logical_id": node["logical_id"], "node_type": node["node_type"],
+                    "identity": node["identity"], "source_sha256": node["content_sha256"],
+                    "scope_sha256": expected_scope, "payload": payload,
+                }
+                if source_snapshot != expected_snapshot:
+                    reasons.append("source_snapshot_mismatch")
+            except (ObservationContractError, TypeError, ValueError, KeyError):
+                reasons.append("source_snapshot_invalid")
+            if not self._pin_artifact_check(conn, node, pin, artifact_cache if artifact_cache is not None else {}):
+                reasons.append("artifact_unavailable_or_changed")
+        if edge is not None:
+            if edge["source_snapshot"] != pin["edge_source_snapshot"] or edge["target_snapshot"] != pin["edge_target_snapshot"]:
+                reasons.append("edge_snapshot_mismatch")
+            try:
+                edge_source = self._safe_json(pin["edge_source_snapshot"], label="edge source snapshot")
+                edge_target = self._safe_json(pin["edge_target_snapshot"], label="edge target snapshot")
+                if node is not None and (edge_source.get("id") != node["id"]
+                        or edge_source.get("type") != "node" or edge_source.get("version_id") != node["version_id"]
+                        or edge_source.get("document_id") != node["document_id"]
+                        or edge_source.get("logical_id") != node["logical_id"]
+                        or edge_source.get("node_type") != node["node_type"]
+                        or edge_source.get("content_sha256") != node["content_sha256"]):
+                    reasons.append("edge_source_snapshot_mismatch")
+                target_id = (shot_id if pin["source_scope"] == "direct-element" else saved_parent)
+                target = conn.execute("SELECT kind FROM entities WHERE id=?", (edge["target_id"],)).fetchone()
+                expected_kind = "shot" if pin["source_scope"] == "direct-element" else "scene"
+                if (edge_target.get("id") != edge["target_id"] or edge_target.get("type") != "entity"
+                        or edge["target_id"] != target_id or target is None or target["kind"] != expected_kind
+                        or edge_target.get("kind") != expected_kind):
+                    reasons.append("edge_target_snapshot_mismatch")
+            except (ObservationContractError, TypeError, ValueError, KeyError):
+                reasons.append("edge_snapshot_invalid")
+        return sorted(set(reasons))
+
+    def _pin_state(self, conn, pin, shot_id, artifact_cache=None):
+        reasons = self._pin_integrity_reasons(conn, pin, shot_id, artifact_cache)
+        edge = conn.execute("SELECT * FROM provenance_edges WHERE id=?", (pin["edge_id"],)).fetchone()
+        if edge is not None:
             if edge["retired"]:
                 reasons.append("edge_retired")
-            if edge["relation"] != "visualizes" or edge["source_type"] != "node" or edge["source_id"] != pin["node_id"]:
-                reasons.append("edge_identity_changed")
             shot = conn.execute("SELECT parent_id FROM entities WHERE id=? AND kind='shot'", (shot_id,)).fetchone()
             expected_target = shot["parent_id"] if pin["source_scope"] == "scene-context" and shot else shot_id
             if edge["target_type"] != "entity" or edge["target_id"] != expected_target:
@@ -610,23 +708,15 @@ class ObservationContracts:
                 reasons.append("edge_target_mismatch")
             elif target_state["archived"]:
                 reasons.append("target_archived")
-        node = conn.execute("SELECT n.*,v.document_id,v.content_sha256 AS version_sha256,v.source_artifact_id,d.current_version_id,d.archived AS document_archived FROM document_nodes n JOIN document_versions v ON v.id=n.version_id JOIN documents d ON d.id=v.document_id WHERE n.id=?",
+        node = conn.execute("""SELECT n.*,v.document_id,v.content_sha256 AS version_sha256,v.source_artifact_id,
+            d.current_version_id,d.archived AS document_archived FROM document_nodes n
+            JOIN document_versions v ON v.id=n.version_id JOIN documents d ON d.id=v.document_id WHERE n.id=?""",
                             (pin["node_id"],)).fetchone()
         if node is None:
             reasons.append("node_missing")
             return {"edge_id": pin["edge_id"], "source_scope": pin["source_scope"], "stale": True,
                     "reasons": sorted(set(reasons)), "current_version_id": None}
         node = dict(node)
-        if node["document_id"] != pin["document_id"] or node["version_id"] != pin["source_version_id"] or node["logical_id"] != pin["logical_id"]:
-            reasons.append("pin_identity_mismatch")
-        try:
-            payload = json.loads(node["payload"])
-            if content_hash(payload) != pin["source_sha256"] or content_hash(payload) != node["content_sha256"]:
-                reasons.append("source_hash_mismatch")
-        except (TypeError, ValueError):
-            reasons.append("source_hash_mismatch")
-        if node["identity"] != "explicit":
-            reasons.append("source_identity_not_explicit")
         if node["document_archived"]:
             reasons.append("document_archived")
         if node["current_version_id"] is None:
@@ -677,7 +767,8 @@ class ObservationContracts:
             items.append({"reference_id": None, "state": "conflict", "reason": "reference_pin_mismatch"})
         return items
 
-    def _validate(self, conn, header, version):
+    def _validate(self, conn, header, version, artifact_cache=None):
+        artifact_cache = artifact_cache if artifact_cache is not None else {}
         findings, conflicts, unresolved = [], False, False
         try:
             body = _validate_body(self._safe_json(version["contract_json"]))
@@ -716,7 +807,7 @@ class ObservationContracts:
             findings.append({"code": "source_pin_rows_mismatch", "expected_edge_ids": sorted(expected_pins), "actual_edge_ids": sorted(actual_pins)})
         pin_status = []
         for pin in pin_rows:
-            state = self._pin_state(conn, pin, header["shot_id"])
+            state = self._pin_state(conn, pin, header["shot_id"], artifact_cache)
             pin_status.append(state)
             if state["stale"]:
                 unresolved = True
@@ -797,7 +888,8 @@ class ObservationContracts:
                 "source_pins": pin_status, "references": references, "basis_current": basis_current,
                 "method": "Deterministic checks of declared IDs, exact pins, hashes, and authored basis. Prose is not interpreted; no image, camera, physical, or rendered result is verified."}
 
-    def _show(self, conn, contract_id, version_id=None):
+    def _show(self, conn, contract_id, version_id=None, artifact_cache=None):
+        artifact_cache = artifact_cache if artifact_cache is not None else {}
         header, version = self._version(conn, contract_id, version_id)
         body = self._safe_json(version["contract_json"])
         pins = []
@@ -815,7 +907,7 @@ class ObservationContracts:
                 "updated_at": header["updated_at"], "selected_version_id": version["id"],
                 "version": {k: version[k] for k in ("id", "contract_id", "parent_version_id", "number", "schema_version", "content_sha256", "basis_sha256", "operation", "created_at")},
                 "contract": body, "source_pins": pins, "reference_pins": references,
-                "history": history, "validation": self._validate(conn, header, version)}
+                "history": history, "validation": self._validate(conn, header, version, artifact_cache)}
 
     def show(self, contract_id, version_id=None):
         with self.repo.transaction(False) as conn:
@@ -879,6 +971,7 @@ class ObservationContracts:
     def integrity_issues(self):
         """Read-only doctor checks for contract headers and immutable records."""
         issues = []
+        artifact_cache = {}
         with self.repo.readonly_transaction() as conn:
             headers = conn.execute("SELECT * FROM observation_contracts ORDER BY id").fetchall()
             for header_row in headers:
@@ -898,13 +991,13 @@ class ObservationContracts:
                         pins = [dict(row) for row in conn.execute("SELECT * FROM observation_source_pins WHERE version_id=? ORDER BY edge_id", (version["id"],))]
                         if {pin["edge_id"]: pin["source_scope"] for pin in pins} != {pin["edge_id"]: pin["source_scope"] for pin in body["source_pins"]}:
                             raise ValueError("contract_pin_rows_mismatch")
+                        pin_issues = []
                         for pin in pins:
-                            node = conn.execute("SELECT n.payload,n.identity,n.content_sha256,n.version_id,n.logical_id,v.document_id,v.content_sha256 AS document_sha256 FROM document_nodes n JOIN document_versions v ON v.id=n.version_id WHERE n.id=?", (pin["node_id"],)).fetchone()
-                            if node is None or node["version_id"] != pin["source_version_id"] or node["document_id"] != pin["document_id"] or node["logical_id"] != pin["logical_id"] or node["content_sha256"] != pin["source_sha256"] or node["document_sha256"] != pin["document_sha256"] or node["identity"] != "explicit" or content_hash(json.loads(node["payload"])) != node["content_sha256"]:
-                                raise ValueError("contract_source_pin_snapshot_mismatch")
-                            self._safe_json(pin["source_snapshot"], label="source pin snapshot")
-                            self._safe_json(pin["edge_source_snapshot"], label="edge source snapshot")
-                            self._safe_json(pin["edge_target_snapshot"], label="edge target snapshot")
+                            pin_reasons = self._pin_integrity_reasons(conn, pin, header["shot_id"], artifact_cache)
+                            if pin_reasons:
+                                pin_issues.append(pin["edge_id"] + "=" + ",".join(pin_reasons))
+                        if pin_issues:
+                            raise ValueError("contract_source_pin_integrity_mismatch:" + ";".join(pin_issues))
                         refs = {row[0] for row in conn.execute("SELECT reference_id FROM observation_reference_pins WHERE version_id=?", (version["id"],))}
                         if refs != set(body["references"]):
                             raise ValueError("contract_reference_pins_mismatch")
