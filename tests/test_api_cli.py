@@ -1,4 +1,3 @@
-from pathlib import Path
 import argparse
 import json
 import subprocess
@@ -22,7 +21,8 @@ def client(workspace):
 def test_workspace_browser_project_creation_switching_shared_core(client,workspace):
     a=client.post('/api/v1/projects',json={'title':'First','slug':'first'})
     assert a.status_code==201,a.text
-    first=a.json();second=client.post('/api/v1/projects',json={'title':'Second','slug':'second'}).json()
+    first=a.json()
+    second=client.post('/api/v1/projects',json={'title':'Second','slug':'second'}).json()
     assert client.post('/api/v1/active',json={'id':first['id']}).status_code==200
     assert workspace.current().id==first['id']
     created=client.post(f"/api/v1/projects/{first['id']}/commands/asset.create",json={'title':'Browser asset','type':'character'})
@@ -70,7 +70,8 @@ def test_api_revision_conflict_returns_current_record(client,workspace):
 
 
 def test_multipart_import_exact_media_and_export_routes(client,workspace,image_factory):
-    project=workspace.create('Images','images');prefix=f'/api/v1/projects/{project.id}'
+    project=workspace.create('Images','images')
+    prefix=f'/api/v1/projects/{project.id}'
     source=image_factory()
     response=client.post(prefix+'/upload',files={'file':('image.png',source.read_bytes(),'image/png')},data={'original_path':'local-folder/image.png'})
     assert response.status_code==201,response.text
