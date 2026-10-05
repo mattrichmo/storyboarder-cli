@@ -68,6 +68,8 @@ PIN_KEYS = {
 }
 REFERENCE_PIN_KEYS = {"version_id", "reference_id", "snapshot", "created_at"}
 HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
+SCREENPLAY_SCENE_POINTER_RE = re.compile(r"^/document/scenes/(?:0|[1-9][0-9]*)$")
+SCREENPLAY_ELEMENT_POINTER_RE = re.compile(r"^/document/scenes/(?:0|[1-9][0-9]*)/body/(?:0|[1-9][0-9]*)$")
 
 
 class ObservationTransferError(StoryboardError):
@@ -136,14 +138,44 @@ def _strict_json_value(raw: str, label: str) -> Any:
     return value
 
 
+def _supported_source_pointer(value: Any, node_type: Any) -> bool:
+    """Accept only the source pointers emitted for screenplay scene and element nodes."""
+    if not isinstance(value, str):
+        return False
+    if node_type == "scene":
+        return SCREENPLAY_SCENE_POINTER_RE.fullmatch(value) is not None
+    if isinstance(node_type, str) and node_type not in ("", "screenplay"):
+        return SCREENPLAY_ELEMENT_POINTER_RE.fullmatch(value) is not None
+    return False
+
+
+def _is_typed_edge_source_pointer(path: tuple[str | int, ...]) -> bool:
+    """Identify the source pointer field by its record shape, never by a suffix alone."""
+    if (len(path) == 8 and path[0] == "contracts" and isinstance(path[1], int)
+            and path[2] == "versions" and isinstance(path[3], int)
+            and path[4] == "source_pins" and isinstance(path[5], int)
+            and path[6:] == ("edge_source_snapshot", "source_pointer")):
+        return True
+    return (len(path) == 6 and path[0] == "versions" and isinstance(path[1], int)
+            and path[2] == "source_pins" and isinstance(path[3], int)
+            and path[4:] == ("edge_source_snapshot", "source_pointer"))
+
+
 def _portable_losses(value: Any) -> list[dict[str, str]]:
     """Fail closed on path, credential, and runtime fields without sanitizing history."""
     losses: list[dict[str, str]] = []
-    stack = [("$", value)]
+    stack = [((), "$", value)]
     while stack:
-        pointer, item = stack.pop()
+        path, pointer, item = stack.pop()
         if isinstance(item, dict):
             for key, child in item.items():
+                child_path = path + (key,)
+                child_pointer = f"{pointer}/{key}"
+                if key == "source_pointer" and _is_typed_edge_source_pointer(child_path):
+                    if _supported_source_pointer(child, item.get("node_type")):
+                        continue
+                    losses.append({"path": child_pointer, "reason": "unsupported_source_pointer"})
+                    continue
                 key_lower = str(key).casefold()
                 compact = re.sub(r"[^a-z0-9]", "", key_lower)
                 sensitive = key_lower in SENSITIVE_KEYS or any(
@@ -153,17 +185,15 @@ def _portable_losses(value: Any) -> list[dict[str, str]]:
                     marker in compact for marker in ("launch", "runtime", "argv", "executable", "workingdirectory", "workingdir", "workspace", "path", "directory", "root", "cwd", "environment", "processid", "pid")
                 )
                 if sensitive:
-                    losses.append({"path": f"{pointer}/{key}", "reason": "credential_field"})
+                    losses.append({"path": child_pointer, "reason": "credential_field"})
                 elif runtime:
-                    losses.append({"path": f"{pointer}/{key}", "reason": "runtime_launch_field"})
+                    losses.append({"path": child_pointer, "reason": "runtime_launch_field"})
                 else:
-                    stack.append((f"{pointer}/{key}", child))
+                    stack.append((child_path, child_pointer, child))
         elif isinstance(item, list):
-            stack.extend((f"{pointer}/{index}", child) for index, child in enumerate(item))
+            stack.extend((path + (index,), f"{pointer}/{index}", child) for index, child in enumerate(item))
         elif isinstance(item, str):
-            # The source endpoint's pointer is an RFC 6901 JSON pointer, not a
-            # filesystem location; its leading slash is meaningful data.
-            if not pointer.endswith("/source_pointer") and ABSOLUTE_PATH_RE.search(item):
+            if ABSOLUTE_PATH_RE.search(item):
                 losses.append({"path": pointer, "reason": "absolute_path"})
             if SECRET_VALUE_RE.search(item):
                 losses.append({"path": pointer, "reason": "credential_shaped_value"})
@@ -345,6 +375,9 @@ def _validate_pin(pin: Any, version_id: str) -> None:
     if (pin["edge_source_snapshot"].get("id") != pin["node_id"]
             or pin["edge_source_snapshot"].get("version_id") != pin["source_version_id"]):
         raise ObservationTransferError("observation_plan_integrity_error", "An edge source snapshot does not match its exact source pin.")
+    if not _supported_source_pointer(pin["edge_source_snapshot"].get("source_pointer"),
+                                     pin["edge_source_snapshot"].get("node_type")):
+        raise ObservationTransferError("observation_plan_invalid", "An edge source snapshot has an unsupported screenplay source pointer.")
     if pin["edge_target_snapshot"].get("id") is None:
         raise ObservationTransferError("observation_plan_integrity_error", "An edge target snapshot must preserve its target ID.")
 

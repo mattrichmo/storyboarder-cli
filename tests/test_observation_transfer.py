@@ -239,9 +239,21 @@ def test_conflict_requires_explicit_skip_or_abort(service, tmp_path):
     assert aborted["aborted"] and not aborted["imported"]
     assert _event_count(target) == before_abort_events
     skipped = preview_observation_import(target, exported, {contract_id: "skip-conflict"})
+    assert skipped["losses"] == [{"contract_id": contract_id, "reason": "explicit_conflict_skip"}]
+    assert skipped["unresolved"] == [{
+        "contract_id": contract_id,
+        "code": "shot_already_has_contract",
+        "id": shot["id"],
+    }]
     result = apply_observation_import(target, exported, skipped)
     assert contract_id in result["skipped"]
     assert len(result["imported"]) == 2
+    assert result["losses"] == [{"contract_id": contract_id, "reason": "explicit_conflict_skip"}]
+    assert result["unresolved"] == [{
+        "contract_id": contract_id,
+        "code": "shot_already_has_contract",
+        "id": shot["id"],
+    }]
 
 
 def test_archived_and_retired_exact_pins_restore_original_rows(service, tmp_path):
@@ -398,6 +410,42 @@ def test_manifest_tampering_and_unknown_runtime_fields_are_rejected(service, tmp
     assert nonportable.value.code == "observation_plan_not_portable"
     reasons = {loss["reason"] for loss in nonportable.value.details["adapter_losses"]}
     assert "absolute_path" in reasons and "runtime_launch_field" in reasons and "credential_field" in reasons
+
+
+def test_nested_source_pointer_in_screenplay_payload_is_not_exempted(service, tmp_path):
+    unsafe = Service(Project.create(tmp_path / "nested-pointer-source", "Nested pointer source"))
+    story = _base(unsafe, screenplay=_screenplay(metadata={"source_pointer": "/secret/project/credential.json"}))
+    ObservationContracts(unsafe).create(
+        story["shots"][0]["id"], story["shots"][0]["revision"],
+        _contract(story["edges"]["scene_a"], "scene-context", 12),
+    )
+
+    with pytest.raises(ObservationTransferError) as nonportable:
+        export_observation_plan(unsafe)
+
+    assert nonportable.value.code == "observation_plan_not_portable"
+    losses = nonportable.value.details["adapter_losses"]
+    assert any(
+        loss["path"].endswith("/source_snapshot/payload/meta/source_pointer")
+        and loss["reason"] == "absolute_path"
+        for loss in losses
+    )
+
+
+def test_typed_edge_source_pointer_must_match_supported_screenplay_syntax(service):
+    story = _base(service)
+    created = ObservationContracts(service).create(
+        story["shots"][0]["id"], story["shots"][0]["revision"],
+        _contract(story["edges"]["shot_a"], "direct-element", 13),
+    )
+    plan = json.loads(export_observation_plan(service))
+    contract = next(row for row in plan["contracts"] if row["id"] == created["id"])
+    contract["versions"][0]["source_pins"][0]["edge_source_snapshot"]["source_pointer"] = "/secret/project/credential.json"
+
+    with pytest.raises(ObservationTransferError) as invalid:
+        preview_observation_import(service, _rehash_plan(plan))
+
+    assert invalid.value.code == "observation_plan_invalid"
 
 
 def test_atomic_rollback_when_event_write_fails(service, tmp_path, monkeypatch):
