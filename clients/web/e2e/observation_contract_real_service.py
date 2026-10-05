@@ -32,6 +32,7 @@ async def run(args):
         "held_old_initial_load_cannot_overwrite_accepted_revision",
         "real_create_survives_a_to_b_to_a_and_syncs_contract_selector",
         "clean_saved_validation_is_restored_after_reload",
+        "mismatched_show_and_validate_tuple_reconciles_without_losing_draft_or_pins",
     ]
     report = {
         "url": args.url,
@@ -52,6 +53,10 @@ async def run(args):
     old_empty_list_held = asyncio.Event()
     release_old_empty_list = asyncio.Event()
     hold_create = {"value": False}
+    arm_tuple_show = {"value": False}
+    capture_tuple_validation = {"value": False}
+    tuple_show_held = asyncio.Event()
+    release_tuple_show = asyncio.Event()
     try:
         async with async_playwright() as playwright:
             launch = {"headless": True, "args": ["--no-sandbox"]}
@@ -133,12 +138,28 @@ async def run(args):
                     await release_revise.wait()
                     await route.continue_()
                     return
-                if route.request.method == "POST" and path == "observation.validate" and arm_old_validation["value"]:
+                if (route.request.method == "POST" and path == "observation.validate"
+                        and arm_old_validation["value"] and payload.get("contract_id") == record["id"]):
                     arm_old_validation["value"] = False
                     response = await route.fetch()
                     report["held_validation_response"] = await response.json()
                     old_validation_held.set()
                     await release_old_validation.wait()
+                    await route.fulfill(response=response)
+                    return
+                if (route.request.method == "POST" and path == "observation.show"
+                        and arm_tuple_show["value"] and payload.get("contract_id") == record["id"]):
+                    arm_tuple_show["value"] = False
+                    response = await route.fetch()
+                    report["held_tuple_show_response"] = await response.json()
+                    tuple_show_held.set()
+                    await release_tuple_show.wait()
+                    await route.fulfill(response=response)
+                    return
+                if (route.request.method == "POST" and path == "observation.validate"
+                        and capture_tuple_validation["value"] and payload.get("contract_id") == record["id"]):
+                    response = await route.fetch()
+                    report.setdefault("tuple_validation_responses", []).append(await response.json())
                     await route.fulfill(response=response)
                     return
                 if (route.request.method == "POST" and path == "observation.list"
@@ -285,6 +306,80 @@ async def run(args):
             assert sum(item["name"] == "observation.create" for item in report["requests"]) == 1
             report["create_result"] = {"contract_id": created_item["id"], "revision": created_record["revision"], "label": create_label}
             mark_passed(cases[3])
+
+            # Hold the actual old show response on the remounted owner while an
+            # independent real writer advances the contract. The old version's
+            # validate response then carries the new header revision and must be
+            # rejected/reconciled by the client, without clearing its draft/pins.
+            panel = await open_shot(shot_a["id"])
+            await panel.get_by_text(expected_current, exact=True).wait_for()
+            await page.get_by_label(f'Priority {requirement["id"]}', exact=True).select_option("must")
+            await panel.get_by_text(
+                f'This status covers saved revision {updated["revision"]} only; the current local draft has not been checked.',
+                exact=True,
+            ).wait_for()
+            await card_b.focus(); await card_b.press("Enter")
+            await page.get_by_role("tab", name="Shot intent", exact=True).click()
+            arm_tuple_show["value"] = True
+            card_a = page.locator(f'.graph-node[data-node-id="{shot_a["id"]}"]')
+            await card_a.focus(); await card_a.press("Enter")
+            await page.get_by_role("tab", name="Shot intent", exact=True).click()
+            await asyncio.wait_for(tuple_show_held.wait(), timeout=15)
+            panel = page.get_by_role("region", name="Shot intent contract", exact=True)
+            held_show = report["held_tuple_show_response"]
+            assert held_show["revision"] == updated["revision"]
+            assert held_show["selected_version_id"] == updated["selected_version_id"]
+
+            external_body = json.loads(json.dumps(updated["contract"]))
+            external_body["notes"] = (external_body.get("notes") or "") + " External tuple-race writer."
+            external = await command("observation.revise", {
+                "contract_id": updated["id"], "revision": updated["revision"], "contract": external_body,
+            })
+            assert external["revision"] == updated["revision"] + 1, external
+            capture_tuple_validation["value"] = True
+            release_tuple_show.set()
+            await page.get_by_text(
+                f'The editor still uses header revision {updated["revision"]}; latest is revision {external["revision"]}. Your local draft and exact pins are retained.',
+                exact=True,
+            ).wait_for()
+            selected_option = await page.get_by_label("Observation contract", exact=True).locator("option:checked").inner_text()
+            assert selected_option.startswith(f'Revision {external["revision"]} · {record["id"]}'), selected_option
+            latest_label = f'Saved revision {external["revision"]} validation: {external["validation"]["status"]}'
+            await panel.get_by_text(latest_label, exact=True).wait_for()
+            metadata = await panel.locator(".shot-intent-meta").inner_text()
+            assert f'Checked header revision {external["revision"]}' in metadata, metadata
+            assert f'Checked version {external["selected_version_id"]}' in metadata, metadata
+            assert f'Editor CAS revision {updated["revision"]}' in metadata, metadata
+            assert f'Draft base version {updated["selected_version_id"]}' in metadata, metadata
+            await panel.get_by_label(f'Priority {requirement["id"]}', exact=True).wait_for()
+            assert await page.get_by_label(f'Priority {requirement["id"]}', exact=True).input_value() == "must"
+            assert await page.get_by_label("Observation contract", exact=True).input_value() == record["id"]
+            checked_edges = await panel.locator(".shot-source-option input:checked").evaluate_all(
+                "inputs => inputs.map(input => input.closest('label').innerText.match(/Edge ([0-9a-f-]+)/)?.[1]).filter(Boolean)"
+            )
+            expected_edges = sorted(pin["edge_id"] for pin in updated["contract"]["source_pins"])
+            assert sorted(checked_edges) == expected_edges, {"actual": checked_edges, "expected": expected_edges}
+            assert await page.get_by_role("button", name="Save draft", exact=True).is_disabled()
+            assert len(report.get("tuple_validation_responses", [])) >= 1
+            mismatch = report["tuple_validation_responses"][0]
+            assert mismatch["revision"] == external["revision"]
+            assert mismatch["version_id"] == held_show["selected_version_id"]
+            assert any(result["revision"] == external["revision"]
+                       and result["version_id"] == external["selected_version_id"]
+                       for result in report["tuple_validation_responses"])
+            report["tuple_race_result"] = {
+                "held_show": {"revision": held_show["revision"], "version_id": held_show["selected_version_id"]},
+                "external_revision": external["revision"],
+                "stale_validation": {"revision": mismatch["revision"], "version_id": mismatch["version_id"]},
+                "reconciled_validation": report["tuple_validation_responses"][-1],
+                "visible_label": latest_label,
+                "selector_option": selected_option,
+                "validation_metadata": metadata,
+                "local_priority_draft": "must",
+                "header_cas": updated["revision"],
+                "draft_pins": checked_edges,
+            }
+            mark_passed(cases[5])
             if report["page_errors"] or report["console_errors"]:
                 raise AssertionError("Browser recorded page or console errors.")
             await page.screenshot(path=str(output / "final.png"), full_page=True)
@@ -293,7 +388,7 @@ async def run(args):
         report["failed"].append({"error": traceback.format_exc()})
     finally:
         # A failed assertion must not strand a paused browser request.
-        release_revise.set(); release_old_validation.set(); release_create.set(); release_old_empty_list.set()
+        release_revise.set(); release_old_validation.set(); release_create.set(); release_old_empty_list.set(); release_tuple_show.set()
         if browser:
             try:
                 await browser.close()
