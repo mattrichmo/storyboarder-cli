@@ -1,7 +1,10 @@
 """Exact source coverage and atomic multi-shot authoring."""
 import copy
+import hashlib
 import json
+import sys
 import uuid
+from pathlib import Path
 
 import pytest
 
@@ -11,7 +14,9 @@ from storyboarder.application.observation_planner import (
     ObservationPlanner,
     ObservationPlannerError,
 )
+import storyboarder.application.observation_contracts as contract_module
 from storyboarder.application.provenance import Provenance
+from storyboarder.application.source_workflows import SourceWorkflows
 from storyboarder.domain.errors import Conflict
 
 
@@ -361,6 +366,136 @@ def test_grouped_create_reuses_preexisting_exact_active_context_edge(story, impo
         assert conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0] == before_link_events
 
 
+def test_grouped_create_reuses_context_edge_after_scene_and_document_title_rename(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    with service.repo.transaction(False) as conn:
+        before = conn.execute("SELECT source_snapshot,target_snapshot FROM provenance_edges WHERE id=?",
+                              (existing["id"],)).fetchone()
+        before_link_events = conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0]
+    renamed_scene = service.update_entity(story["scene"]["id"], story["scene"]["revision"],
+                                          {"title": "Renamed storyboard scene"})
+    with service.repo.transaction() as conn:
+        conn.execute("UPDATE documents SET title=?,revision=revision+1,updated_at='later' WHERE id=?",
+                     ("Renamed screenplay", imported["document"]["id"]))
+    item = plan_item(uid(1221), uid(1222), renamed_scene,
+                     [exact_edge(existing["id"], imported, source, scope="scene-context")])
+
+    result = ObservationPlanner(service).create_group([item])
+
+    assert result["items"][0]["edge_ids"] == [existing["id"]]
+    with service.repo.transaction(False) as conn:
+        after = conn.execute("SELECT source_snapshot,target_snapshot FROM provenance_edges WHERE id=?",
+                             (existing["id"],)).fetchone()
+        assert tuple(after) == tuple(before)
+        assert conn.execute("SELECT count(*) FROM provenance_edges WHERE id=?", (existing["id"],)).fetchone()[0] == 1
+        assert conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0] == before_link_events
+
+
+def test_existing_context_edge_survives_scene_context_edit_and_parent_move(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    with service.repo.transaction(False) as conn:
+        original_snapshots = tuple(conn.execute("SELECT source_snapshot,target_snapshot FROM provenance_edges WHERE id=?",
+                                                (existing["id"],)).fetchone())
+        link_events = conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0]
+    changed = service.update_entity(story["scene"]["id"], story["scene"]["revision"],
+                                    {"fields": {"summary": "Night replaces dawn."}})
+    service.put_context(changed["id"], "time", "replace", "Night")
+    new_sequence = service.create_entity("sequence", "Later sequence")
+    moved = service.move(changed["id"], changed["revision"], 0, new_sequence["id"])
+    item = plan_item(uid(1223), uid(1224), moved,
+                     [exact_edge(existing["id"], imported, source, scope="scene-context")])
+
+    result = ObservationPlanner(service).create_group([item])
+
+    assert result["items"][0]["edge_ids"] == [existing["id"]]
+    with service.repo.transaction(False) as conn:
+        snapshots = tuple(conn.execute("SELECT source_snapshot,target_snapshot FROM provenance_edges WHERE id=?",
+                                       (existing["id"],)).fetchone())
+        assert snapshots == original_snapshots
+        assert conn.execute("SELECT count(*) FROM provenance_edges WHERE id=?", (existing["id"],)).fetchone()[0] == 1
+        assert conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0] == link_events
+
+
+def test_grouped_create_rejects_corrupt_existing_context_source_hash_snapshot(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    with service.repo.transaction() as conn:
+        # Simulate on-disk corruption beneath the immutable-endpoint guard.
+        conn.execute("DROP TRIGGER immutable_provenance_endpoints")
+        saved = json.loads(conn.execute("SELECT source_snapshot FROM provenance_edges WHERE id=?",
+                                        (existing["id"],)).fetchone()[0])
+        saved["content_sha256"] = "0" * 64
+        conn.execute("UPDATE provenance_edges SET source_snapshot=? WHERE id=?",
+                     (json.dumps(saved, sort_keys=True, separators=(",", ":")), existing["id"]))
+    item = plan_item(uid(1231), uid(1232), story["scene"],
+                     [exact_edge(existing["id"], imported, source, scope="scene-context")])
+
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group([item])
+
+    assert error.value.code == "observation_group_existing_edge_mismatch"
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT 1 FROM entities WHERE id=?", (uid(1231),)).fetchone() is None
+
+
+def test_grouped_create_rejects_archived_exact_source_when_reusing_context_edge(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    with service.repo.transaction(False) as conn:
+        original_snapshots = tuple(conn.execute("SELECT source_snapshot,target_snapshot FROM provenance_edges WHERE id=?",
+                                                (existing["id"],)).fetchone())
+        link_events = conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0]
+    workflows = SourceWorkflows(service)
+    archived = workflows.archive(imported["document"]["id"], imported["document"]["revision"], True)
+    item = plan_item(uid(1241), uid(1242), story["scene"],
+                     [exact_edge(existing["id"], imported, source, scope="scene-context")])
+
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group([item])
+
+    assert error.value.code == "observation_source_archived"
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT 1 FROM entities WHERE id=?", (uid(1241),)).fetchone() is None
+    workflows.archive(imported["document"]["id"], archived["revision"], False)
+    result = ObservationPlanner(service).create_group([item])
+    assert result["items"][0]["edge_ids"] == [existing["id"]]
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT count(*) FROM provenance_edges WHERE id=?", (existing["id"],)).fetchone()[0] == 1
+        snapshots = tuple(conn.execute("SELECT source_snapshot,target_snapshot FROM provenance_edges WHERE id=?",
+                                       (existing["id"],)).fetchone())
+        assert snapshots == original_snapshots
+        assert conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0] == link_events
+
+
+def test_grouped_create_rejects_archived_context_target_via_current_lifecycle(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    service.lifecycle(story["shot"]["id"], story["shot"]["revision"], "archive")
+    archived_scene = service.lifecycle(story["scene"]["id"], story["scene"]["revision"], "archive")
+    item = plan_item(uid(1243), uid(1244), archived_scene,
+                     [exact_edge(existing["id"], imported, source, scope="scene-context")])
+
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group([item])
+
+    assert error.value.code == "observation_group_invalid"
+    assert "archived" in str(error.value).casefold()
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT 1 FROM entities WHERE id=?", (uid(1243),)).fetchone() is None
+
+
 def test_grouped_create_requires_the_existing_context_edge_uuid(story, imported_screenplay):
     service = story["service"]
     imported, nodes = imported_screenplay
@@ -420,15 +555,21 @@ def test_grouped_create_rejects_existing_context_edge_for_another_scene(story, i
         assert conn.execute("SELECT 1 FROM observation_contracts WHERE id=?", (uid(1402),)).fetchone() is None
 
 
-def test_grouped_create_rejects_stale_snapshot_on_existing_context_edge(story, imported_screenplay):
+def test_grouped_create_rejects_corrupt_existing_context_target_identity(story, imported_screenplay):
     service = story["service"]
     imported, nodes = imported_screenplay
     source = nodes[uid(3)]
     existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
-    changed_scene = service.update_entity(story["scene"]["id"], story["scene"]["revision"],
-                                          {"fields": {"summary": "The scene context changed."}})
+    with service.repo.transaction() as conn:
+        # Simulate on-disk corruption beneath the immutable-endpoint guard.
+        conn.execute("DROP TRIGGER immutable_provenance_endpoints")
+        saved = json.loads(conn.execute("SELECT target_snapshot FROM provenance_edges WHERE id=?",
+                                        (existing["id"],)).fetchone()[0])
+        saved["id"] = uid(1999)
+        conn.execute("UPDATE provenance_edges SET target_snapshot=? WHERE id=?",
+                     (json.dumps(saved, sort_keys=True, separators=(",", ":")), existing["id"]))
     edge = exact_edge(existing["id"], imported, source, scope="scene-context")
-    item = plan_item(uid(1501), uid(1502), changed_scene, [edge])
+    item = plan_item(uid(1501), uid(1502), story["scene"], [edge])
 
     with pytest.raises(ObservationPlannerError) as error:
         ObservationPlanner(service).create_group([item])
@@ -452,3 +593,98 @@ def test_grouped_create_does_not_reuse_preexisting_direct_edge(story, imported_s
     assert error.value.code == "observation_group_existing_edge_mismatch"
     with service.repo.transaction(False) as conn:
         assert conn.execute("SELECT 1 FROM entities WHERE id=?", (uid(1601),)).fetchone() is None
+
+
+def test_planner_artifact_cache_is_operation_local_and_checks_each_exact_node(story, imported_screenplay, monkeypatch):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    with service.repo.transaction(False) as conn:
+        artifact = conn.execute("SELECT path FROM source_artifacts WHERE id=?",
+                                (imported["version"]["source_artifact_id"],)).fetchone()
+    artifact_path = (service.root / artifact["path"]).resolve()
+    original_read = Path.read_bytes
+    original_sha256 = hashlib.sha256
+    raw_artifact = original_read(artifact_path)
+    changed_artifact = raw_artifact + b" "
+    changed = [False]
+    file_reads = []
+    artifact_hashes = []
+    artifact_parses = []
+    real_parse = contract_module.parse
+
+    def read_bytes(path):
+        if path.resolve() == artifact_path:
+            file_reads.append(path)
+            return changed_artifact if changed[0] else raw_artifact
+        return original_read(path)
+
+    def sha256(data=b"", *args, **kwargs):
+        caller = sys._getframe(1)
+        if caller.f_code.co_name == "_artifact_check" and caller.f_globals.get("__name__") == contract_module.__name__:
+            artifact_hashes.append(data)
+        return original_sha256(data, *args, **kwargs)
+
+    def parse(raw, format):
+        if format == "screenjson":
+            artifact_parses.append(raw)
+        return real_parse(raw, format)
+
+    monkeypatch.setattr(Path, "read_bytes", read_bytes)
+    monkeypatch.setattr(contract_module.hashlib, "sha256", sha256)
+    monkeypatch.setattr(contract_module, "parse", parse)
+    anchors = [{"document_id": imported["document"]["id"], "version_id": imported["version"]["id"],
+                "node_id": nodes[logical_id]["id"], "source_sha256": nodes[logical_id]["content_sha256"],
+                "priority": "must", "basis": "direct"} for logical_id in (uid(4), uid(6))]
+
+    coverage = ObservationPlanner(service).coverage(anchors)
+
+    assert [row["node_id"] for row in coverage["request_anchors"]] == [nodes[uid(4)]["id"], nodes[uid(6)]["id"]]
+    assert [row["source_sha256"] for row in coverage["request_anchors"]] == [nodes[uid(4)]["content_sha256"], nodes[uid(6)]["content_sha256"]]
+    assert len(file_reads) == len(artifact_hashes) == len(artifact_parses) == 1
+
+    direct_edges = [exact_edge(uid(1701), imported, nodes[uid(4)]),
+                    exact_edge(uid(1702), imported, nodes[uid(6)])]
+    group = [plan_item(uid(1703), uid(1704), story["scene"], [direct_edges[0]]),
+             plan_item(uid(1705), uid(1706), story["scene"], [direct_edges[1]])]
+    created = ObservationPlanner(service).create_group(group)
+    assert created["count"] == 2
+    assert {pin["node_id"] for item in created["items"]
+            for pin in item["contract"]["source_pins"]} == {nodes[uid(4)]["id"], nodes[uid(6)]["id"]}
+    assert len(file_reads) == len(artifact_hashes) == len(artifact_parses) == 2
+
+    changed[0] = True
+    stale = ObservationPlanner(service).coverage(anchors)
+    assert all("source_artifact_unavailable_or_changed" in row["out_of_date_reasons"]
+               for row in stale["request_anchors"])
+    assert len(file_reads) == len(artifact_hashes) == 3
+    assert len(artifact_parses) == 2
+
+
+def test_grouped_create_edge_reference_budget_accepts_512_and_rejects_513(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    edge = exact_edge(uid(1801), imported, nodes[uid(3)], scope="scene-context")
+    items = []
+    for index in range(4):
+        item = plan_item(uid(1810 + index), uid(1820 + index), story["scene"], [edge])
+        item["source_edges"] = [edge] * 128
+        items.append(item)
+
+    result = ObservationPlanner(service).create_group(items)
+
+    assert result["count"] == 4
+    assert all(item["edge_ids"] == [edge["edge_id"]] for item in result["items"])
+    assert len({item["edge_ids"][0] for item in result["items"]}) == 1
+
+    over_limit = []
+    for index, count in enumerate((128, 128, 128, 128, 1)):
+        item = plan_item(uid(1830 + index), uid(1840 + index), story["scene"], [edge])
+        item["source_edges"] = [edge] * count
+        over_limit.append(item)
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group(over_limit)
+    assert error.value.code == "observation_plan_too_many_edge_references"
+    assert error.value.details == {"limit": 512, "provided": 513}
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT count(*) FROM entities WHERE id IN (?,?,?,?,?)",
+                            tuple(uid(1830 + index) for index in range(5))).fetchone()[0] == 0

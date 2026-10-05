@@ -1,6 +1,6 @@
 # Observation planner reports and grouped authoring
 
-`ObservationPlanner(service)` provides two application operations for callers that need a bounded exact-source planning step:
+`ObservationPlanner(service)` provides two application operations for exact-source planning:
 
 ```python
 from storyboarder.application.observation_planner import ObservationPlanner
@@ -10,7 +10,10 @@ report = planner.coverage(anchors=[...])
 created = planner.create_group([...])
 ```
 
-The planner is an application service. This slice does not add CLI/API registry entries or browser UI.
+The shared command catalog exposes these as agent-only JSON-safe `observation.coverage`
+and `observation.create-group` commands. Both are available through the CLI and JSON API;
+neither is browser-visible. The TUI adds a focused one-shot shot-and-contract authoring
+flow, rather than a wizard for arbitrary multi-shot groups.
 
 ## Coverage report
 
@@ -35,7 +38,15 @@ Request-scoped anchors last only for that report call. Persistent requirements b
 
 ## Atomic grouped authoring
 
-`create_group(items)` accepts between one and fifty item objects. Each item supplies caller UUIDs for `shot_id`, `contract_id`, and every `source_edges[].edge_id`, plus `scene_id`, `expected_scene_revision`, title, optional description/shot fields, exact `source_edges`, and a complete v1 `contract` body. Every source edge must include exact `document_id`, `version_id`, `node_id`, `source_sha256`, and `source_scope`. A `direct-element` edge targets the new shot; `scene-context` targets its existing parent scene. The contract must pin exactly the source edges in its item.
+`create_group(items)` accepts between one and fifty item objects with at most 512 total
+source-edge references in a request. Each item supplies caller UUIDs for `shot_id`,
+`contract_id`, and every `source_edges[].edge_id`, plus `scene_id`,
+`expected_scene_revision`, title, optional description/shot fields, exact `source_edges`,
+and a complete v1 `contract` body. Every source edge must include exact `document_id`,
+`version_id`, `node_id`, `source_sha256`, and `source_scope`. A `direct-element` edge
+targets the new shot; `scene-context` targets its existing parent scene. The contract
+must pin exactly the source edges in its item. At the command boundary the JSON shape is
+`{"request":{"items":[...]}}`; coverage takes `{"request":{"anchors":[...]}}`.
 
 The planner validates the request shape, caller UUIDs, shot fields, and canonical contract bodies before opening the write. Parent-scene revision checks, exact source identities and hashes, backing artifacts, active endpoint/archive state, edge semantics, contract references, and all writes then run inside one SQLite write transaction. Each item creates its shot, exact `visualizes` edges, stable contract header, and first immutable version. Any invalid item rolls back every item in the group. Returned records include caller IDs and generated first-version IDs/revisions. Ordering positions are allocated only after validation and are not source identity. The operation creates no camera, frame, approval, or render state.
 
@@ -65,4 +76,12 @@ result = planner.create_group([
 ])
 ```
 
-The planner does not expose import/export, batch updates to existing shots, or adapters in this slice. Exact-history transfer of a scene-context pin authored before a shot moved also remains a separate core/schema follow-up; ordinary grouped authoring always targets the current parent scene.
+The terminal flow lets a person create one shot with one or more exact screenplay links
+and its first purpose/requirements contract in one transaction. Its document, immutable
+version, node, node hash, priority, basis, and scene revision are explicit. Multiple shots
+can independently select the same exact beat. The terminal page preserves existing IDs,
+hidden contract data, and pins when a person edits one field. Arbitrary grouped planning
+remains an advanced CLI/API request. The planner does not expose import/export or batch
+updates to existing shots. Exact-history transfer of a scene-context pin authored before
+a shot moved remains a separate core/schema concern; ordinary grouped authoring always
+targets the current parent scene.

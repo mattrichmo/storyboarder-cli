@@ -27,6 +27,7 @@ from storyboarder.domain.models import dumps, now, text, title, validate_fields
 UUID_RE = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 COVERAGE_SCHEMA = "storyboarder.observation-coverage/v1"
+MAX_GROUP_EDGE_REFERENCES = 512
 
 
 class ObservationPlannerError(ObservationContractError):
@@ -129,6 +130,22 @@ class ObservationPlanner:
             return "direct-element-link"
         return "unsupported-target"
 
+    @staticmethod
+    def _snapshot_matches_stable_identity(saved, current, endpoint_type):
+        """Compare stable snapshot identity, leaving active lifecycle to the caller."""
+        if not isinstance(saved, dict) or not isinstance(current, dict):
+            return False
+        if endpoint_type == "entity":
+            # Scene context is intentionally mutable. Its current revision is
+            # checked separately, while identity and endpoint type stay fixed.
+            stable_keys = ("id", "type", "kind", "key")
+            return all(saved.get(key) == current.get(key) for key in stable_keys)
+        mutable_metadata = {"title", "label", "updated_at", "revision", "archived",
+                            "document_title", "document_revision", "is_current"}
+        saved_identity = {key: value for key, value in saved.items() if key not in mutable_metadata}
+        current_identity = {key: value for key, value in current.items() if key not in mutable_metadata}
+        return saved_identity == current_identity
+
     def _authored_links(self, conn, limit, offset):
         where = "e.relation='visualizes' AND e.source_type='node' AND e.target_type='entity' AND d.kind='screenplay' AND target.kind IN ('scene','shot')"
         total = conn.execute(f"""SELECT count(*) FROM provenance_edges e
@@ -188,7 +205,7 @@ class ObservationPlanner:
         return {"items": items, "total": total, "limit": limit, "offset": offset,
                 "next_offset": offset + len(items) if offset + len(items) < total else None}
 
-    def _contract_declarations(self, conn, limit, offset):
+    def _contract_declarations(self, conn, limit, offset, artifact_cache=None):
         total = conn.execute("SELECT count(*) FROM observation_contracts").fetchone()[0]
         rows = conn.execute("""SELECT * FROM observation_contracts ORDER BY shot_id,id LIMIT ? OFFSET ?""",
                             (limit, offset)).fetchall()
@@ -202,7 +219,7 @@ class ObservationPlanner:
                 continue
             try:
                 _, version = self.contracts._version(conn, header["id"])
-                validation = self.contracts._validate(conn, header, version)
+                validation = self.contracts._validate(conn, header, version, artifact_cache)
                 items.append({"contract_id": header["id"], "shot_id": header["shot_id"],
                               "contract_revision": header["revision"], "version_id": version["id"],
                               "state": validation["status"],
@@ -222,7 +239,7 @@ class ObservationPlanner:
         return {"items": items, "total": total, "limit": limit, "offset": offset,
                 "next_offset": offset + len(items) if offset + len(items) < total else None}
 
-    def _exact_anchor(self, conn, anchor):
+    def _exact_anchor(self, conn, anchor, artifact_cache=None):
         row = conn.execute("""SELECT n.*,v.document_id,v.content_sha256 AS document_sha256,v.source_artifact_id,
                  d.kind AS document_kind,d.current_version_id,d.archived AS document_archived
           FROM document_nodes n JOIN document_versions v ON v.id=n.version_id
@@ -251,7 +268,7 @@ class ObservationPlanner:
                                           {"node_id": row["id"], "expected": row["content_sha256"], "actual": actual})
         version = {"id": row["version_id"], "source_artifact_id": row["source_artifact_id"],
                    "content_sha256": row["document_sha256"]}
-        artifact = self.contracts._artifact_check(conn, version)
+        artifact = self.contracts._artifact_check(conn, version, artifact_cache)
         out_of_date_reasons = []
         if row["document_archived"]:
             out_of_date_reasons.append("document_archived")
@@ -349,12 +366,13 @@ class ObservationPlanner:
         identities = [(item.document_id, item.version_id, item.node_id) for item in parsed]
         if len(identities) != len(set(identities)):
             raise ObservationPlannerError("observation_anchor_duplicate", "A request cannot repeat the same exact document/version/node anchor.")
+        artifact_cache = {}
         with self.repo.transaction(False) as conn:
             authored_links = self._authored_links(conn, limit, offset)
-            declarations = self._contract_declarations(conn, limit, offset)
+            declarations = self._contract_declarations(conn, limit, offset, artifact_cache)
             request_anchors = []
             for anchor in parsed:
-                source = self._exact_anchor(conn, anchor)
+                source = self._exact_anchor(conn, anchor, artifact_cache)
                 links = self._anchor_links(conn, source)
                 request_anchors.append(self._anchor_state(anchor, source, links))
             return {"schema": COVERAGE_SCHEMA,
@@ -363,7 +381,7 @@ class ObservationPlanner:
                     "contract_declarations": declarations,
                     "request_anchors": request_anchors}
 
-    def _validate_exact_source(self, conn, edge_input):
+    def _validate_exact_source(self, conn, edge_input, artifact_cache=None):
         row = conn.execute("""SELECT n.*,v.document_id,v.content_sha256 AS document_sha256,v.source_artifact_id,
                  d.kind AS document_kind,d.archived AS document_archived
           FROM document_nodes n JOIN document_versions v ON v.id=n.version_id
@@ -395,7 +413,7 @@ class ObservationPlanner:
         artifact = self.contracts._artifact_check(conn, {
             "id": row["version_id"], "source_artifact_id": row["source_artifact_id"],
             "content_sha256": row["document_sha256"],
-        })
+        }, artifact_cache)
         if artifact is None:
             raise ObservationPlannerError("observation_source_artifact_unavailable",
                                           "The exact screenplay artifact or version hash is unavailable or changed.",
@@ -422,6 +440,11 @@ class ObservationPlanner:
         if not isinstance(items, list) or not 1 <= len(items) <= 50:
             raise ObservationPlannerError("observation_plan_invalid", "A grouped plan must contain 1 to 50 items.")
         parsed = [_validated_model(GroupItem, value, f"items[{index}]") for index, value in enumerate(items)]
+        edge_reference_count = sum(len(item.source_edges) for item in parsed)
+        if edge_reference_count > MAX_GROUP_EDGE_REFERENCES:
+            raise ObservationPlannerError("observation_plan_too_many_edge_references",
+                                          f"A grouped plan can contain at most {MAX_GROUP_EDGE_REFERENCES} source-edge references.",
+                                          {"limit": MAX_GROUP_EDGE_REFERENCES, "provided": edge_reference_count})
         shot_ids = [item.shot_id for item in parsed]
         contract_ids = [item.contract_id for item in parsed]
         if len(set(shot_ids)) != len(shot_ids) or len(set(contract_ids)) != len(contract_ids):
@@ -468,6 +491,7 @@ class ObservationPlanner:
 
         try:
             with self.repo.transaction() as conn:
+                artifact_cache = {}
                 for scene_id, revision in scene_revisions.items():
                     scene = self.service.entity(conn, scene_id, "scene")
                     self.repo.check(scene, revision)
@@ -486,7 +510,7 @@ class ObservationPlanner:
                 for item, _, field_values, _, _ in prepared:
                     self.service._validate_location(conn, field_values)
                     for edge in item.source_edges:
-                        self._validate_exact_source(conn, edge)
+                        self._validate_exact_source(conn, edge, artifact_cache)
                         if edge.node_id not in source_endpoints:
                             source_endpoints[edge.node_id] = self.provenance._endpoint(conn, "node", edge.node_id)
 
@@ -537,7 +561,8 @@ class ObservationPlanner:
                     if (existing["source_type"] != "node" or existing["source_id"] != edge_input.node_id
                             or existing["target_type"] != "entity" or existing["target_id"] != target_id
                             or existing["relation"] != "visualizes" or existing["retired"]
-                            or source_snapshot != source or target_snapshot != target):
+                            or not self._snapshot_matches_stable_identity(source_snapshot, source, "node")
+                            or not self._snapshot_matches_stable_identity(target_snapshot, target, "entity")):
                         raise ObservationPlannerError("observation_group_existing_edge_mismatch", "The existing edge UUID does not identify a current exact scene-context link to the requested scene.",
                                                       {"edge_id": edge_id, "target_id": target_id})
                     reusable_edges[edge_id] = dict(existing)
@@ -595,12 +620,12 @@ class ObservationPlanner:
                     conn.execute("""INSERT INTO observation_contracts
                       (id,shot_id,current_version_id,revision,created_at,updated_at) VALUES(?,?,NULL,1,?,?)""",
                                  (item.contract_id, item.shot_id, stamp, stamp))
-                    version = self.contracts._insert_version(conn, header, body, "create")
+                    version = self.contracts._insert_version(conn, header, body, "create", artifact_cache)
                     conn.execute("UPDATE observation_contracts SET current_version_id=? WHERE id=?",
                                  (version["id"], item.contract_id))
                     self.repo.event(conn, "observation_contract.created", item.contract_id,
                                     {"shot_id": item.shot_id, "version_id": version["id"]})
-                    shown = self.contracts._show(conn, item.contract_id, version["id"])
+                    shown = self.contracts._show(conn, item.contract_id, version["id"], artifact_cache)
                     created.append({"shot_id": item.shot_id, "shot_revision": shot["revision"],
                                     "scene_id": item.scene_id, "expected_scene_revision": item.expected_scene_revision,
                                     "contract_id": item.contract_id, "contract_revision": 1,

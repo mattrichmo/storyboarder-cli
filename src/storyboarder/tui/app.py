@@ -1,12 +1,13 @@
 """Full-screen authoring desk. All mutations call application.commands.execute."""
 from __future__ import annotations
 import asyncio
+import copy
 from contextlib import asynccontextmanager
 import json
 import os
+import uuid
 import webbrowser
 from pathlib import Path
-from typing import Any
 from prompt_toolkit.application import Application
 from prompt_toolkit.layout import Layout, HSplit, VSplit, Window, FloatContainer, Float, DynamicContainer, ConditionalContainer, ScrollablePane
 from prompt_toolkit.layout.controls import FormattedTextControl
@@ -21,12 +22,13 @@ from prompt_toolkit.output import ColorDepth
 from PIL import Image, ImageOps
 from storyboarder.application.projects import Project, Workspace, discover
 from storyboarder.application.service import Service
+from storyboarder.application.observation_contracts import ObservationContracts
 from storyboarder.application.commands import COMMANDS, execute, options_for, source_options, source_record
 from storyboarder.application.recovery import restore
 from storyboarder.domain.errors import StoryboardError, Conflict
 from storyboarder.media.files import safe_path, thumbnail
 from storyboarder.rendering.composer import markdown
-from .pages import PAGES, PAGE_MAP, defaults, rows_for, describe, context_text, human, display_title
+from .pages import PAGES, PAGE_MAP, defaults, rows_for, describe, context_text, human
 from .widgets import Row, RecordList, clean
 
 STYLE = Style.from_dict({
@@ -71,6 +73,8 @@ class Desk:
         self.thumbnail_fragments = []
         self.show_thumbnails = os.environ.get('STORYBOARDER_NO_THUMBNAILS') != '1'
         self.compare_ids = []
+        self.observation_rows = []
+        self.observation_draft = None
         self.modal_depth = 0
         self._busy_operations = set()
         self._busy_workers = set()
@@ -92,7 +96,11 @@ class Desk:
                       Button('Keyboard help  F1', handler=lambda: self.spawn(self.help()), width=26)])
         main = HSplit([
             Window(FormattedTextControl(lambda: [('class:header', '  STORYBOARDER  /  '+(self.state['project']['title'] if self.state else 'Workspace')+'  /  '+PAGE_MAP[self.page].title)]), height=1, style='class:header'),
-            VSplit([Box(nav, padding=1, width=29, style='class:nav'), Window(width=1, char='│', style='class:frame.border'), DynamicContainer(lambda: self.page_body)]),
+            VSplit([ConditionalContainer(Box(nav, padding=1, width=29, style='class:nav'),
+                                         Condition(lambda: self._terminal_columns() >= 80)),
+                    ConditionalContainer(Window(width=1, char='│', style='class:frame.border'),
+                                         Condition(lambda: self._terminal_columns() >= 80)),
+                    DynamicContainer(lambda: self.page_body)]),
             Window(FormattedTextControl(lambda: [('class:footer', '  '+clean(self.message))]), height=2, wrap_lines=True, style='class:footer'),
             Window(FormattedTextControl([('class:footer', '  Tab focus  ↑↓ choose  Enter inspect  Ctrl+E edit  Ctrl+N new  Ctrl+K actions  F5 reload  Ctrl+Q quit')]), height=1, style='class:footer')
         ])
@@ -179,9 +187,14 @@ class Desk:
         if hasattr(self, 'app'):
             self.app.layout.focus(self.records.control)
             self.app.invalidate()
+        if key == 'coverage':
+            self.spawn(self.refresh_observation_rows())
 
     def build_page(self):
         page = PAGE_MAP[self.page]
+        if self.page == 'coverage':
+            self.build_coverage_page(page)
+            return
         buttons = []
         if self.page == 'workspace':
             buttons = [Button('New project', handler=lambda: self.spawn(self.create_project())), Button('Open path', handler=lambda: self.spawn(self.open_path())), Button('Refresh', handler=lambda: self.spawn(self.refresh()))]
@@ -203,9 +216,337 @@ class Desk:
         ])
         self.rebuild_rows()
 
+    def _terminal_columns(self):
+        try:
+            return self.app.output.get_size().columns
+        except (AttributeError, ValueError):
+            return 80
+
+    def build_coverage_page(self, page):
+        buttons = [
+            Button('Plan shot + contract', handler=lambda: self.spawn(self.create_observation_plan())),
+            Button('Show exact pins', handler=lambda: self.spawn(self.show_observation())),
+            Button('Validate', handler=lambda: self.spawn(self.validate_observation())),
+            Button('Edit one field', handler=lambda: self.spawn(self.edit_observation_field())),
+            Button('Diff versions', handler=lambda: self.spawn(self.diff_observation())),
+            Button('Rebase preview', handler=lambda: self.spawn(self.rebase_observation())),
+            Button('Refresh list', handler=lambda: self.spawn(self.refresh_observation_rows())),
+            Button('Coverage JSON', handler=lambda: self.launch_action('observation.coverage')),
+            Button('Advanced group JSON', handler=lambda: self.launch_action('observation.create-group')),
+        ]
+        standard_observation_forms = {
+            'observation.create', 'observation.show', 'observation.list', 'observation.revise',
+            'observation.validate', 'observation.rebase', 'observation.diff',
+            'observation.coverage', 'observation.create-group',
+        }
+        for name, command in COMMANDS.items():
+            if command.page == 'coverage' and not command.browser and name not in standard_observation_forms:
+                buttons.append(Button(command.label[:28], handler=lambda n=name: self.launch_action(n)))
+        if self.observation_draft:
+            buttons += [Button('Retry saved draft', handler=lambda: self.spawn(self.retry_observation_draft())),
+                        Button('Discard saved draft', handler=self.discard_observation_draft)]
+        columns = 3 if self._terminal_columns() >= 150 else 2 if self._terminal_columns() >= 100 else 1
+        button_rows = [VSplit(buttons[index:index + columns], padding=1, height=1)
+                       for index in range(0, len(buttons), columns)]
+        draft_status = Label(self._observation_draft_label(), style='class:warning') if self.observation_draft else Window(height=0)
+        controls = Box(HSplit([Label(page.title, style='class:title'), Label(page.subtitle, style='class:muted'),
+                               draft_status, self.search, *button_rows]), padding=1, padding_bottom=0)
+        list_frame = Frame(self.records, title='Contracts · revision · source state', width=D(weight=1, min=25))
+        detail_frame = Frame(self.detail, title='Selected contract', width=D(weight=1, min=25))
+        if self._terminal_columns() >= 115:
+            records = VSplit([list_frame, detail_frame], padding=1)
+        else:
+            records = HSplit([list_frame, detail_frame], padding=1)
+        self.page_body = HSplit([controls, ScrollablePane(HSplit([records]), show_scrollbar=True)])
+        self.rebuild_rows()
+
+    def _observation_draft_label(self):
+        if not self.observation_draft:
+            return ''
+        kind = self.observation_draft.get('kind', 'plan')
+        if kind == 'group':
+            item = self.observation_draft['payload']['request']['items'][0]
+            return f"Saved draft · {item['title']} · exact source pins retained · scene revision {item['expected_scene_revision']}"
+        return f"Saved edit draft · contract {self.observation_draft['contract_id']} · header revision {self.observation_draft['revision']}"
+
+    async def refresh_observation_rows(self):
+        if not self.service:
+            return
+        try:
+            result = await self.run_worker(lambda: ObservationContracts(self.service).list(limit=500))
+            self.observation_rows = [Row(item['id'],
+                                         f"{item['shot_title']} · contract r{item['revision']} · v{item['version_number']}",
+                                         f"{item['content_sha256']} · {'archived' if item.get('shot_archived') else 'active'}", item)
+                                     for item in result['items']]
+            self.rebuild_rows()
+        except (StoryboardError, OSError) as exc:
+            self.set_message(str(exc))
+
+    def discard_observation_draft(self):
+        self.observation_draft = None
+        self.build_page()
+        self.set_message('Saved observation draft discarded.')
+
+    def _selected_contract_id(self):
+        if self.selected and self.page == 'coverage':
+            return self.selected.record['id']
+        self.set_message('Select an observation contract first.')
+        return None
+
+    @staticmethod
+    def _format_observation_show(record):
+        sections = [f"Contract {record['id']} · header revision {record['revision']}",
+                    f"Shot {record['shot_id']} · version {record['version']['number']} · {record['version']['id']}",
+                    f"Version hash {record['version']['content_sha256']} · basis hash {record['version']['basis_sha256']}",
+                    f"Validation: {record['validation']['status']} · basis current: {record['validation']['basis_current']}",
+                    '', 'Purpose and requirements', json.dumps({
+                        'script_intents': record['contract']['script_intents'],
+                        'requirements': record['contract']['requirements'],
+                    }, ensure_ascii=False, indent=2), '', 'Exact source pins (document/version/node/hash/edge)',
+                    json.dumps(record['source_pins'], ensure_ascii=False, indent=2), '', 'Saved history',
+                    json.dumps(record['history'], ensure_ascii=False, indent=2)]
+        return '\n'.join(sections)
+
+    async def show_observation(self):
+        contract_id = self._selected_contract_id()
+        if not contract_id:
+            return
+        try:
+            record = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+            await self.message_dialog('Observation contract · exact pins', self._format_observation_show(record))
+        except (StoryboardError, OSError) as exc:
+            await self.message_dialog('Observation contract unavailable', str(exc))
+
+    async def validate_observation(self):
+        contract_id = self._selected_contract_id()
+        if not contract_id:
+            return
+        try:
+            result = await self.run_worker(ObservationContracts(self.service).validate, contract_id)
+            await self.message_dialog('Observation validation',
+                                      json.dumps(result, ensure_ascii=False, indent=2))
+        except (StoryboardError, OSError) as exc:
+            await self.message_dialog('Validation failed', str(exc))
+
+    async def diff_observation(self):
+        contract_id = self._selected_contract_id()
+        if not contract_id:
+            return
+        try:
+            record = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+            versions = record['history']
+            if len(versions) < 2:
+                await self.message_dialog('No earlier version', 'Create a revision before comparing contract versions.')
+                return
+            choices = [(item['id'], f"Version {item['number']} · {item['operation']} · {item['created_at']}") for item in versions]
+            before = await self.choose('Earlier contract version', choices[:-1])
+            if not before:
+                return
+            after = await self.choose('Later contract version', choices)
+            if not after:
+                return
+            result = await self.run_worker(ObservationContracts(self.service).diff, contract_id, before, after)
+            await self.message_dialog('Observation contract difference', json.dumps(result, ensure_ascii=False, indent=2))
+        except (StoryboardError, OSError) as exc:
+            await self.message_dialog('Could not compare versions', str(exc))
+
+    async def edit_observation_field(self):
+        contract_id = self._selected_contract_id()
+        if not contract_id:
+            return
+        try:
+            saved = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+            body = copy.deepcopy(saved['contract'])
+            components = []
+            for item in body['script_intents']:
+                components.append((item['id'], f"Purpose · {item['purpose']} · intent {item['id']}"))
+            for item in body['requirements']:
+                label = item.get('statement') or item.get('topic') or ''
+                components.append((item['id'], f"{item['priority']} requirement · {label} · {item['id']}"))
+            if not components:
+                await self.message_dialog('Nothing to edit', 'This contract has no purpose or requirement rows yet.')
+                return
+            component_id = await self.choose('Choose one purpose or requirement', components)
+            if not component_id:
+                return
+            intent = next((item for item in body['script_intents'] if item['id'] == component_id), None)
+            requirement = next((item for item in body['requirements'] if item['id'] == component_id), None)
+            if intent:
+                prop = await self.choose('Choose one purpose field', [('purpose', 'Purpose'), ('communication', 'How it should read visually'), ('basis', 'Basis label')])
+                if not prop:
+                    return
+                if prop == 'basis':
+                    value = await self.choose('Purpose basis', [('direct', 'Directly stated'), ('interpreted', 'Interpreted'), ('unknown', 'Unknown')], intent['basis'])
+                    if value is None:
+                        return
+                    intent[prop] = value
+                else:
+                    values = await self.simple_form('Edit one purpose field', [(prop, 'New ' + ('purpose' if prop == 'purpose' else 'visual communication'), intent[prop])])
+                    if values is None:
+                        return
+                    intent[prop] = values[prop]
+            else:
+                current_text_key = 'topic' if requirement['priority'] == 'unknown' else 'statement'
+                properties = [('priority', 'Priority'), ('basis', 'Basis label'), (current_text_key, 'Topic' if current_text_key == 'topic' else 'Requirement statement')]
+                prop = await self.choose('Choose one requirement field', properties)
+                if not prop:
+                    return
+                if prop == 'priority':
+                    value = await self.choose('Requirement priority', [('must', 'Must include'), ('prefer', 'Prefer'), ('unknown', 'Unknown / open question')], requirement['priority'])
+                    if value is None:
+                        return
+                    old_key = 'topic' if requirement['priority'] == 'unknown' else 'statement'
+                    new_key = 'topic' if value == 'unknown' else 'statement'
+                    content = requirement.pop(old_key)
+                    requirement['priority'] = value
+                    requirement[new_key] = content
+                elif prop == 'basis':
+                    value = await self.choose('Requirement basis', [('direct', 'Directly stated'), ('interpreted', 'Interpreted'), ('unknown', 'Unknown')], requirement['basis'])
+                    if value is None:
+                        return
+                    requirement[prop] = value
+                else:
+                    values = await self.simple_form('Edit one requirement field', [(prop, 'New ' + prop, requirement[prop])])
+                    if values is None:
+                        return
+                    requirement[prop] = values[prop]
+            payload = {'contract_id': contract_id, 'revision': saved['revision'], 'contract': body}
+            self.observation_draft = {'kind': 'revise', **copy.deepcopy(payload)}
+            await self._apply_observation_draft()
+        except (StoryboardError, OSError) as exc:
+            await self.message_dialog('Contract edit was not saved', str(exc))
+
+    async def rebase_observation(self):
+        if not self._selected_contract_id():
+            return
+        await self.message_dialog('Rebase preview unavailable',
+                                  'This build is waiting for the shared basis-preview and compare-and-swap API. No pins or basis were changed.')
+
+    async def retry_observation_draft(self):
+        if not self.observation_draft:
+            return
+        await self._apply_observation_draft()
+
+    async def _apply_observation_draft(self):
+        draft = self.observation_draft
+        if not draft:
+            return
+        try:
+            if draft['kind'] == 'group':
+                result = await self.run_worker(execute, self.service, 'observation.create-group', draft['payload'])
+                self.set_message(f"Created shot {result['items'][0]['shot_id']} and its exact observation contract.")
+            else:
+                result = await self.run_worker(execute, self.service, 'observation.revise', {
+                    'contract_id': draft['contract_id'], 'revision': draft['revision'], 'contract': draft['contract']})
+                self.set_message(f"Saved contract revision {result['revision']} with the existing IDs and source pins.")
+            self.observation_draft = None
+            await self.refresh()
+        except (StoryboardError, OSError) as exc:
+            self.set_message('Draft retained with exact IDs, revisions, and pins. ' + str(exc))
+            self.build_page()
+
+    async def _pick_exact_source(self):
+        async def pick(source, title, values=None, *, exact_nodes=False):
+            async def load(query, offset):
+                page = await self.run_worker(source_options, self.service, source, values or {}, query, 100, offset)
+                if exact_nodes:
+                    page['items'] = [item for item in page['items']
+                                     if item.get('identity') == 'explicit' and item.get('node_type') != 'screenplay']
+                return page
+            selected = await self.choose(title, [], loader=load)
+            if not selected:
+                return None
+            return await self.run_worker(source_record, self.service, source, selected, values or {})
+
+        document = await pick('documents', 'Choose a screenplay document', {'kind': 'screenplay'})
+        if not document:
+            return None
+        if document.get('kind') != 'screenplay' or document.get('archived'):
+            await self.message_dialog('Choose an active screenplay', 'Observation links require an active screenplay document.')
+            return None
+        version = await pick('versions', 'Choose the exact screenplay version', {'document_id': document['id']})
+        if not version:
+            return None
+        node = await pick('document_nodes', 'Choose an explicitly identified scene or element',
+                          {'document_id': document['id'], 'version_id': version['id']}, exact_nodes=True)
+        if not node:
+            return None
+        return {'document_id': document['id'], 'version_id': version['id'], 'node_id': node['id'],
+                'source_sha256': node['content_sha256'], 'node_type': node['node_type'],
+                'label': node.get('label') or node.get('title') or node['id']}
+
+    async def create_observation_plan(self):
+        if not self.service or not self.state:
+            return
+        scenes = [(item['id'], f"{item['title']} · scene revision {item['revision']}")
+                  for item in self.state['entities'] if item['kind'] == 'scene' and not item['archived']]
+        scene_id = await self.choose('Choose the shot’s parent scene', scenes)
+        if not scene_id:
+            return
+        scene = next(item for item in self.state['entities'] if item['id'] == scene_id)
+        title_values = await self.simple_form('Name the planned shot', [('title', 'Shot title', '')],
+                                              f"Expected scene revision {scene['revision']} is captured now. A later scene edit will keep this draft and return a conflict.")
+        if not title_values:
+            return
+        edges, intents, requirements = [], [], []
+        while True:
+            source = await self._pick_exact_source()
+            if not source:
+                if not edges:
+                    return
+                break
+            self.set_message(f"Exact source selected: {source['document_id']} / {source['version_id']} / {source['node_id']} · {source['source_sha256']}")
+            fields = await self.simple_form('Describe this exact source', [
+                ('purpose', 'Purpose', ''), ('communication', 'How the visual should read', '')],
+                f"Pinned source: {source['document_id']} · version {source['version_id']} · node {source['node_id']} · hash {source['source_sha256']}")
+            if not fields:
+                return
+            intent_basis = await self.choose('Purpose basis', [('direct', 'Directly stated'), ('interpreted', 'Interpreted'), ('unknown', 'Unknown')], 'unknown')
+            if intent_basis is None:
+                return
+            priority = await self.choose('Requirement priority', [('must', 'Must include'), ('prefer', 'Prefer'), ('unknown', 'Unknown / open question')], 'must')
+            if priority is None:
+                return
+            req_basis = await self.choose('Requirement basis', [('direct', 'Directly stated'), ('interpreted', 'Interpreted'), ('unknown', 'Unknown')], 'unknown')
+            if req_basis is None:
+                return
+            field_name = 'topic' if priority == 'unknown' else 'statement'
+            req_form = await self.simple_form('State the requirement', [(field_name, 'Open question topic' if priority == 'unknown' else 'Requirement statement', '')])
+            if not req_form:
+                return
+            edge_id = str(uuid.uuid4())
+            edges.append({'edge_id': edge_id, 'document_id': source['document_id'], 'version_id': source['version_id'],
+                          'node_id': source['node_id'], 'source_sha256': source['source_sha256'],
+                          'source_scope': 'scene-context' if source['node_type'] == 'scene' else 'direct-element'})
+            intents.append({'id': str(uuid.uuid4()), 'source_edge_id': edge_id, 'source_scope': edges[-1]['source_scope'],
+                            'purpose': fields['purpose'], 'communication': fields['communication'], 'basis': intent_basis})
+            requirement = {'id': str(uuid.uuid4()), 'priority': priority, 'basis': req_basis,
+                           'source_edge_ids': [edge_id], field_name: req_form[field_name]}
+            requirements.append(requirement)
+            more = await self.choose('Add another exact source?', [('yes', 'Add another source link'), ('no', 'Finish this shot')], 'no')
+            if more != 'yes':
+                break
+        if not edges:
+            return
+        shot_id, contract_id = str(uuid.uuid4()), str(uuid.uuid4())
+        item = {'shot_id': shot_id, 'contract_id': contract_id, 'scene_id': scene_id,
+                'expected_scene_revision': scene['revision'], 'title': title_values['title'], 'description': '',
+                'fields': {}, 'source_edges': edges,
+                'contract': {'schema': 'storyboarder.observation-contract/v1',
+                             'source_pins': [{'edge_id': edge['edge_id'], 'source_scope': edge['source_scope']} for edge in edges],
+                             'script_intents': intents, 'requirements': requirements,
+                             'references': [], 'continuity': [], 'notes': ''}}
+        self.observation_draft = {'kind': 'group', 'payload': {'request': {'items': [item]}}}
+        await self._apply_observation_draft()
+
     def rebuild_rows(self):
         previous = self.selected.id if self.selected else None
-        self.records.rows = rows_for(self.page, self.state, self.projects, self.search.text, self.anchor, self.neighbors)
+        if self.page == 'coverage':
+            query = self.search.text.casefold().strip()
+            self.records.rows = [row for row in self.observation_rows
+                                 if not query or query in (row.label + ' ' + row.detail + ' ' + row.id).casefold()]
+        else:
+            self.records.rows = rows_for(self.page, self.state, self.projects, self.search.text, self.anchor, self.neighbors)
         self.records.index = next((i for i, r in enumerate(self.records.rows) if r.id == previous), 0)
         self.select(self.records.selected)
         if hasattr(self, 'app'): self.app.invalidate()
@@ -213,6 +554,23 @@ class Desk:
     def select(self, row):
         self.selected = row
         self.thumbnail_fragments = []
+        if self.page == 'coverage':
+            if row:
+                record = row.record
+                shot = next((item for item in self.state['entities'] if item['id'] == record['shot_id']), None)
+                parent = next((item for item in self.state['entities'] if shot and item['id'] == shot.get('parent_id')), None)
+                self.detail.text = (f"{record.get('shot_title', 'Shot')}\n\n"
+                                    f"Contract revision: {record['revision']} · Version {record.get('version_number', '?')}\n"
+                                    f"Header ID: {record['id']}\nShot ID: {record['shot_id']}\n"
+                                    f"Current version ID: {record.get('current_version_id')}\n"
+                                    f"Source hash: {record.get('content_sha256')}\n"
+                                    f"Scene: {parent.get('title', parent['id']) if parent else 'Unavailable'}\n\n"
+                                    "Choose Show to inspect exact pins, basis, and saved history.\n"
+                                    "Validate checks the saved declarations against current source and shot context.")
+            else:
+                self.detail.text = 'No observation contracts yet. Choose “Plan shot + contract” to create a shot with exact source links and its first contract version.'
+            self.detail.buffer.cursor_position = 0
+            return
         if self.page == 'workspace':
             self.detail.text = (row.record.get('title','Untitled project')+'\n\n'+row.record.get('description','')+'\n\nSaved at: '+row.record.get('path','')) if row else 'No projects here yet.\n\nCreate a project folder or open one from this computer.\n\nThe workspace helps you switch between projects; each project keeps its own story and images together.'
         elif row and self.state:
@@ -328,6 +686,7 @@ class Desk:
             if self.service: self.state = await self.run_worker(self.service.state)
             if self.workspace: self.projects = await self.run_worker(self.workspace.list)
             if self.anchor: self.neighbors = await self.run_worker(self.service.neighbors, self.anchor)
+            if self.page == 'coverage': await self.refresh_observation_rows()
             self.rebuild_rows()
             self.set_message('Project refreshed. Unsaved edits are unchanged.')
         except (StoryboardError, OSError) as exc:

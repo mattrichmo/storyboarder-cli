@@ -231,7 +231,7 @@ with a conflict instead of overwriting newer work. See the
 ## Command map
 
 Every group and subcommand has `--help`. The
-[full CLI reference](docs/CLI.md#command-catalog) documents all **98 shared application
+[full CLI reference](docs/CLI.md#command-catalog) documents all **100 shared application
 commands**, including their flags, choices, defaults, and required fields, plus lifecycle commands.
 
 | Area | Commands to reach for |
@@ -283,8 +283,8 @@ pinned when a new draft arrives; `document diff` and `provenance impact` help re
 what changed. Coverage reports describe explicit links, rather than infer missing footage.
 OTIO imports preserve media references without fetching or playing the referenced media.
 
-Dedicated source-document browser/TUI workspaces, visual draft comparison, and broader
-format adapters remain unfinished. Fountain, FDX, PDF screenplay imports, and general
+Dedicated source-document workspaces and visual draft comparison remain unfinished; the
+terminal desk includes a focused exact Observation coverage page. Fountain, FDX, PDF screenplay imports, and general
 NLE interoperability are not implemented. Read the [format profiles](docs/FORMATS.md)
 and [implementation status](docs/V2_IMPLEMENTATION_STATUS.md) before adopting these
 preview workflows. Back up existing projects before opening them with the newer schema.

@@ -5,7 +5,6 @@ import logging
 import os
 from pathlib import Path
 import sys
-import webbrowser
 from rich.console import Console
 from rich.table import Table
 from storyboarder import __version__
@@ -341,7 +340,14 @@ def main(argv=None):
             print(json.dumps({"error": exc.as_dict()}, ensure_ascii=False), file=sys.stderr)
         else:
             Console(stderr=True).print("[bold red]Could not complete this action.[/] " + str(exc), markup=True, highlight=False)
-        raise SystemExit(3 if isinstance(exc, Conflict) else 2 if isinstance(exc, NotFound) else 1)
+        status = getattr(exc, "status", None)
+        if isinstance(exc, Conflict) or status == 409:
+            exit_code = 3
+        elif isinstance(exc, NotFound) or status == 404:
+            exit_code = 2
+        else:
+            exit_code = 1
+        raise SystemExit(exit_code)
     except (OSError, ValueError) as exc:
         message = {"code": "input_or_io", "message": str(exc)}
         print(json.dumps({"error": message}) if as_json else "Could not complete this action: " + str(exc), file=sys.stderr)

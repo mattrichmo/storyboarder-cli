@@ -1,6 +1,7 @@
 """Agent-facing, JSON-safe observation-contract commands."""
 from .core import F, ID, REV, register
 from storyboarder.application.observation_contracts import ObservationContracts
+from storyboarder.application.observation_planner import ObservationPlanner
 
 
 SHOT = F("shot_id", "Storyboard shot", required=True, source="shots")
@@ -37,3 +38,30 @@ register("observation.diff", "Compare two observation contract versions", [
          F("after_version_id", "Later version", required=True)],
          lambda s, p: ObservationContracts(s).diff(p["contract_id"], p["before_version_id"], p["after_version_id"]),
          browser=False, api_safe=True, read_only=True, page="coverage")
+
+
+def _coverage(s, p):
+    request = p["request"]
+    if set(request) - {"anchors"}:
+        from storyboarder.application.observation_planner import ObservationPlannerError
+        raise ObservationPlannerError("observation_plan_invalid", "Coverage requests accept only an anchors array.")
+    return ObservationPlanner(s).coverage(request.get("anchors"), limit=p["limit"], offset=p["offset"])
+
+
+def _create_group(s, p):
+    request = p["request"]
+    if set(request) != {"items"}:
+        from storyboarder.application.observation_planner import ObservationPlannerError
+        raise ObservationPlannerError("observation_plan_invalid", "Grouped plans require one items array.")
+    return ObservationPlanner(s).create_group(request["items"])
+
+
+register("observation.coverage", "Report exact observation coverage", [
+         F("request", "Request-scoped exact anchors", "json", True,
+           help='JSON object: {"anchors": [{"document_id", "version_id", "node_id", "source_sha256", "priority", "basis"}]}.'),
+         F("limit", "Page size", "integer", default=500), F("offset", "Offset", "integer", default=0)],
+         _coverage, browser=False, api_safe=True, read_only=True, page="coverage")
+register("observation.create-group", "Create planned shots, source links, and contracts", [
+         F("request", "Atomic grouped plan", "json", True,
+           help='JSON object: {"items": [GroupItem, ...]}; include caller-generated shot_id, contract_id, edge_id, and expected_scene_revision.' )],
+         _create_group, browser=False, api_safe=True, page="coverage")

@@ -572,6 +572,73 @@ def test_cli_and_api_share_contract_errors_and_safe_catalog(story, tmp_path):
         assert client.post(prefix + "/commands/document.import", json={"path": "/tmp/source"}).status_code == 422
 
 
+def test_observation_contract_cli_uses_http_status_exit_codes(story):
+    service = story["service"]
+
+    def cli(*parts):
+        return subprocess.run([sys.executable, "-m", "storyboarder", "--project", str(service.root),
+                               *parts, "--json"], capture_output=True, text=True, timeout=15)
+
+    missing = cli("observation", "show", "--contract-id", uid(9690))
+    assert missing.returncode == 2
+    assert json.loads(missing.stderr)["error"]["code"] == "contract_not_found"
+
+    body = _contract([], intents=False)
+    records = ObservationContracts(service)
+    created = records.create(story["shot"]["id"], story["shot"]["revision"], body)
+    payload = {"shot_id": story["shot"]["id"], "expected_shot_revision": story["shot"]["revision"],
+               "contract": body}
+    duplicate = cli("observation", "create", "--payload", json.dumps(payload))
+    assert duplicate.returncode == 3
+    assert json.loads(duplicate.stderr)["error"]["code"] == "contract_already_exists"
+
+    stale_payload = {"contract_id": created["id"], "revision": created["revision"] - 1, "contract": body}
+    stale = cli("observation", "revise", "--payload", json.dumps(stale_payload))
+    assert stale.returncode == 3
+    assert json.loads(stale.stderr)["error"]["code"] == "revision_conflict"
+
+
+def test_planner_command_schemas_are_json_api_safe_but_agent_only(story, screenplay):
+    service = story["service"]
+    imported = Documents(service).import_bytes(json.dumps(screenplay).encode(), "planner-api.json", "screenjson")
+    action = next(row for row in Documents(service).tree(imported["version"]["id"])["items"]
+                  if row["node_type"] == "action")
+    source_edge_id = uid(9680)
+    contract_id, planned_shot_id = uid(9681), uid(9682)
+    item = {
+        "shot_id": planned_shot_id, "contract_id": contract_id, "scene_id": story["scene"]["id"],
+        "expected_scene_revision": story["scene"]["revision"], "title": "API planned shot",
+        "source_edges": [{"edge_id": source_edge_id, "document_id": imported["document"]["id"],
+                           "version_id": imported["version"]["id"], "node_id": action["id"],
+                           "source_sha256": action["content_sha256"], "source_scope": "direct-element"}],
+        "contract": _contract([({"id": source_edge_id}, "direct-element")]),
+    }
+    app = create_app(project=service.project, port=7430)
+    with TestClient(app, base_url="http://127.0.0.1:7430") as client:
+        client.headers["X-Storyboarder-Token"] = client.get("/api/v1/session").json()["token"]
+        prefix = f"/api/v1/projects/{service.project.id}"
+        metadata = client.get("/api/v1/meta").json()
+        browser_commands = {row["name"]: row for row in metadata["commands"]}
+        api_commands = {row["name"]: row for row in metadata["api_commands"]}
+        for name in ("observation.coverage", "observation.create-group"):
+            assert name not in browser_commands
+            assert api_commands[name]["api_safe"] is True
+            assert api_commands[name]["browser"] is False
+        assert [field["name"] for field in api_commands["observation.coverage"]["fields"]] == ["request", "limit", "offset"]
+        assert [field["name"] for field in api_commands["observation.create-group"]["fields"]] == ["request"]
+
+        coverage = client.post(prefix + "/commands/observation.coverage", json={"request": {"anchors": []}})
+        assert coverage.status_code == 200
+        assert coverage.json()["schema"] == "storyboarder.observation-coverage/v1"
+        malformed = client.post(prefix + "/commands/observation.coverage", json={"request": {"titles": []}})
+        assert malformed.status_code == 422
+        assert malformed.json()["error"]["code"] == "observation_plan_invalid"
+        created = client.post(prefix + "/commands/observation.create-group", json={"request": {"items": [item]}})
+        assert created.status_code == 200, created.text
+        assert created.json()["items"][0]["shot_id"] == planned_shot_id
+        assert created.json()["items"][0]["contract_id"] == contract_id
+
+
 def test_doctor_checks_contract_history_read_only(story, screenplay):
     service = story["service"]
     _, source = _source_rows(service, screenplay)

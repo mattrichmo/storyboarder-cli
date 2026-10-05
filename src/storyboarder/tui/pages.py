@@ -24,6 +24,7 @@ PAGES = (
     Page('frames', 'Storyboard frames', 'Add, compare, select, and approve storyboard images.', ('frame.add', 'frame.attach', 'frame.state', 'frame.remove')),
     Page('composition', 'Board & exports', 'Review the storyboard and create files to share or hand off.', ('composition.preview', 'export.bundle', 'export.board')),
     Page('automation', 'Image tools', 'Run trusted tools and review their results before adding them to a project.', ('job.create', 'job.run', 'job.preview', 'job.approve', 'job.cancel', 'job.retry')),
+    Page('coverage', 'Observation coverage', 'Pin exact screenplay sources to a shot, then review purpose, requirements, and basis.'),
     Page('settings', 'Project care', 'Check project health, manage images, back up, restore, and review archived items.', ('project.doctor', 'project.backup', 'cache.rebuild', 'cache.clear', 'entity.restore')),
 )
 PAGE_MAP = {p.key: p for p in PAGES}

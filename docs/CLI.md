@@ -1,14 +1,14 @@
 # CLI reference
 
 `storyboarder` is the installed command. This reference includes lifecycle commands
-and all **98 commands** in the shared application catalog. The flag tables are
+and all **100 commands** in the shared application catalog. The flag tables are
 generated from that catalog. Run `storyboarder --help`, `storyboarder GROUP --help`,
 or `storyboarder GROUP ACTION --help` for the commands in your installed checkout.
 
 The original authoring workflows are available through the CLI, browser, and TUI.
-Source documents and provenance are currently a CLI/local API preview; dedicated
-browser and TUI workspaces are unfinished. Catalog availability in the local API does
-not imply a finished graphical workflow. See [implementation status](V2_IMPLEMENTATION_STATUS.md).
+Source documents and provenance remain CLI/local API previews; the TUI now has a focused
+Observation coverage page for exact source pins and first contract authoring. A dedicated
+browser workspace remains unfinished. See [implementation status](V2_IMPLEMENTATION_STATUS.md).
 
 ## Project selection and common options
 
@@ -91,13 +91,23 @@ the last-read **document revision**. Revising a draft does not repoint existing 
 | `0` | Operation or help completed successfully. |
 | `1` | Validation, domain, input, or I/O failure. |
 | `2` | Record/path not found, or argument parsing failure. |
-| `3` | Revision conflict. Re-read the record before editing again. |
+| `3` | Revision or contract conflict, including already-existing contracts. Re-read before retrying. |
 | `4` | Unhealthy doctor result, partial import, or failed job result. |
 | `130` | Interrupted. |
 
 With JSON output enabled, errors use an `error` object on stderr. The command schema
 is also available as [commands.json](commands.json). See [format profiles](FORMATS.md)
 for source import limits and [the README](../README.md#cli-workflows) for a walkthrough.
+
+Observation planning commands accept JSON objects through `--payload`. `observation.coverage`
+uses `{"request":{"anchors":[...]}}` with exact document/version/node/hash pins; `limit`
+and `offset` default to 500 and 0. `observation.create-group` uses
+`{"request":{"items":[...]}}`, with caller-supplied shot, contract, and edge UUIDs and
+the scene revision read before planning. The planner accepts up to 50 items and 512 total
+source-edge references per call. Both commands are JSON/API-safe and remain agent-only
+(`browser=false`). Contract-specific 404 and 409 errors use the same CLI exit mapping as
+their HTTP status: missing contract exits 2; already-exists, stale-revision, and reviewed
+basis-token conflicts exit 3. Other contract validation failures keep the legacy exit 1.
 
 ## Command catalog
 
