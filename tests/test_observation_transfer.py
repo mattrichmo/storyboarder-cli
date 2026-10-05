@@ -321,7 +321,6 @@ def test_artifact_change_after_dry_run_requires_new_preview_and_import_stays_unr
     assert any(item["code"] == "source_artifact_bytes_unavailable" for item in result["unresolved"])
 
 
-@pytest.mark.xfail(strict=True, reason="pending schema-6 restore-only support for a saved historical parent scene")
 def test_reparented_shot_restores_exact_context_history_as_stale(service, tmp_path):
     story = _base(service)
     target = _clone_project(service, tmp_path / "reparent-copy")
@@ -330,12 +329,28 @@ def test_reparented_shot_restores_exact_context_history_as_stale(service, tmp_pa
         _contract(story["edges"]["shot_c"], "scene-context", 3),
     )
     exported = export_observation_plan(service)
+    source_plan = json.loads(exported)
+    source_contract = next(row for row in source_plan["contracts"] if row["id"] == created["id"])
+    source_version = source_contract["versions"][0]
+    source_pin = source_version["source_pins"][0]
     shot = target.get("entities", story["shots"][2]["id"])
     target.move(shot["id"], shot["revision"], 0, parent_id=story["scenes"][0]["id"])
     preview = preview_observation_import(target, exported)
     result = apply_observation_import(target, exported, preview)
     assert result["imported"] == [created["id"]]
-    assert any(row["status"] == "unresolved" for row in result["validations"])
+    validation = next(row for row in result["validations"] if row["version_id"] == source_version["id"])
+    assert validation["status"] == "unresolved"
+    stale_pin = next(row for row in validation["source_pins"] if row["edge_id"] == source_pin["edge_id"])
+    assert stale_pin["stale"]
+    assert "edge_target_mismatch" in stale_pin["reasons"]
+
+    restored_plan = json.loads(export_observation_plan(target))
+    restored_contract = next(row for row in restored_plan["contracts"] if row["id"] == created["id"])
+    restored_version = restored_contract["versions"][0]
+    assert restored_version["id"] == source_version["id"]
+    assert restored_version["content_sha256"] == source_version["content_sha256"]
+    assert restored_version["basis_sha256"] == source_version["basis_sha256"]
+    assert restored_version["source_pins"] == source_version["source_pins"]
     assert export_observation_plan(target) == exported
 
 
