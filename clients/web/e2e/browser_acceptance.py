@@ -122,7 +122,8 @@ async def main(args):
             # More detailed assertions are appended below after the first visual pass.
             await exercise_authoring(page,report,output,args.url)
             assert not report['page_errors'],report['page_errors']
-            assert len(report['expected_conflict_console'])==8,report['expected_conflict_console']
+            expected_conflicts=8+(1 if args.source_forms else 0)
+            assert len(report['expected_conflict_console'])==expected_conflicts,report['expected_conflict_console']
             assert not report['console_errors'],report['console_errors']
             report['passed']=True
         except Exception as exc:
