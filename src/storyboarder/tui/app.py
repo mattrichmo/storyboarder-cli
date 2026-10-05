@@ -473,6 +473,19 @@ class Desk:
                 revision = saved['revision']
                 saved_version_id = saved['version']['id']
 
+            if body['source_pins']:
+                pin_action = await self.choose('Keep exact pins or retarget one?', [
+                    ('keep', 'Keep these exact source pins'),
+                    ('retarget', 'Retarget one pin to another linked exact source'),
+                    ('cancel', 'Cancel rebase review')], 'keep')
+                if pin_action == 'retarget':
+                    updated_body = await self._retarget_rebase_pin(saved['shot_id'], body, saved)
+                    if updated_body is None:
+                        return
+                    body = updated_body
+                elif pin_action != 'keep':
+                    return
+
             preview = await self.run_worker(execute, self.service, 'observation.rebase-preview', {
                 'contract_id': contract_id, 'contract': body})
             await self.message_dialog('Review authored basis changes', self._format_rebase_preview(preview))
@@ -488,6 +501,108 @@ class Desk:
             await self._apply_observation_draft()
         except (StoryboardError, OSError) as exc:
             await self.message_dialog('Could not review contract rebase', str(exc))
+
+    async def _retarget_rebase_pin(self, shot_id, body, saved):
+        shot = await self.run_worker(self.service.get, 'entities', shot_id)
+        source_result = await self.run_worker(execute, self.service, 'shot.sources', {'id': shot_id})
+        documents, linked = {}, {}
+        for edge in source_result['items']:
+            if edge['inherited']:
+                if edge['target_id'] != shot['parent_id']:
+                    continue
+                scope = 'scene-context'
+            else:
+                if edge['target_id'] != shot_id:
+                    continue
+                scope = 'direct-element'
+            node = await self.run_worker(source_record, self.service, 'document_nodes', edge['node_id'], {
+                'document_id': edge['document_id'], 'version_id': edge['version_id']})
+            if node.get('identity') != 'explicit' or node.get('content_sha256') != edge['content_sha256']:
+                continue
+            document = documents.get(edge['document_id'])
+            if document is None:
+                document = await self.run_worker(source_record, self.service, 'documents', edge['document_id'])
+                documents[edge['document_id']] = document
+            if document.get('kind') != 'screenplay' or document.get('archived'):
+                continue
+            linked[edge['edge_id']] = {
+                'edge_id': edge['edge_id'], 'source_scope': scope,
+                'document_id': edge['document_id'], 'version_id': edge['version_id'],
+                'node_id': edge['node_id'], 'source_sha256': edge['content_sha256'],
+                'node_type': edge['node_type'], 'document_title': document['title'],
+                'title': edge['title'], 'stale': edge['stale'],
+            }
+
+        current_pin_ids = {pin['edge_id'] for pin in body['source_pins']}
+        saved_pins = {pin['edge_id']: pin for pin in saved['source_pins']}
+
+        def detail(pin):
+            edge_id = pin['edge_id']
+            found = saved_pins.get(edge_id) or linked.get(edge_id) or {}
+            return {
+                'edge_id': edge_id,
+                'source_scope': pin.get('source_scope', found.get('source_scope', 'unknown')),
+                'document_id': found.get('document_id', '<unavailable>'),
+                'version_id': found.get('source_version_id', found.get('version_id', '<unavailable>')),
+                'node_id': found.get('node_id', '<unavailable>'),
+                'source_sha256': found.get('source_sha256', found.get('content_sha256', '<unavailable>')),
+            }
+
+        pin_choices = [(pin['edge_id'], self._rebase_pin_description(detail(pin)))
+                       for pin in body['source_pins']]
+        old_edge_id = await self.choose('Choose the exact contract pin to retarget', pin_choices)
+        if not old_edge_id:
+            return None
+        old_pin = next(pin for pin in body['source_pins'] if pin['edge_id'] == old_edge_id)
+        old_detail = detail(old_pin)
+        candidates = [source for edge_id, source in linked.items()
+                      if edge_id != old_edge_id and edge_id not in current_pin_ids]
+        if not candidates:
+            await self.message_dialog(
+                'No replacement exact links',
+                'This shot has no other active, explicitly identified screenplay visualizes edge to itself or its current parent scene. Link the exact source first, then review the rebase again.',
+            )
+            return None
+        choices = [(source['edge_id'], self._rebase_pin_description(source) +
+                    (' · older exact source version' if source['stale'] else ' · current source version'))
+                   for source in candidates]
+        new_edge_id = await self.choose('Choose another already-linked exact source', choices)
+        if not new_edge_id:
+            return None
+        new_pin = linked[new_edge_id]
+        await self.message_dialog(
+            'Confirm exact source retarget',
+            'Current pin:\n' + self._rebase_pin_description(old_detail) +
+            '\n\nReplacement pin:\n' + self._rebase_pin_description(new_pin) +
+            '\n\nThe replacement is already linked to this shot. Matching uses the exact edge ID; no source is chosen by title, order, or latest-version status.',
+        )
+        decision = await self.choose('Retarget this exact source pin?', [
+            ('yes', 'Retarget to this exact linked source'), ('no', 'Keep current pin')], 'no')
+        if decision != 'yes':
+            return None
+
+        revised = copy.deepcopy(body)
+        for pin in revised['source_pins']:
+            if pin['edge_id'] == old_edge_id:
+                pin['edge_id'] = new_edge_id
+                pin['source_scope'] = new_pin['source_scope']
+                break
+        for intent in revised['script_intents']:
+            if intent['source_edge_id'] == old_edge_id:
+                intent['source_edge_id'] = new_edge_id
+                intent['source_scope'] = new_pin['source_scope']
+        for requirement in revised['requirements']:
+            if old_edge_id in requirement['source_edge_ids']:
+                requirement['source_edge_ids'] = list(dict.fromkeys(
+                    new_edge_id if edge_id == old_edge_id else edge_id
+                    for edge_id in requirement['source_edge_ids']))
+        return revised
+
+    @staticmethod
+    def _rebase_pin_description(pin):
+        return (f"{Desk._observation_scope_label(pin['source_scope'])} · "
+                f"doc {pin['document_id']} · version {pin['version_id']} · "
+                f"node {pin['node_id']} · hash {pin['source_sha256']} · edge {pin['edge_id']}")
 
     @staticmethod
     def _format_rebase_preview(preview):

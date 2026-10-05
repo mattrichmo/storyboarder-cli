@@ -437,7 +437,8 @@ async def test_rebase_preview_shows_values_and_conflict_keeps_exact_draft(story,
         desk.run_worker = run_worker
         desk.refresh = lambda: asyncio.sleep(0)
         desk.set_message = lambda message: setattr(desk, 'message', str(message))
-        async def choose(*_args, **_kwargs): return 'yes'
+        async def choose(title, *_args, **_kwargs):
+            return 'keep' if title == 'Keep exact pins or retarget one?' else 'yes'
         desk.choose = choose
         dialogs = []
         async def message_dialog(title, message): dialogs.append((title, message))
@@ -481,6 +482,171 @@ async def test_rebase_preview_shows_values_and_conflict_keeps_exact_draft(story,
 
 
 @pytest.mark.asyncio
+async def test_rebase_can_keep_old_exact_pin_when_newer_link_is_available(story, imported_screenplay):
+    service = story['service']
+    imported, nodes = imported_screenplay
+    shot, old_node = story['shot'], nodes[uid(99603)]
+    old_edge = Provenance(service).link('node', old_node['id'], 'entity', story['scene']['id'], 'visualizes')
+    body = {
+        'schema': 'storyboarder.observation-contract/v1',
+        'source_pins': [{'edge_id': old_edge['id'], 'source_scope': 'scene-context'}],
+        'script_intents': [{'id': uid(99391), 'source_edge_id': old_edge['id'],
+                            'source_scope': 'scene-context', 'purpose': 'Keep the original room read',
+                            'communication': 'Keep the doorway framed.', 'basis': 'direct'}],
+        'requirements': [], 'references': [], 'continuity': [], 'notes': '',
+    }
+    records = ObservationContracts(service)
+    created = records.create(shot['id'], shot['revision'], body)
+    later = Documents(service).revise_node(old_node['id'], {'text': {'en': 'A newer linked action.'}},
+                                          imported['document']['revision'])
+    newer_node = next(row for row in Documents(service).tree(later['version']['id'])['items']
+                      if row['logical_id'] == old_node['logical_id'])
+    newer_edge = tui_app.execute(service, 'shot.link-source', {
+        'shot_id': shot['id'], 'node_id': newer_node['id'],
+    })
+    assert newer_edge['id'] in {row['edge_id'] for row in Provenance(service).sources(shot['id'])['items']}
+
+    with create_pipe_input() as pipe:
+        desk = Desk(project=service.project, input=pipe, output=DummyOutput())
+        desk.page = 'coverage'
+        desk.selected = Row(created['id'], 'Test contract', '', {'id': created['id']})
+        async def run_worker(function, *args, **kwargs): return function(*args, **kwargs)
+        desk.run_worker = run_worker
+        desk.refresh = lambda: asyncio.sleep(0)
+        desk.set_message = lambda message: setattr(desk, 'message', str(message))
+        desk.message_dialog = lambda *_args, **_kwargs: asyncio.sleep(0)
+        async def choose(title, choices, *_args, **_kwargs):
+            if title == 'Keep exact pins or retarget one?':
+                assert {value for value, _label in choices} >= {'keep', 'retarget'}
+                return 'keep'
+            if title == 'Rebase this exact contract body and pin set?':
+                return 'yes'
+            raise AssertionError(f'unexpected chooser: {title}')
+        desk.choose = choose
+
+        await desk.rebase_observation()
+        current = records.show(created['id'])
+        assert desk.observation_draft is None
+        assert current['revision'] == created['revision'] + 1
+        assert current['contract']['source_pins'] == body['source_pins']
+        assert current['source_pins'][0]['edge_id'] == old_edge['id']
+        assert current['source_pins'][0]['source_version_id'] == imported['version']['id']
+        assert current['source_pins'][0]['source_scope'] == 'scene-context'
+
+
+@pytest.mark.asyncio
+async def test_rebase_explicit_retarget_preserves_hidden_body_and_draft_after_conflict(
+        story, imported_screenplay, monkeypatch):
+    service = story['service']
+    imported, nodes = imported_screenplay
+    shot = story['shot']
+    related = service.create_entity('shot', 'Continuity angle', story['scene']['id'])
+    old_node = nodes[uid(99603)]
+    old_edge = Provenance(service).link('node', old_node['id'], 'entity', story['scene']['id'], 'visualizes')
+    body = {
+        'schema': 'storyboarder.observation-contract/v1',
+        'source_pins': [{'edge_id': old_edge['id'], 'source_scope': 'scene-context'}],
+        'script_intents': [{'id': uid(99401), 'source_edge_id': old_edge['id'],
+                            'source_scope': 'scene-context', 'purpose': 'Preserve the entry beat',
+                            'communication': 'Let the room context read.', 'basis': 'interpreted'}],
+        'requirements': [
+            {'id': uid(99402), 'priority': 'must', 'basis': 'direct',
+             'source_edge_ids': [old_edge['id']], 'statement': 'Keep the doorway visible.'},
+            {'id': uid(99403), 'priority': 'unknown', 'basis': 'unknown',
+             'source_edge_ids': [], 'topic': 'Which side of the frame holds the light?'},
+        ],
+        'references': [story['character']['id']],
+        'continuity': [{'id': uid(99404), 'related_shot_ids': [related['id']],
+                        'statement': 'Preserve this continuity note.'}],
+        'notes': 'Keep this hidden note exactly.',
+    }
+    records = ObservationContracts(service)
+    created = records.create(shot['id'], shot['revision'], body)
+
+    later = Documents(service).revise_node(old_node['id'], {'text': {'en': 'A newer exact action.'}},
+                                          imported['document']['revision'])
+    newer_node = next(row for row in Documents(service).tree(later['version']['id'])['items']
+                      if row['logical_id'] == old_node['logical_id'])
+    new_edge = tui_app.execute(service, 'shot.link-source', {
+        'shot_id': shot['id'], 'node_id': newer_node['id'],
+    })
+
+    with create_pipe_input() as pipe:
+        desk = Desk(project=service.project, input=pipe, output=DummyOutput())
+        desk.page = 'coverage'
+        desk.selected = Row(created['id'], 'Test contract', '', {'id': created['id']})
+        async def run_worker(function, *args, **kwargs): return function(*args, **kwargs)
+        desk.run_worker = run_worker
+        desk.refresh = lambda: asyncio.sleep(0)
+        desk.set_message = lambda message: setattr(desk, 'message', str(message))
+        dialogs, pin_actions = [], iter(['retarget', 'keep'])
+        async def message_dialog(title, message): dialogs.append((title, message))
+        desk.message_dialog = message_dialog
+        async def choose(title, *_args, **_kwargs):
+            if title == 'Keep exact pins or retarget one?':
+                return next(pin_actions)
+            if title == 'Choose the exact contract pin to retarget':
+                return old_edge['id']
+            if title == 'Choose another already-linked exact source':
+                return new_edge['id']
+            if title == 'Retarget this exact source pin?':
+                return 'yes'
+            if title == 'Rebase this exact contract body and pin set?':
+                return 'yes'
+            raise AssertionError(f'unexpected chooser: {title}')
+        desk.choose = choose
+
+        real_execute = tui_app.execute
+        rebase_payloads, raced = [], [False]
+        def conflict_once(_service, name, payload):
+            if name == 'observation.rebase':
+                rebase_payloads.append(copy.deepcopy(payload))
+                if not raced[0]:
+                    current_shot = service.get('entities', shot['id'])
+                    service.update_entity(current_shot['id'], current_shot['revision'],
+                                          {'fields': {'action': 'Changed after pin review.'}})
+                    raced[0] = True
+            return real_execute(service, name, payload)
+        monkeypatch.setattr(tui_app, 'execute', conflict_once)
+
+        await desk.rebase_observation()
+        expected = copy.deepcopy(created['contract'])
+        expected['source_pins'] = [{'edge_id': new_edge['id'], 'source_scope': 'direct-element'}]
+        expected['script_intents'][0]['source_edge_id'] = new_edge['id']
+        expected['script_intents'][0]['source_scope'] = 'direct-element'
+        expected['requirements'][0]['source_edge_ids'] = [new_edge['id']]
+        assert desk.observation_draft['kind'] == 'rebase'
+        assert desk.observation_draft['contract'] == expected
+        assert desk.observation_draft['contract']['references'] == body['references']
+        assert desk.observation_draft['contract']['continuity'] == body['continuity']
+        assert desk.observation_draft['contract']['notes'] == body['notes']
+        assert [row['id'] for row in desk.observation_draft['contract']['script_intents']] == [uid(99401)]
+        assert [(row['id'], row['priority'], row['basis']) for row in desk.observation_draft['contract']['requirements']] == [
+            (uid(99402), 'must', 'direct'), (uid(99403), 'unknown', 'unknown')]
+        assert records.show(created['id'])['revision'] == created['revision']
+        assert len(records.show(created['id'])['history']) == 1
+        retarget_text = next(message for title, message in dialogs if title == 'Confirm exact source retarget')
+        assert 'Scene context' in retarget_text and old_edge['id'] in retarget_text
+        assert new_edge['id'] in retarget_text and 'Direct shot link' in retarget_text
+        assert imported['document']['id'] in retarget_text
+        assert imported['version']['id'] in retarget_text and later['version']['id'] in retarget_text
+        assert old_node['id'] in retarget_text and newer_node['id'] in retarget_text
+        assert old_node['content_sha256'] in retarget_text and newer_node['content_sha256'] in retarget_text
+
+        await desk.rebase_observation()
+        current = records.show(created['id'])
+        assert desk.observation_draft is None
+        assert current['revision'] == created['revision'] + 1
+        assert current['history'][-1]['operation'] == 'rebase'
+        assert current['contract'] == expected
+        assert current['source_pins'][0]['edge_id'] == new_edge['id']
+        assert current['source_pins'][0]['source_scope'] == 'direct-element'
+        assert len(rebase_payloads) == 2
+        assert rebase_payloads[0]['contract'] == rebase_payloads[1]['contract'] == expected
+        assert rebase_payloads[0]['expected_basis_sha256'] != rebase_payloads[1]['expected_basis_sha256']
+
+
+@pytest.mark.asyncio
 async def test_rebase_header_conflict_requires_diff_and_explicit_reload(story, imported_screenplay):
     service = story['service']
     imported, nodes = imported_screenplay
@@ -512,6 +678,8 @@ async def test_rebase_header_conflict_requires_diff_and_explicit_reload(story, i
         desk.message_dialog = message_dialog
         async def choose(title, *_args, **_kwargs):
             choices.append(title)
+            if title == 'Keep exact pins or retarget one?':
+                return 'keep'
             if title == 'Rebase this exact contract body and pin set?' and choices.count(title) == 1:
                 records.revise(created['id'], created['revision'], latest)
             return 'yes'

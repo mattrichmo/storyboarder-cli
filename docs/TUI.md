@@ -42,9 +42,15 @@ from parent-scene context, then collects purpose, communication, and multiple re
 with priority and basis labels. A stale shot revision keeps that exact draft for retry.
 Rebase is a separate explicit
 review action: the page shows saved/current basis values and the exact retained edge IDs,
-then asks before saving with its review token. A conflict keeps the draft and pins for a
-fresh review. Source labels distinguish **Direct shot link** from **Scene context** and
-show the screenplay node kind, so a whole-scene context link is not presented as beat coverage.
+then lets the editor keep every exact pin or explicitly retarget one pin to another exact
+screenplay link already attached to the same shot. Use the normal shot source-link action
+first to attach a newer draft that should be available as a replacement. The confirmation
+names both scopes and document/version/node/hash identities; intents and requirements that
+reference the pin follow its exact edge ID while their stable IDs and other contract data
+remain intact. Nothing selects a newer source automatically. The page asks before saving
+with its review token, and a conflict keeps the complete draft for a fresh review. Source
+labels distinguish **Direct shot link** from **Scene context** and show the screenplay node
+kind, so a whole-scene context link is not presented as beat coverage.
 
 Source actions use searchable, paginated document, draft, element, provenance and note
 pickers. Selecting a mutable source record supplies its current revision automatically.
