@@ -12,7 +12,7 @@ A shot may own one contract header keyed by its stable ID. Create, revise and ex
 
 Versions pin existing provenance edge IDs and exact screenplay document/version/node IDs and hashes. A shot can pin several edges; one source node can link to several shots. Direct shot links remain distinct from parent-scene context. Requirements attach to source edges and declare `must`, `prefer` or `unknown` with an authored basis.
 
-Validation checks authored action, dialogue, duration, framing, camera direction, continuity and constraints, plus effective scene, sequence, location and asset context. It checks IDs, hashes, lifecycle and revision tokens; titles/order do not establish identity. Free-form notes are outside v1 basis. Results report consistent, conflict or unresolved, never semantic, image, camera or physical verification.
+Validation checks authored action, dialogue, duration, framing, camera direction, continuity and constraints, plus effective scene, sequence, location and asset context. It checks IDs, hashes, lifecycle and revision tokens; titles/order do not establish identity. Uncited shot and contract notes are outside the v1 basis; notes on referenced library or context records remain captured where modeled. Results report consistent, conflict or unresolved, never semantic, image, camera or physical verification.
 
 Portable history uses a separate project-level observation-plan sidecar. Deterministic export and dry-run import expose classifications and losses; apply requires explicit reconciliation and target-state checks. Exact restore uses a scoped internal gate; ordinary authoring remains lifecycle-guarded. Migrations 005/006 add version/pin and history-retention rules without changing earlier migrations.
 
