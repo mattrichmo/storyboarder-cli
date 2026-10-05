@@ -274,12 +274,13 @@ class ObservationContracts:
         artifact_id = node.get("source_artifact_id")
         if not artifact_id:
             return False
-        if artifact_id not in cache:
-            cache[artifact_id] = self._artifact_check(conn, {
-                "id": node["version_id"], "source_artifact_id": artifact_id,
-                "content_sha256": node["version_sha256"],
-            }, cache)
-        checked = cache[artifact_id]
+        # Recheck every pin's expected document hash against the cached parsed
+        # artifact metadata. `_artifact_check` reuses bytes/hash/parse work by
+        # artifact ID while comparing this caller's expected content hash.
+        checked = self._artifact_check(conn, {
+            "id": node["version_id"], "source_artifact_id": artifact_id,
+            "content_sha256": node["version_sha256"],
+        }, cache)
         return checked is not None and checked["sha256"] == pin["artifact_sha256"]
 
     @staticmethod

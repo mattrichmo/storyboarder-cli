@@ -956,3 +956,114 @@ def test_two_connection_contract_revision_compare_and_swap_has_one_winner(story,
         events = conn.execute("SELECT count(*) FROM events WHERE entity_id=? AND action='observation_contract.revise'", (created["id"],)).fetchone()[0]
     assert header["revision"] == 2 and header["current_version_id"] == successes[0]["version"]["id"]
     assert versions == 2 and events == 1
+
+
+def test_artifact_cache_rechecks_each_pin_expected_document_hash(story, screenplay, monkeypatch):
+    service = story["service"]
+    imported, source = _source_rows(service, screenplay)
+    source_version_id = imported["version"]["id"]
+    source_scene = source[uid(3)]
+    clone_document_id, clone_version_id, clone_node_id = uid(9101), uid(9102), uid(9103)
+    correct_edge_id, mismatched_edge_id = uid(9201), uid(9202)
+    provenance = Provenance(service)
+    with service.repo.transaction() as conn:
+        document = dict(conn.execute("SELECT * FROM documents WHERE id=?", (imported["document"]["id"],)).fetchone())
+        version = dict(conn.execute("SELECT * FROM document_versions WHERE id=?", (source_version_id,)).fetchone())
+        node = dict(conn.execute("SELECT * FROM document_nodes WHERE id=?", (source_scene["id"],)).fetchone())
+        conn.execute("""INSERT INTO documents
+          (id,kind,format,external_id,title,current_version_id,revision,archived,created_at,updated_at)
+          VALUES(?,?,?,?,?,NULL,1,0,?,?)""",
+                     (clone_document_id, "screenplay", document["format"], None, "Integrity clone",
+                      document["created_at"], document["updated_at"]))
+        conn.execute("""INSERT INTO document_versions
+          (id,document_id,parent_version_id,number,label,format_version,content_sha256,source_artifact_id,warnings,created_at)
+          VALUES(?,?,NULL,1,?,?,?,?,?,?)""",
+                     (clone_version_id, clone_document_id, version["label"], version["format_version"],
+                      version["content_sha256"], version["source_artifact_id"], version["warnings"], version["created_at"]))
+        conn.execute("""INSERT INTO document_nodes
+          (id,version_id,logical_id,parent_id,node_type,position,title,text,source_pointer,payload,content_sha256,identity)
+          VALUES(?,?,?,NULL,?,?,?,?,?,?,?,?)""",
+                     (clone_node_id, clone_version_id, node["logical_id"], node["node_type"], node["position"],
+                      node["title"], node["text"], node["source_pointer"], node["payload"],
+                      node["content_sha256"], node["identity"]))
+        conn.execute("UPDATE documents SET current_version_id=? WHERE id=?", (clone_version_id, clone_document_id))
+        target = provenance._endpoint(conn, "entity", story["shot"]["id"])
+        for edge_id, node_id in ((correct_edge_id, source_scene["id"]), (mismatched_edge_id, clone_node_id)):
+            source_snapshot = provenance._endpoint(conn, "node", node_id)
+            conn.execute("""INSERT INTO provenance_edges
+              (id,source_type,source_id,target_type,target_id,relation,source_snapshot,target_snapshot,notes,retired,revision,created_at)
+              VALUES(?,'node',?,'entity',?,'visualizes',?,?, '',0,1,?)""",
+                         (edge_id, node_id, story["shot"]["id"], dumps(source_snapshot), dumps(target), "test"))
+    assert version["source_artifact_id"] == imported["version"]["source_artifact_id"]
+    body = _contract([(dict(id=correct_edge_id), "direct-element"),
+                      (dict(id=mismatched_edge_id), "direct-element")])
+    records = ObservationContracts(service)
+    created = records.create(story["shot"]["id"], story["shot"]["revision"], body)
+    assert created["validation"]["status"] == "consistent"
+
+    with service.repo.transaction() as conn:
+        conn.execute("DROP TRIGGER immutable_document_version_update")
+        conn.execute("UPDATE document_versions SET content_sha256=? WHERE id=?", ("f" * 64, clone_version_id))
+    validation = records.validate(created["id"])
+    mismatched_pin = next(pin for pin in validation["source_pins"] if pin["edge_id"] == mismatched_edge_id)
+    assert validation["status"] == "unresolved"
+    assert "artifact_unavailable_or_changed" in mismatched_pin["reasons"]
+
+    from pathlib import Path
+
+    with service.repo.readonly_transaction() as conn:
+        artifact = dict(conn.execute("SELECT * FROM source_artifacts WHERE id=?", (version["source_artifact_id"],)).fetchone())
+    artifact_path = (service.root / artifact["path"]).resolve()
+    original_read_bytes = Path.read_bytes
+    original_bytes = original_read_bytes(artifact_path)
+    artifact_path.write_bytes(bytes([original_bytes[0] ^ 1]) + original_bytes[1:])
+    reads = []
+
+    def counted_read_bytes(path):
+        if path.resolve() == artifact_path:
+            reads.append(path)
+        return original_read_bytes(path)
+
+    monkeypatch.setattr(Path, "read_bytes", counted_read_bytes)
+    try:
+        next_validation = records.validate(created["id"])
+        assert next_validation["status"] == "unresolved"
+        assert len(reads) == 1
+        assert all("artifact_unavailable_or_changed" in pin["reasons"] for pin in next_validation["source_pins"])
+    finally:
+        artifact_path.write_bytes(original_bytes)
+
+
+def test_two_connection_contract_create_compare_and_swap_has_one_winner(story, screenplay):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    shot_before = service.get("entities", story["shot"]["id"])
+    competing = [ObservationContracts(Service(Project(service.root))) for _ in range(2)]
+    barrier = Barrier(2)
+
+    def create(index):
+        body = _contract([(edge, "direct-element")], notes=f"create-writer-{index}")
+        body["script_intents"][0]["id"] = uid(9300 + index)
+        barrier.wait(timeout=5)
+        try:
+            return competing[index].create(story["shot"]["id"], shot_before["revision"], body)
+        except Exception as exc:  # return both outcomes for deterministic assertions
+            return exc
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(create, range(2)))
+    successes = [item for item in outcomes if isinstance(item, dict)]
+    conflicts = [item for item in outcomes if isinstance(item, ObservationContractError)]
+    assert len(successes) == 1 and len(conflicts) == 1
+    assert conflicts[0].code == "contract_already_exists" and conflicts[0].status == 409
+    with service.repo.readonly_transaction() as conn:
+        headers = conn.execute("SELECT count(*) FROM observation_contracts WHERE shot_id=?", (story["shot"]["id"],)).fetchone()[0]
+        versions = conn.execute("""SELECT count(*) FROM observation_contract_versions v
+          JOIN observation_contracts c ON c.id=v.contract_id WHERE c.shot_id=?""", (story["shot"]["id"],)).fetchone()[0]
+        events = conn.execute("SELECT count(*) FROM events WHERE entity_id=? AND action='observation_contract.created'",
+                              (successes[0]["id"],)).fetchone()[0]
+        shot_after = conn.execute("SELECT fields,revision FROM entities WHERE id=?", (story["shot"]["id"],)).fetchone()
+    assert headers == versions == events == 1
+    assert json.loads(shot_after["fields"]) == shot_before["fields"]
+    assert shot_after["revision"] == shot_before["revision"]
