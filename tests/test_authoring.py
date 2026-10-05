@@ -147,6 +147,51 @@ def test_layout_changes_only_presentation_and_revision(story):
     assert len(graph['edges'])==2
 
 
+def test_layout_cas_by_stable_id_supports_disjoint_merge_and_explicit_overlap_choice(story):
+    s=story['service'];cards=[node['id'] for node in s.graph('assets')['nodes'][:2]]
+    assert len(cards)==2
+    start={cards[0]:{'x':10,'y':20},cards[1]:{'x':30,'y':40}}
+    base=s.save_layout('Shared desk','assets',start)
+    external={**start,cards[0]:{'x':80,'y':20}}
+    remote=s.save_layout(base['name'],base['mode'],external,base['settings'],base['revision'],base['id'])
+    local={**start,cards[1]:{'x':95,'y':40}}
+    with pytest.raises(Conflict):s.save_layout(base['name'],base['mode'],local,base['settings'],base['revision'],base['id'])
+    merged={**external,cards[1]:local[cards[1]]}
+    result=s.save_layout(base['name'],base['mode'],merged,base['settings'],remote['revision'],remote['id'])
+    assert result['revision']==3 and result['positions']==merged
+
+    same_card_local={**merged,cards[0]:{'x':120,'y':20}}
+    remote_again={**merged,cards[0]:{'x':140,'y':20}}
+    second=s.save_layout(base['name'],base['mode'],remote_again,result['settings'],result['revision'],result['id'])
+    with pytest.raises(Conflict):s.save_layout(base['name'],base['mode'],same_card_local,result['settings'],result['revision'],result['id'])
+    # The service accepts only the already-resolved value under the newest CAS revision.
+    chosen={**remote_again,cards[0]:same_card_local[cards[0]]}
+    resolved=s.save_layout(base['name'],base['mode'],chosen,second['settings'],second['revision'],second['id'])
+    assert resolved['revision']==5 and resolved['positions'][cards[0]]=={'x':120,'y':20}
+
+
+def test_layout_id_cas_can_rename_or_change_mode_and_rejects_stale_or_colliding_identity(story):
+    s=story['service'];card=s.graph('assets')['nodes'][0]['id'];positions={card:{'x':1,'y':2}}
+    first=s.save_layout('Original','assets',positions)
+    renamed=s.save_layout('Renamed','scene',positions,first['settings'],first['revision'],first['id'])
+    assert renamed['id']==first['id'] and renamed['name']=='Renamed' and renamed['mode']=='scene' and renamed['revision']==2
+    collision=s.save_layout('Taken','assets',positions)
+    with pytest.raises(StoryboardError):s.save_layout('Taken','assets',positions,renamed['settings'],renamed['revision'],renamed['id'])
+    with pytest.raises(Conflict):s.save_layout('Stale','story',positions,{},first['revision'],first['id'])
+    with pytest.raises(Conflict):s.save_layout('Missing','story',positions,{},1,'layout-from-another-project')
+    assert s.get('layouts',collision['id'])['name']=='Taken'
+
+
+def test_canvas_command_catalog_uses_stable_id_cas_through_shared_command_layer(story):
+    s=story['service'];fields={field.name:field for field in COMMANDS['canvas.save'].fields}
+    assert fields['layout_id'].source=='layouts' and fields['layout_id'].type=='select'
+    payload={'name':'Command path','mode':'story','positions':{'stable-card':{'x':4,'y':8}},'settings':{}}
+    first=execute(s,'canvas.save',payload)
+    updated=execute(s,'canvas.save',{**payload,'layout_id':first['id'],'revision':first['revision'],'name':'Command path renamed'})
+    assert updated['id']==first['id'] and updated['revision']==2 and updated['name']=='Command path renamed'
+    with pytest.raises(Conflict):execute(s,'canvas.save',{**payload,'layout_id':first['id'],'revision':first['revision']})
+
+
 @pytest.mark.parametrize('positions,settings',[
  ({'missing':{'x':0}},{}), ({'x':{'x':float('nan'),'y':0}},{}),
  ({},{'viewport':{'x':0,'y':0,'scale':100}}), ({},{'unsupported':'field'})
