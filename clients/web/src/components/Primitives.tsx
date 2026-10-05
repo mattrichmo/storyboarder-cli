@@ -23,6 +23,8 @@ export function Icon({name,size=18}:{name:string;size?:number}){
   chevron:<path d="m9 5 7 7-7 7"/>,
   search:<><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></>,
   check:<path d="m4 12 5 5L20 6"/>,
+  warning:<><circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/></>,
+  stop:<rect x="5" y="5" width="14" height="14" rx="2"/>,
   arrow:<path d="M3 12h18m-7-7 7 7-7 7"/>,
   refresh:<><path d="M20 8a8 8 0 1 0 1 7M20 3v5h-5"/></>,
   menu:<path d="M3 5h18M3 12h18M3 19h18"/>,

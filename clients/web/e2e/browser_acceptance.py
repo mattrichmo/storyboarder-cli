@@ -562,25 +562,28 @@ async def exercise_authoring(page,report,output,url):
         nav_layout_name='Acceptance navigation layout '+stamp
         await page.get_by_label('Saved arrangement',exact=True).select_option(label='Acceptance layout '+stamp)
         await page.get_by_label('Arrangement name',exact=True).fill(nav_layout_name)
+        await page.get_by_role('button',name='Save as new',exact=True).click()
+        nav_layout_name=await page.get_by_label('Arrangement name',exact=True).input_value()
+        await page.get_by_role('button',name='Save arrangement',exact=True).click()
+        await wait_for_page_state(page,f"Array.from(document.querySelectorAll('.canvas-layout-bar select option')).some(option=>option.textContent==={json.dumps(nav_layout_name)})","the explicit navigation layout copy to save")
         nav_node=page.locator(f'[data-node-id="{asset["id"]}"]')
         await nav_node.focus();await nav_node.press('ArrowRight')
         nav_transform=await nav_node.evaluate("el=>el.style.transform")
         await page.get_by_role('button',name='Story outline',exact=True).click()
         navigation=page.get_by_role('dialog',name='Unsaved canvas arrangement')
         await navigation.wait_for()
-        nav_base=next(l for l in (await state())['layouts'] if l['id']==layout['id'])
-        nav_external=await verify.post(f'/api/v1/projects/{pid}/commands/canvas.save',headers={'X-Storyboarder-Token':session['token']},json={'name':nav_layout_name,'mode':'assets','positions':nav_base['positions'],'settings':nav_base['settings']})
+        nav_base=next(l for l in (await state())['layouts'] if l['name']==nav_layout_name)
+        nav_external=await verify.post(f'/api/v1/projects/{pid}/commands/canvas.save',headers={'X-Storyboarder-Token':session['token']},json={'name':nav_layout_name,'mode':'assets','positions':nav_base['positions'],'settings':nav_base['settings'],'layout_id':nav_base['id'],'revision':nav_base['revision']})
         assert nav_external.status_code==200,nav_external.text
         await navigation.get_by_role('button',name='Save and continue',exact=True).click()
         await navigation.get_by_role('alert').filter(has_text='changed elsewhere').wait_for()
         await navigation.get_by_role('button',name='Refresh latest saved revision',exact=True).click()
         nav_review=navigation.locator('.layout-conflict-review')
-        await nav_review.get_by_role('button',name='Keep local',exact=True).wait_for()
-        await nav_review.get_by_role('button',name='Keep local',exact=True).click()
+        await nav_review.get_by_text('These edits do not overlap and will be merged automatically.',exact=True).wait_for()
         await nav_review.get_by_role('button',name='Reapply merged arrangement',exact=True).click()
         await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
         nav_layout=next(l for l in (await state())['layouts'] if l['name']==nav_layout_name)
-        assert nav_layout['revision']==2
+        assert nav_layout['revision']==nav_base['revision']+2
         nav_xy=[float(part) for part in re.search(r'translate\(([-\d.]+)px,\s*([\-\d.]+)px\)',nav_transform).groups()]
         nav_saved=nav_layout['positions'][asset['id']]
         nav_deltas=(nav_saved['x']-nav_xy[0],nav_saved['y']-nav_xy[1])
