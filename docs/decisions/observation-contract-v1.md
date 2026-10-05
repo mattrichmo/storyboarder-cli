@@ -14,7 +14,7 @@ Versions pin existing provenance edge IDs and exact screenplay document/version/
 
 Validation checks authored action, dialogue, duration, framing, camera direction, continuity and constraints, plus effective scene, sequence, location and asset context. It checks IDs, hashes, lifecycle and revision tokens; titles/order do not establish identity. Uncited shot and contract notes are outside the v1 basis; notes on referenced library or context records remain captured where modeled. Results report consistent, conflict or unresolved, never semantic, image, camera or physical verification.
 
-Portable history uses a separate project-level observation-plan sidecar. Deterministic export and dry-run import expose classifications and losses; apply requires explicit reconciliation and target-state checks. Exact restore uses a scoped internal gate; ordinary authoring remains lifecycle-guarded. Migrations 005/006 add version/pin and history-retention rules without changing earlier migrations.
+Portable history uses a separate project-level observation-plan sidecar. Deterministic export and dry-run import expose classifications and losses; apply requires explicit reconciliation and target-state checks. Exact restore uses a scoped internal gate; ordinary authoring remains lifecycle-guarded. Migrations 005–007 add version/pin, history-retention and published-head preservation rules; earlier migrations are never rewritten. Schema version 7 keeps a published contract head non-null and permits advancement only to its next sealed child.
 
 ## Alternatives rejected
 
