@@ -12,8 +12,9 @@ created = planner.create_group([...])
 
 The shared command catalog exposes these as agent-only JSON-safe `observation.coverage`
 and `observation.create-group` commands. Both are available through the CLI and JSON API;
-neither is browser-visible. The TUI adds a focused one-shot shot-and-contract authoring
-flow, rather than a wizard for arbitrary multi-shot groups.
+neither is browser-visible. The TUI can create a planned shot with its initial contract or
+create a contract for an existing shot with active exact screenplay links. It keeps grouped
+multi-shot planning as a structured CLI/API operation rather than a wizard.
 
 ## Coverage report
 
@@ -79,12 +80,13 @@ result = planner.create_group([
 The terminal flow lets a person create one shot with one or more exact screenplay links
 and its first purpose/requirements contract in one transaction. Its document, immutable
 version, node, node hash, priority, basis, and scene revision are explicit. Multiple shots
-can independently select the same exact beat. The terminal page preserves existing IDs,
-hidden contract data, and pins when a person edits one field. Arbitrary grouped planning
-remains an advanced CLI/API request. The planner does not expose import/export or batch
-updates to existing shots. Exact-history transfer of a scene-context pin authored before
-a shot moved remains a separate core/schema concern; ordinary grouped authoring always
-targets the current parent scene.
+can independently select the same exact beat. The terminal page also creates a contract
+for an existing shot from its active exact direct and parent-scene links. Contract field
+edits preserve existing IDs, hidden data, and pins. Arbitrary grouped planning remains an
+advanced CLI/API request. Portable exact-history transfer is provided by the separate
+observation-plan commands in [OBSERVATION_TRANSFER.md](OBSERVATION_TRANSFER.md); a saved
+scene-context pin remains tied to the exact historical parent snapshot when a shot moves.
+Ordinary grouped authoring always targets the current parent scene.
 
 ## Reviewing contract rebases
 

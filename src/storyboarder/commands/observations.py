@@ -1,7 +1,14 @@
 """Agent-facing, JSON-safe observation-contract commands."""
+import json
+
 from .core import F, ID, REV, register
 from storyboarder.application.observation_contracts import ObservationContracts
 from storyboarder.application.observation_planner import ObservationPlanner
+from storyboarder.application.observation_transfer import (
+    apply_observation_import,
+    export_observation_plan,
+    preview_observation_import,
+)
 
 
 SHOT = F("shot_id", "Storyboard shot", required=True, source="shots")
@@ -79,3 +86,31 @@ register("observation.create-group", "Create planned shots, source links, and co
          F("request", "Atomic grouped plan", "json", True,
            help='JSON object: {"items": [GroupItem, ...]}; include caller-generated shot_id, contract_id, edge_id, and expected_scene_revision.' )],
          _create_group, browser=False, api_safe=True, page="coverage")
+
+
+def _plan_json(value):
+    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
+
+
+def _plan_export(s, _p):
+    return {"plan": json.loads(export_observation_plan(s))}
+
+
+def _plan_import_preview(s, p):
+    return preview_observation_import(s, _plan_json(p["plan"]), p.get("choices"))
+
+
+def _plan_import_apply(s, p):
+    return apply_observation_import(s, _plan_json(p["plan"]), p["preview"])
+
+
+register("observation.plan-export", "Export exact observation history plan", [], _plan_export,
+         browser=False, api_safe=True, read_only=True, page="coverage")
+register("observation.plan-import-preview", "Preview observation plan reconciliation", [
+         F("plan", "Portable observation plan", "json", True),
+         F("choices", "Explicit conflict choices by contract ID", "json")],
+         _plan_import_preview, browser=False, api_safe=True, read_only=True, page="coverage")
+register("observation.plan-import-apply", "Apply a reviewed observation plan import", [
+         F("plan", "Portable observation plan", "json", True),
+         F("preview", "Exact preview receipt", "json", True)],
+         _plan_import_apply, browser=False, api_safe=True, page="coverage")

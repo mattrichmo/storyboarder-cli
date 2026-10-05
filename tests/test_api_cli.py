@@ -101,6 +101,50 @@ def test_packaged_frontend_no_remote_assets_and_security_headers(client):
     assert client.get('/api/v1/openapi.json').json()['info']['title']=='Storyboarder local API'
 
 
+def test_observation_plan_commands_share_api_cli_json_contract(client, workspace):
+    project = workspace.create('Observation transfer', 'observation-transfer')
+    prefix = f'/api/v1/projects/{project.id}/commands'
+    metadata = client.get('/api/v1/meta').json()
+    browser_names = {item['name'] for item in metadata['commands']}
+    api_commands = {item['name']: item for item in metadata['api_commands']}
+    names = {
+        'observation.plan-export',
+        'observation.plan-import-preview',
+        'observation.plan-import-apply',
+    }
+    assert names <= api_commands.keys()
+    assert not names & browser_names
+    assert all(api_commands[name]['browser'] is False and api_commands[name]['api_safe'] is True for name in names)
+    assert all('path' not in {field['name'] for field in api_commands[name]['fields']} for name in names)
+
+    exported = client.post(prefix + '/observation.plan-export', json={})
+    assert exported.status_code == 200, exported.text
+    plan = exported.json()['plan']
+    assert plan['project_id'] == project.id
+
+    service = Service(project)
+    with service.repo.readonly_transaction() as conn:
+        before_events = conn.execute('SELECT count(*) FROM events').fetchone()[0]
+    preview_response = client.post(prefix + '/observation.plan-import-preview', json={'plan': plan})
+    assert preview_response.status_code == 200, preview_response.text
+    preview = preview_response.json()
+    assert preview['ready'] is True and preview['contracts'] == []
+    with service.repo.readonly_transaction() as conn:
+        assert conn.execute('SELECT count(*) FROM events').fetchone()[0] == before_events
+
+    applied = client.post(prefix + '/observation.plan-import-apply', json={'plan': plan, 'preview': preview})
+    assert applied.status_code == 200, applied.text
+    assert applied.json()['applied'] is False
+
+    cli_export = cli('--project', project.root, 'observation', 'plan-export', '--json')
+    assert cli_export.returncode == 0, cli_export.stderr
+    assert json.loads(cli_export.stdout) == exported.json()
+    cli_preview = cli('--project', project.root, 'observation', 'plan-import-preview',
+                      '--payload', json.dumps({'plan': plan}), '--json')
+    assert cli_preview.returncode == 0, cli_preview.stderr
+    assert json.loads(cli_preview.stdout)['ready'] is True
+
+
 def cli(*args,cwd=None):
     return subprocess.run([sys.executable,'-m','storyboarder',*map(str,args)],cwd=cwd,text=True,capture_output=True,timeout=20)
 

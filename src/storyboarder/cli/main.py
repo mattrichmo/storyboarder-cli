@@ -43,6 +43,7 @@ COMMAND_GROUP_HELP = {
     "job": "Prepare and review image tool runs",
     "link": "Connect library items",
     "media": "Import and tag images",
+    "observation": "Plan and review shot intent and portable history",
     "project": "Create, select, and maintain projects",
     "provenance": "Connect and trace production sources",
     "scene": "Create and edit scenes",

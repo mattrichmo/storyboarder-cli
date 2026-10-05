@@ -2843,6 +2843,16 @@
           "source": "",
           "help": "",
           "default": null
+        },
+        {
+          "name": "layout_id",
+          "label": "Saved arrangement",
+          "type": "select",
+          "required": false,
+          "options": [],
+          "source": "layouts",
+          "help": "",
+          "default": null
         }
       ],
       "page": "",
@@ -4961,6 +4971,78 @@
           "options": [],
           "source": "",
           "help": "JSON object: {\"items\": [GroupItem, ...]}; include caller-generated shot_id, contract_id, edge_id, and expected_scene_revision.",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "observation.plan-export",
+      "label": "Export exact observation history plan",
+      "fields": [],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.plan-import-preview",
+      "label": "Preview observation plan reconciliation",
+      "fields": [
+        {
+          "name": "plan",
+          "label": "Portable observation plan",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "choices",
+          "label": "Explicit conflict choices by contract ID",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.plan-import-apply",
+      "label": "Apply a reviewed observation plan import",
+      "fields": [
+        {
+          "name": "plan",
+          "label": "Portable observation plan",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "preview",
+          "label": "Exact preview receipt",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
           "default": null
         }
       ],
