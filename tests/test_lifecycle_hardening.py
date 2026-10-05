@@ -77,3 +77,16 @@ def test_archived_frame_state_and_archived_parent_shot_block_new_links(story, ed
     assert provenance.endpoint('frame', another_frame['id'])['archived'] is True
     with pytest.raises(StoryboardError, match='archived'):
         provenance.link('frame', another_frame['id'], 'node', clip['id'], 'appears-in')
+
+
+def test_archived_shot_blocks_new_provenance_links_as_source_and_target(story):
+    service = story['service']
+    provenance = Provenance(service)
+    archived_shot = story['shot']
+    active_shot = service.create_entity('shot', 'Another angle', story['scene']['id'])
+    service.lifecycle(archived_shot['id'], archived_shot['revision'], 'archive')
+
+    with pytest.raises(StoryboardError, match='archived'):
+        provenance.link('entity', archived_shot['id'], 'entity', active_shot['id'], 'corresponds-to')
+    with pytest.raises(StoryboardError, match='archived'):
+        provenance.link('entity', active_shot['id'], 'entity', archived_shot['id'], 'corresponds-to')
