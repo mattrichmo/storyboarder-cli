@@ -64,10 +64,10 @@ function ShotDetails({entity,state}:{entity:Entity;state:State}){
 }
 
 export function Inspector({state,id,onClose,onSelect,action}:{state:State;id:string;onClose:()=>void;onSelect:(id:string)=>void;action:ActionFn}){
- const entity=state.entities.find(e=>e.id===id);const [tab,setTab]=useState('details'),[context,setContext]=useState<ResolvedContext|null>(null),[error,setError]=useState(''),[contextLoading,setContextLoading]=useState(false);
+ const entity=state.entities.find(e=>e.id===id);const contextRefreshRevision=state.events[0]?.id;const [tab,setTab]=useState('details'),[context,setContext]=useState<ResolvedContext|null>(null),[error,setError]=useState(''),[contextLoading,setContextLoading]=useState(false);
  const contextRequest=useRef(0),contextOwner=useRef({id,projectId:state.project.id});contextOwner.current={id,projectId:state.project.id};
  async function loadContext(ownerId:string,projectId:string){const request=++contextRequest.current;setContextLoading(true);setError('');try{const value=await runCommand<ResolvedContext>(projectId,'context.resolve',{owner_id:ownerId});if(request===contextRequest.current&&contextOwner.current.id===ownerId&&contextOwner.current.projectId===projectId)setContext(value);}catch(e:any){if(request===contextRequest.current&&contextOwner.current.id===ownerId&&contextOwner.current.projectId===projectId)setError(e.message||'Could not load story direction.');}finally{if(request===contextRequest.current&&contextOwner.current.id===ownerId&&contextOwner.current.projectId===projectId)setContextLoading(false);}}
- useEffect(()=>{setContext(null);setError('');if(entity&&entity.kind!=='asset')void loadContext(id,state.project.id);else setContextLoading(false);return()=>{contextRequest.current+=1;};},[state.project.id,id,entity?.kind]);
+ useEffect(()=>{setContext(null);setError('');if(entity&&entity.kind!=='asset')void loadContext(id,state.project.id);else setContextLoading(false);return()=>{contextRequest.current+=1;};},[state.project.id,id,entity?.kind,contextRefreshRevision]);
  const panel=useRef<HTMLElement|null>(null);const closeRef=useRef(onClose);closeRef.current=onClose;
  useEffect(()=>{if(entity?.kind==='asset'&&tab==='context')setTab('details');},[entity?.kind,tab]);
  useEffect(()=>{const narrow=window.matchMedia('(max-width:800px)');const el=panel.current;let previous:HTMLElement|null=null;

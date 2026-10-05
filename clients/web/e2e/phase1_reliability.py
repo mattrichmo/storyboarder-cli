@@ -8,6 +8,7 @@ from pathlib import Path
 import argparse
 import asyncio
 import json
+import math
 import re
 import sys
 import uuid
@@ -36,6 +37,7 @@ async def main(args):
         "inspector_tabs_and_responsive_focus",
         "context_failure_retry",
         "context_stale_owner_response",
+        "context_saved_direction_refresh",
         "usage_failure_retry_preserves_target",
         "stable_layout_id_conflict_and_save_as_new",
         "queued_cancel_outcome_notice",
@@ -79,6 +81,29 @@ async def main(args):
 
             async def check_space_enter():
                 await canvas()
+                toggle = page.locator('.graph-node button[aria-label^="Collapse"],.graph-node button[aria-label^="Expand"]').first
+                assert await toggle.count(), "Fixture must include a nested Canvas collapse control."
+                owner = toggle.locator('xpath=ancestor::article[contains(@class,"graph-node")]')
+                initial_toggle = await toggle.get_attribute("aria-label")
+                initial_pressed = await owner.get_attribute("aria-pressed")
+                await toggle.focus()
+                await toggle.press("Space")
+                after_space = owner.locator('button[aria-label^="Collapse"],button[aria-label^="Expand"]')
+                space_toggle = await after_space.get_attribute("aria-label")
+                assert space_toggle != initial_toggle, "Space on the nested collapse control did not toggle it."
+                assert await owner.get_attribute("aria-pressed") == initial_pressed, "Space on the nested control also selected its parent card."
+                await after_space.focus()
+                await after_space.press("Enter")
+                after_enter = owner.locator('button[aria-label^="Collapse"],button[aria-label^="Expand"]')
+                enter_toggle = await after_enter.get_attribute("aria-label")
+                assert enter_toggle == initial_toggle, "Enter on the nested collapse control did not toggle it back."
+                assert await owner.get_attribute("aria-pressed") == initial_pressed, "Enter on the nested control also selected its parent card."
+                toggle_layout = f"Nested toggle keyboard regression {uuid.uuid4().hex[:7]}"
+                await page.get_by_label("Arrangement name", exact=True).fill(toggle_layout)
+                await page.get_by_role("button", name="Save arrangement", exact=True).click()
+                await page.wait_for_function("name => Array.from(document.querySelectorAll('.canvas-layout-bar select option')).some(option => option.textContent === name)", arg=toggle_layout)
+                await page.wait_for_function("!document.querySelector('.canvas-layout-bar')?.textContent.includes('Unsaved changes')")
+                report["nested_toggle"] = {"initial": initial_toggle, "after_space": space_toggle, "after_enter": enter_toggle, "parent_pressed": initial_pressed}
                 nodes = page.locator(".graph-node")
                 assert await nodes.count() >= 2, "Fixture must include at least two Canvas cards."
                 space_node = nodes.nth(0)
@@ -219,6 +244,36 @@ async def main(args):
                 await page.unroute("**/commands/context.resolve", delay_sequence)
                 report["context_race"] = {"owner": scene_title, "preserved_text_length": len(after)}
 
+            async def check_context_saved_refresh():
+                await canvas()
+                shot = page.locator('.graph-node[aria-label^="Shot:"]').first
+                assert await page.locator('.graph-node[aria-label^="Shot:"]').count(), "Context save fixture needs a storyboard shot."
+                shot_id = await shot.get_attribute("data-node-id")
+                context_resolution = {"count": 0}
+                async def count_context_resolve(route):
+                    context_resolution["count"] += 1
+                    await route.continue_()
+                await page.route("**/commands/context.resolve", count_context_resolve)
+                await shot.focus()
+                await shot.press("Enter")
+                await page.locator(".inspector").wait_for()
+                await (await context_tab()).click()
+                await page.locator(".inspector .context-view").wait_for()
+                before = context_resolution["count"]
+                unique = f"Visible saved direction {uuid.uuid4().hex[:8]}"
+                await page.get_by_role("button", name="Add direction note", exact=True).click()
+                dialog = page.get_by_role("dialog", name="Add or edit a direction note", exact=True)
+                await dialog.wait_for()
+                await dialog.get_by_label(re.compile("^Topic")).fill(unique)
+                await dialog.get_by_label(re.compile("^How this changes earlier direction")).select_option("append")
+                await dialog.get_by_label(re.compile("^Direction notes")).fill(f"Saved through the inspector: {unique}")
+                await dialog.get_by_role("button", name="Add or edit a direction note", exact=True).click()
+                await dialog.wait_for(state="hidden")
+                await page.wait_for_function("text => document.querySelector('.inspector .context-view')?.textContent.includes(text)", arg=unique)
+                assert context_resolution["count"] > before, "Saving direction did not refresh the selected owner's resolved context."
+                report["context_saved_refresh"] = {"shot_id": shot_id, "context_resolve_calls": context_resolution["count"] - before, "visible_note": unique}
+                await page.unroute("**/commands/context.resolve", count_context_resolve)
+
             async def check_usage_retry():
                 await canvas()
                 scene = page.locator('.graph-node[aria-label^="Scene:"]').first
@@ -273,12 +328,30 @@ async def main(args):
                 state = (await client.get(state_path)).json()
                 saved_rename = next(layout for layout in state["layouts"] if layout["id"] == original_id)
                 assert saved_rename["name"] == renamed, saved_rename
+                original_after_rename = json.loads(json.dumps(saved_rename))
 
                 node = page.locator(".graph-node").first
                 node_id = await node.get_attribute("data-node-id")
                 await node.focus()
                 await node.press("ArrowRight")
-                before = await node.get_attribute("style")
+                copy_xy = tuple(float(value) for value in re.search(r'translate\(([-\d.]+)px,\s*([\-\d.]+)px\)', await node.get_attribute("style")).groups())
+                await page.get_by_role("button", name="Save as new", exact=True).click()
+                copy_name = await page.get_by_label("Arrangement name", exact=True).input_value()
+                await page.get_by_role("button", name="Save arrangement", exact=True).click()
+                await page.wait_for_function("name => Array.from(document.querySelectorAll('.canvas-layout-bar select option')).some(option => option.textContent === name)", arg=copy_name)
+                after_copy = (await client.get(state_path)).json()
+                copied = next(layout for layout in after_copy["layouts"] if layout["name"] == copy_name)
+                original_after_copy = next(layout for layout in after_copy["layouts"] if layout["id"] == original_id)
+                assert copied["id"] != original_id
+                assert original_after_copy == original_after_rename, "Save as new changed the original saved arrangement."
+                copied_position = copied["positions"][node_id]
+                assert math.isclose(copied_position["x"], copy_xy[0], abs_tol=0.02) and math.isclose(copied_position["y"], copy_xy[1], abs_tol=0.02), (copied_position, copy_xy)
+
+                await page.get_by_label("Saved arrangement", exact=True).select_option(original_id)
+                node = page.locator(f'.graph-node[data-node-id="{node_id}"]')
+                await node.focus()
+                await node.press("ArrowRight")
+                local_xy = tuple(float(value) for value in re.search(r'translate\(([-\d.]+)px,\s*([\-\d.]+)px\)', await node.get_attribute("style")).groups())
                 latest_original = next(layout for layout in state["layouts"] if layout["id"] == original_id)
                 await command("canvas.remove", {"id": original_id, "revision": latest_original["revision"]})
                 replacement = await command("canvas.save", {"name": renamed, "mode": "story", "positions": {"replacement-sentinel": {"x": 919, "y": 717}}, "settings": {}})
@@ -304,11 +377,12 @@ async def main(args):
                 after_save = (await client.get(state_path)).json()
                 new_layout = next(layout for layout in after_save["layouts"] if layout["name"] == new_name)
                 replacement_after = next(layout for layout in after_save["layouts"] if layout["id"] == replacement_id)
-                assert new_layout["id"] not in (original_id, replacement_id)
+                assert new_layout["id"] not in (original_id, replacement_id, copied["id"]), new_layout
+                new_position = new_layout["positions"][node_id]
+                assert math.isclose(new_position["x"], local_xy[0], abs_tol=0.02) and math.isclose(new_position["y"], local_xy[1], abs_tol=0.02), (new_position, local_xy)
                 assert replacement_after["revision"] == replacement["revision"]
                 assert replacement_after["positions"] == replacement["positions"]
-                assert node_id and before
-                report["layout_recovery"] = {"old_id": original_id, "replacement_id": replacement_id, "new_id": new_layout["id"], "replacement_revision": replacement_after["revision"]}
+                report["layout_recovery"] = {"old_id": original_id, "replacement_id": replacement_id, "copied_id": copied["id"], "new_id": new_layout["id"], "replacement_revision": replacement_after["revision"], "saved_local_xy": list(local_xy)}
 
             async def check_queued_cancel():
                 state = (await client.get(state_path)).json()
@@ -366,7 +440,7 @@ async def main(args):
                 assert "rect" in icon and "m4 12 5 5L20 6" not in icon, icon
                 report["cancel_notice"] = {"title": title, "outcome": await toast.get_attribute("data-outcome"), "icon": icon}
 
-            functions = [check_space_enter, check_tabs_and_responsive, check_context_retry, check_context_race, check_usage_retry, check_layout_id_recovery, check_queued_cancel]
+            functions = [check_space_enter, check_tabs_and_responsive, check_context_retry, check_context_race, check_context_saved_refresh, check_usage_retry, check_layout_id_recovery, check_queued_cancel]
             for index, (name, function) in enumerate(zip(cases, functions)):
                 try:
                     await function()
