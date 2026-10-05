@@ -81,10 +81,9 @@ The normal-navigation test still needs to be run on an unrestricted target machi
 
 ## Platform and operational caveats
 
-Linux/Python 3.13 was executed here. The project includes platform-neutral Python paths,
-Windows startup instructions, and CI definitions for Linux/macOS/Windows; those remote
-CI jobs were not run in this environment. System image-viewer handoff depends on the
-host desktop configuration. The TUI benefits from at least 110×35 terminal cells.
+Linux/Python 3.13 was executed here. The project includes platform-neutral Python paths
+and Windows startup instructions. System image-viewer handoff depends on the host
+desktop configuration. The TUI benefits from at least 110×35 terminal cells.
 PDF core fonts do not guarantee arbitrary Unicode glyph coverage; full HTML/JSON is
 available for international productions.
 
