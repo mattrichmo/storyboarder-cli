@@ -723,6 +723,26 @@ def _receipt(source_hash: str, target_hash: str, artifact_hash: str, choices: di
                  "artifact_state_sha256": artifact_hash, "choices": choices})
 
 
+def _reconciliation_report(results: list[dict], choices: dict[str, str], artifact_available: dict[str, bool]) -> dict:
+    """Derive loss and unresolved details from verified state and explicit choices."""
+    return {
+        "losses": [
+            {"contract_id": contract_id, "reason": "explicit_conflict_skip"}
+            for contract_id in sorted(choices) if choices[contract_id] == "skip-conflict"
+        ],
+        "unresolved": [
+            {"contract_id": row["contract_id"], "code": conflict["code"], "id": conflict.get("id")}
+            for row in results for conflict in row["conflicts"]
+        ] + [
+            {"contract_id": contract_id, "reason": "abort_selected"}
+            for contract_id in sorted(choices) if choices[contract_id] == "abort"
+        ] + [
+            {"source_version_id": version_id, "code": "source_artifact_bytes_unavailable"}
+            for version_id, available in sorted(artifact_available.items()) if not available
+        ],
+    }
+
+
 def preview_observation_import(service, source: bytes | str, choices: dict[str, str] | None = None) -> dict:
     """Read-only import preview. No database, event, file, or backup writes occur."""
     plan = _read_plan(source)
@@ -750,6 +770,7 @@ def preview_observation_import(service, source: bytes | str, choices: dict[str, 
     decisions = {key: supplied[key] for key in sorted(supplied)}
     ready = not missing
     receipt = _receipt(source_hash, state_hash, artifact_hash, decisions) if ready else None
+    report = _reconciliation_report(results, decisions, artifact_available)
     output = []
     for row in results:
         item = dict(row)
@@ -771,13 +792,7 @@ def preview_observation_import(service, source: bytes | str, choices: dict[str, 
         "required_choices": missing,
         "receipt": receipt,
         "contracts": output,
-        "losses": [{"contract_id": key, "reason": "explicit_conflict_skip"} for key in sorted(conflicts) if supplied.get(key) == "skip-conflict"],
-        "unresolved": [
-            {"contract_id": row["contract_id"], "code": conflict["code"], "id": conflict.get("id")}
-            for row in results for conflict in row["conflicts"]
-        ] + [{"contract_id": key, "reason": "abort_selected"} for key in aborted]
-        + [{"source_version_id": version_id, "code": "source_artifact_bytes_unavailable"}
-           for version_id, available in artifact_available.items() if not available],
+        **report,
     }
 
 
@@ -832,9 +847,6 @@ def apply_observation_import(service, source: bytes | str, preview: dict) -> dic
                                 preview.get("artifact_state_sha256", ""), choices)
     if (preview.get("source_manifest_sha256") != source_hash or preview.get("receipt") != expected_receipt):
         raise ObservationTransferError("observation_transfer_receipt_invalid", "The dry-run receipt does not match this plan and its reconciliation choices.")
-    if preview.get("aborted"):
-        return {"applied": False, "aborted": True, "imported": [], "already_present": [], "skipped": [],
-                "losses": preview.get("losses", []), "unresolved": preview.get("unresolved", [])}
 
     packages = {item["id"]: item for item in plan["contracts"]}
     inserted, existing, skipped = [], [], []
@@ -861,9 +873,10 @@ def apply_observation_import(service, source: bytes | str, preview: dict) -> dic
             conflict_ids = {row["contract_id"] for row in classified if row["status"] == "conflict"}
             if set(choices) != conflict_ids or any(choice not in ("skip-conflict", "abort") for choice in choices.values()):
                 raise ObservationTransferError("observation_transfer_target_changed", "Conflict status changed after dry-run. Run a new dry-run before applying.", status=409)
+            report = _reconciliation_report(classified, choices, artifact_available)
             if any(choice == "abort" for choice in choices.values()):
                 return {"applied": False, "aborted": True, "imported": [], "already_present": [], "skipped": [],
-                        "losses": preview.get("losses", []), "unresolved": preview.get("unresolved", [])}
+                        **report}
             for result in classified:
                 package = packages[result["contract_id"]]
                 if result["status"] == "already_present":
@@ -909,7 +922,6 @@ def apply_observation_import(service, source: bytes | str, preview: dict) -> dic
     return {
         "applied": bool(inserted), "aborted": False, "imported": inserted, "already_present": existing,
         "skipped": skipped,
-        "losses": preview.get("losses", []),
-        "unresolved": preview.get("unresolved", []),
+        **report,
         "validations": validations,
     }

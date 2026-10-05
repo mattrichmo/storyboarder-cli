@@ -245,7 +245,11 @@ def test_conflict_requires_explicit_skip_or_abort(service, tmp_path):
         "code": "shot_already_has_contract",
         "id": shot["id"],
     }]
+    skipped["losses"] = []
+    skipped["unresolved"] = []
+    skipped["aborted"] = True
     result = apply_observation_import(target, exported, skipped)
+    assert not result["aborted"]
     assert contract_id in result["skipped"]
     assert len(result["imported"]) == 2
     assert result["losses"] == [{"contract_id": contract_id, "reason": "explicit_conflict_skip"}]
@@ -254,6 +258,51 @@ def test_conflict_requires_explicit_skip_or_abort(service, tmp_path):
         "code": "shot_already_has_contract",
         "id": shot["id"],
     }]
+
+
+def test_abort_choice_overrides_tampered_summary_and_writes_nothing(service, tmp_path):
+    story = _base(service)
+    target = _clone_project(service, tmp_path / "abort-with-skip-copy")
+    _populate_history(story)
+    exported = export_observation_plan(service)
+    packages = json.loads(exported)["contracts"]
+    by_shot = {row["shot_id"]: row for row in packages}
+    skipped_id = by_shot[story["shots"][0]["id"]]["id"]
+    aborted_id = by_shot[story["shots"][1]["id"]]["id"]
+    target_story = {**story, "service": target}
+    for index, edge_key in ((0, "shot_a"), (1, "shot_b")):
+        shot = target_story["shots"][index]
+        existing = target.get("entities", shot["id"])
+        ObservationContracts(target).create(
+            shot["id"], existing["revision"],
+            _contract(target_story["edges"][edge_key], "direct-element", 30 + index,
+                      notes="Different local history"),
+        )
+
+    decisions = {skipped_id: "skip-conflict", aborted_id: "abort"}
+    preview = preview_observation_import(target, exported, decisions)
+    assert preview["ready"] and preview["aborted"]
+    preview["losses"] = []
+    preview["unresolved"] = []
+    preview["aborted"] = False
+    before_events = _event_count(target)
+    before_files = _file_state(target.project.root)
+
+    result = apply_observation_import(target, exported, preview)
+
+    assert result["aborted"] and not result["applied"]
+    assert result["imported"] == [] and result["already_present"] == [] and result["skipped"] == []
+    assert result["losses"] == [{"contract_id": skipped_id, "reason": "explicit_conflict_skip"}]
+    conflict_rows = sorted(
+        ((row["id"], row["shot_id"]) for row in packages if row["id"] in decisions),
+        key=lambda item: item[0],
+    )
+    assert result["unresolved"] == [
+        {"contract_id": contract_id, "code": "shot_already_has_contract", "id": shot_id}
+        for contract_id, shot_id in conflict_rows
+    ] + [{"contract_id": aborted_id, "reason": "abort_selected"}]
+    assert _event_count(target) == before_events
+    assert _file_state(target.project.root) == before_files
 
 
 def test_archived_and_retired_exact_pins_restore_original_rows(service, tmp_path):
