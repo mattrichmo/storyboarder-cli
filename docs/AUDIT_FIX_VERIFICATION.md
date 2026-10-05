@@ -21,7 +21,7 @@ Validation on Linux with Python 3.12 and system Chromium:
   001–004 verified in the wheel.
 - `git diff --check`: passed.
 
-Browser regression coverage runs in GitHub Actions alongside the existing
+At the time of this report, browser regressions ran in GitHub Actions alongside the
 cross-platform Python matrix. Those remote results are separate from these local
 checks. POSIX descendant cleanup has a process-group regression; Windows uses
 bounded CTRL_BREAK/taskkill fallback and has not been executed locally.
