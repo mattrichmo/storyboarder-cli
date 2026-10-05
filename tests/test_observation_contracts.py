@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 from storyboarder.api.server import create_app
 from storyboarder.application.documents import Documents
 from storyboarder.application.observation_contracts import (
-    CONTRACT_SCHEMA, ObservationContractError, ObservationContracts, _parse_json,
+    CONTRACT_SCHEMA, ObservationContractError, ObservationContracts, _parse_json, _validate_body,
 )
 from storyboarder.application.projects import Project
 from storyboarder.application.provenance import Provenance
@@ -486,6 +486,73 @@ def test_rebase_requires_unchanged_reviewed_basis_and_preserves_shot_and_frame_s
     assert service.get("frames", frame["id"]) == frame_before
 
 
+@pytest.mark.parametrize("proposal_change", ["pin", "statement", "priority"])
+def test_rebase_review_digest_binds_exact_proposed_contract(story, screenplay, proposal_change):
+    service = story["service"]
+    shot = service.update_entity(story["shot"]["id"], story["shot"]["revision"],
+                                 {"fields": {"camera": "Locked-off."}})
+    frame = service.attach_frame(shot["id"], story["exact"]["id"])
+    _, source = _source_rows(service, screenplay)
+    edge_a = _new_edge(service, source[uid(4)]["id"], shot["id"])
+    edge_b = _new_edge(service, source[uid(6)]["id"], shot["id"])
+    requirements = []
+    if proposal_change in ("statement", "priority"):
+        requirements = [{"id": uid(8890), "priority": "must", "basis": "direct",
+                         "source_edge_ids": [edge_a["id"]], "statement": "Keep the key visible."}]
+    body_a = _contract([(edge_a, "direct-element")], intents=False, requirements=requirements)
+    records = ObservationContracts(service)
+    created = records.create(shot["id"], shot["revision"], body_a)
+    review = records.review_rebase(created["id"], body_a)
+    assert review["expected_basis_sha256"] != review["current_basis_sha256"]
+    assert review["expected_basis_sha256_kind"] == "sha256(canonical {contract,basis})"
+
+    if proposal_change == "pin":
+        proposed = _contract([(edge_b, "direct-element")], intents=False)
+    else:
+        updated_requirement = dict(body_a["requirements"][0])
+        if proposal_change == "statement":
+            updated_requirement["statement"] = "Show the key change hands."
+        else:
+            updated_requirement["priority"] = "prefer"
+        proposed = {**body_a, "requirements": [updated_requirement]}
+    before_shot = service.get("entities", shot["id"])
+    before_frame = service.get("frames", frame["id"])
+    with service.repo.readonly_transaction() as conn:
+        before_header = dict(conn.execute("SELECT revision,current_version_id FROM observation_contracts WHERE id=?",
+                                          (created["id"],)).fetchone())
+        before_versions = conn.execute("SELECT count(*) FROM observation_contract_versions WHERE contract_id=?",
+                                       (created["id"],)).fetchone()[0]
+        before_events = conn.execute("SELECT count(*) FROM events WHERE entity_id=? AND action='observation_contract.rebase'",
+                                     (created["id"],)).fetchone()[0]
+
+    with pytest.raises(ObservationContractError) as changed:
+        records.rebase(created["id"], created["revision"], proposed, review["expected_basis_sha256"])
+    assert changed.value.code == "contract_basis_changed"
+    assert changed.value.status == 409
+    assert changed.value.details["current_basis_sha256"] == review["current_basis_sha256"]
+    assert changed.value.details["current_review_digest_sha256"] != review["expected_basis_sha256"]
+    with service.repo.readonly_transaction() as conn:
+        after_header = dict(conn.execute("SELECT revision,current_version_id FROM observation_contracts WHERE id=?",
+                                         (created["id"],)).fetchone())
+        assert after_header == before_header
+        assert conn.execute("SELECT count(*) FROM observation_contract_versions WHERE contract_id=?",
+                            (created["id"],)).fetchone()[0] == before_versions
+        assert conn.execute("SELECT count(*) FROM events WHERE entity_id=? AND action='observation_contract.rebase'",
+                            (created["id"],)).fetchone()[0] == before_events
+    assert service.get("entities", shot["id"]) == before_shot
+    assert service.get("frames", frame["id"]) == before_frame
+
+    refreshed = records.review_rebase(created["id"], proposed)
+    rebased = records.rebase(created["id"], created["revision"], proposed,
+                             refreshed["expected_basis_sha256"])
+    assert rebased["revision"] == created["revision"] + 1
+    assert rebased["contract"] == _validate_body(proposed)
+    expected_edge = edge_b["id"] if proposal_change == "pin" else edge_a["id"]
+    assert [pin["edge_id"] for pin in rebased["source_pins"]] == [expected_edge]
+    assert service.get("entities", shot["id"]) == before_shot
+    assert service.get("frames", frame["id"]) == before_frame
+
+
 def test_create_uses_expected_shot_revision(story):
     service = story["service"]
     shot = story["shot"]
@@ -655,6 +722,40 @@ def test_doctor_checks_contract_history_read_only(story, screenplay):
         conn.execute("UPDATE observation_contract_versions SET content_sha256='broken' WHERE id=?", (created["version"]["id"],))
     damaged = service.doctor()
     assert any(issue["code"] == "observation_contract_integrity" for issue in damaged["issues"])
+
+
+@pytest.mark.parametrize(("tamper", "reason"), [
+    ("number_parent", "contract_version_number_sequence_mismatch"),
+    ("parent", "contract_version_parent_chain_mismatch"),
+    ("sealed", "contract_version_unsealed"),
+])
+def test_doctor_checks_contiguous_sealed_version_chain(story, screenplay, tamper, reason):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    records = ObservationContracts(service)
+    created = records.create(story["shot"]["id"], story["shot"]["revision"],
+                             _contract([(edge, "direct-element")]))
+    revised = records.revise(created["id"], created["revision"],
+                             _contract([(edge, "direct-element")], notes="Second immutable version."))
+    with service.repo.transaction() as conn:
+        conn.execute("DROP TRIGGER observation_version_seal_once")
+        if tamper == "number_parent":
+            conn.execute("UPDATE observation_contract_versions SET number=3,parent_version_id=NULL WHERE id=?",
+                         (revised["version"]["id"],))
+        elif tamper == "parent":
+            conn.execute("UPDATE observation_contract_versions SET parent_version_id=NULL WHERE id=?",
+                         (revised["version"]["id"],))
+        else:
+            conn.execute("UPDATE observation_contract_versions SET sealed=0 WHERE id=?",
+                         (revised["version"]["id"],))
+
+    before = hashlib.sha256(service.repo.path.read_bytes()).hexdigest()
+    report = service.doctor()
+    after = hashlib.sha256(service.repo.path.read_bytes()).hexdigest()
+    issue = next(issue for issue in report["issues"] if issue["code"] == "observation_contract_integrity")
+    assert reason in issue["details"]["reason"]
+    assert before == after
 
 
 def test_doctor_handles_missing_contract_table_and_schema_four_without_mutation(story, tmp_path, monkeypatch):
@@ -1078,8 +1179,12 @@ def test_reference_snapshot_identity_and_kind_are_checked_without_comparing_muta
         snapshot["type"] = "historical-type"
         conn.execute("UPDATE observation_reference_pins SET snapshot_json=? WHERE version_id=? AND reference_id=?",
                      (dumps(snapshot), created["version"]["id"], reference["id"]))
-    assert records.validate(created["id"])["references"][0]["state"] == "available"
-    assert not any(issue["code"] == "observation_contract_integrity" for issue in service.doctor()["issues"])
+    type_tamper = records.validate(created["id"])
+    assert type_tamper["status"] == "conflict"
+    assert type_tamper["references"][0]["reason"] == "reference_snapshot_basis_type_mismatch"
+    assert records.show(created["id"])["reference_pins"][0]["reason"] == "reference_snapshot_basis_type_mismatch"
+    type_issue = next(issue for issue in service.doctor()["issues"] if issue["code"] == "observation_contract_integrity")
+    assert "reference_snapshot_basis_type_mismatch" in type_issue["details"]["reason"]
 
     snapshot["reference_id"] = uid(8898)
     snapshot["kind"] = "scene"

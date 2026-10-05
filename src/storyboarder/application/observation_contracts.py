@@ -570,6 +570,11 @@ class ObservationContracts:
         walk("", saved, current)
         return changes, truncated
 
+    @staticmethod
+    def _proposal_review_digest(body, basis):
+        """Bind a rebase token to both the normalized proposal and its basis."""
+        return content_hash({"contract": body, "basis": basis})
+
     def review_rebase(self, contract_id, requested_body):
         """Read-only preview token and bounded authored-basis change report."""
         body = _validate_body(requested_body)
@@ -578,7 +583,8 @@ class ObservationContracts:
             header, version = self._version(conn, contract_id)
             saved_basis = self._safe_json(version["basis_json"], code="contract_basis_invalid", label="saved basis")
             current_basis = self._basis(conn, header["shot_id"], body)
-            expected_basis_sha256 = content_hash(current_basis)
+            current_basis_sha256 = content_hash(current_basis)
+            expected_basis_sha256 = self._proposal_review_digest(body, current_basis)
             changes, changes_truncated = self._basis_changes(saved_basis, current_basis)
             validation = self._validate(conn, header, version, artifact_cache)
             return {
@@ -587,9 +593,10 @@ class ObservationContracts:
                 "revision": header["revision"],
                 "saved_version_id": version["id"],
                 "saved_basis_sha256": version["basis_sha256"],
-                "current_basis_sha256": expected_basis_sha256,
+                "current_basis_sha256": current_basis_sha256,
                 "expected_basis_sha256": expected_basis_sha256,
-                "basis_changed": expected_basis_sha256 != version["basis_sha256"],
+                "expected_basis_sha256_kind": "sha256(canonical {contract,basis})",
+                "basis_changed": current_basis_sha256 != version["basis_sha256"],
                 "changes": changes,
                 "changes_truncated": changes_truncated,
                 "requested_source_pins": sorted(
@@ -693,15 +700,18 @@ class ObservationContracts:
                     )
                 reviewed_basis = self._basis(conn, shot["id"], body)
                 current_basis_sha256 = content_hash(reviewed_basis)
-                if current_basis_sha256 != expected_basis_sha256:
+                current_review_digest = self._proposal_review_digest(body, reviewed_basis)
+                if current_review_digest != expected_basis_sha256:
                     saved_basis = self._safe_json(current["basis_json"], code="contract_basis_invalid", label="saved basis")
                     changes, changes_truncated = self._basis_changes(saved_basis, reviewed_basis)
                     raise ObservationContractError(
                         "contract_basis_changed",
-                        "The authored basis changed after review. Review the rebase again before saving.",
+                        "The reviewed proposal or authored basis changed. Review the rebase again before saving.",
                         {"expected_basis_sha256": expected_basis_sha256,
+                         "current_review_digest_sha256": current_review_digest,
                          "current_basis_sha256": current_basis_sha256,
                          "saved_basis_sha256": current["basis_sha256"],
+                         "basis_changed": current_basis_sha256 != current["basis_sha256"],
                          "changes": changes, "changes_truncated": changes_truncated}, 409,
                     )
             requested_pins = {pin["edge_id"]: pin["source_scope"] for pin in body["source_pins"]}
@@ -870,8 +880,18 @@ class ObservationContracts:
                 "node_id": pin["node_id"], "logical_id": pin["logical_id"],
                 "source_sha256": pin["source_sha256"], "scope_sha256": pin["scope_sha256"]}
 
-    def _reference_states(self, conn, version_id, body):
+    def _reference_states(self, conn, version_id, body, saved_basis=None):
         items = []
+        if saved_basis is None:
+            basis_row = conn.execute("SELECT basis_json FROM observation_contract_versions WHERE id=?", (version_id,)).fetchone()
+            try:
+                saved_basis = self._safe_json(basis_row["basis_json"], code="contract_basis_invalid", label="saved basis") if basis_row else {}
+            except ObservationContractError:
+                saved_basis = {}
+        reference_basis = {
+            item.get("asset_id"): item for item in saved_basis.get("referenced_assets", [])
+            if isinstance(item, dict) and isinstance(item.get("asset_id"), str)
+        } if isinstance(saved_basis, dict) else {}
         pins = {row["reference_id"]: dict(row) for row in conn.execute(
             "SELECT reference_id,snapshot_json FROM observation_reference_pins WHERE version_id=? ORDER BY reference_id",
             (version_id,),
@@ -892,6 +912,13 @@ class ObservationContracts:
                     or snapshot.get("kind") != "asset"
                     or entity is not None and (entity["id"] != pin["reference_id"] or entity["kind"] != "asset")):
                 items.append({"reference_id": reference_id, "state": "conflict", "reason": "reference_snapshot_mismatch"})
+            elif reference_id not in reference_basis:
+                items.append({"reference_id": reference_id, "state": "conflict", "reason": "reference_snapshot_basis_type_missing"})
+            elif snapshot.get("type") != (
+                reference_basis[reference_id].get("fields", {}).get("type")
+                if isinstance(reference_basis[reference_id].get("fields", {}), dict) else None
+            ):
+                items.append({"reference_id": reference_id, "state": "conflict", "reason": "reference_snapshot_basis_type_mismatch"})
             elif entity is None or entity["kind"] != "asset":
                 items.append({"reference_id": reference_id, "state": "dangling", "reason": "reference_missing"})
             elif entity["archived"]:
@@ -913,6 +940,7 @@ class ObservationContracts:
         if dumps(body) != version["contract_json"] or content_hash(body) != version["content_sha256"]:
             conflicts = True
             findings.append({"code": "contract_hash_mismatch", "version_id": version["id"]})
+        saved_basis = None
         try:
             saved_basis = self._safe_json(version["basis_json"], code="contract_basis_invalid", label="saved basis")
             if dumps(saved_basis) != version["basis_json"] or content_hash(saved_basis) != version["basis_sha256"]:
@@ -999,9 +1027,11 @@ class ObservationContracts:
             requirements.append({"id": requirement["id"], "priority": requirement["priority"],
                                  "basis": requirement["basis"], "state": state,
                                  "source_mappings": mappings})
-        references = self._reference_states(conn, version["id"], body)
+        references = self._reference_states(conn, version["id"], body, saved_basis)
         for reference in references:
-            if reference.get("reason") in ("reference_snapshot_invalid", "reference_snapshot_mismatch", "reference_pin_mismatch"):
+            if reference.get("reason") in ("reference_snapshot_invalid", "reference_snapshot_mismatch",
+                                            "reference_snapshot_basis_type_missing", "reference_snapshot_basis_type_mismatch",
+                                            "reference_pin_mismatch"):
                 conflicts = True
             if reference["state"] in ("dangling", "unresolved", "conflict"):
                 unresolved = True
@@ -1125,6 +1155,14 @@ class ObservationContracts:
                     versions = [dict(row) for row in conn.execute("SELECT * FROM observation_contract_versions WHERE contract_id=? ORDER BY number", (header["id"],))]
                     if not versions or header["current_version_id"] != versions[-1]["id"] or header["revision"] != len(versions):
                         raise ValueError("header_revision_or_pointer_mismatch")
+                    if [version["number"] for version in versions] != list(range(1, len(versions) + 1)):
+                        raise ValueError("contract_version_number_sequence_mismatch")
+                    for index, version in enumerate(versions):
+                        expected_parent = versions[index - 1]["id"] if index else None
+                        if version["parent_version_id"] != expected_parent:
+                            raise ValueError("contract_version_parent_chain_mismatch")
+                        if version["sealed"] != 1:
+                            raise ValueError("contract_version_unsealed")
                     for version in versions:
                         body = self._safe_json(version["contract_json"], label="saved contract")
                         normalized = _validate_body(body)
@@ -1146,8 +1184,10 @@ class ObservationContracts:
                         refs = {row[0] for row in conn.execute("SELECT reference_id FROM observation_reference_pins WHERE version_id=?", (version["id"],))}
                         if refs != set(body["references"]):
                             raise ValueError("contract_reference_pins_mismatch")
-                        reference_issues = [item for item in self._reference_states(conn, version["id"], body)
-                                            if item.get("reason") in ("reference_snapshot_invalid", "reference_snapshot_mismatch")]
+                        reference_issues = [item for item in self._reference_states(conn, version["id"], body, basis)
+                                            if item.get("reason") in (
+                                                "reference_snapshot_invalid", "reference_snapshot_mismatch",
+                                                "reference_snapshot_basis_type_missing", "reference_snapshot_basis_type_mismatch")]
                         if reference_issues:
                             raise ValueError("contract_reference_snapshot_integrity_mismatch:" + dumps(reference_issues))
                 except Exception as exc:
