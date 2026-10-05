@@ -424,9 +424,22 @@ class ObservationPlanner:
         parsed = [_validated_model(GroupItem, value, f"items[{index}]") for index, value in enumerate(items)]
         shot_ids = [item.shot_id for item in parsed]
         contract_ids = [item.contract_id for item in parsed]
-        edge_ids = [edge.edge_id for item in parsed for edge in item.source_edges]
-        if len(set(shot_ids)) != len(shot_ids) or len(set(contract_ids)) != len(contract_ids) or len(set(edge_ids)) != len(edge_ids):
-            raise ObservationPlannerError("observation_plan_duplicate_id", "Shot, contract, and edge UUIDs must be unique within the group.")
+        if len(set(shot_ids)) != len(shot_ids) or len(set(contract_ids)) != len(contract_ids):
+            raise ObservationPlannerError("observation_plan_duplicate_id", "Shot and contract UUIDs must be unique within the group.")
+        edge_specs = {}
+        for item in parsed:
+            for edge in item.source_edges:
+                target_id = item.shot_id if edge.source_scope == "direct-element" else item.scene_id
+                identity = (edge.edge_id, edge.document_id, edge.version_id, edge.node_id,
+                            edge.source_sha256, edge.source_scope, target_id)
+                previous = edge_specs.get(edge.edge_id)
+                if previous is not None and previous["identity"] != identity:
+                    raise ObservationPlannerError("observation_plan_edge_id_mismatch", "A shared edge UUID must describe the same exact source, scope, and target in every planned item.",
+                                                  {"edge_id": edge.edge_id, "first_target_id": previous["identity"][-1],
+                                                   "conflicting_target_id": target_id})
+                if previous is None:
+                    edge_specs[edge.edge_id] = {"identity": identity, "input": edge}
+        edge_ids = list(edge_specs)
         if set(shot_ids) & set(contract_ids) or set(shot_ids) & set(edge_ids) or set(contract_ids) & set(edge_ids):
             raise ObservationPlannerError("observation_plan_duplicate_id", "A caller UUID cannot identify more than one planned record.")
         prepared = []
@@ -458,14 +471,81 @@ class ObservationPlanner:
                 for scene_id, revision in scene_revisions.items():
                     scene = self.service.entity(conn, scene_id, "scene")
                     self.repo.check(scene, revision)
-                # Validate the exact source endpoints before writing any rows.
-                for item, _, _, _, _ in prepared:
+
+                # Fail on caller IDs that already identify a record before any
+                # rows or events are created.
+                for shot_id in shot_ids:
+                    if conn.execute("SELECT 1 FROM entities WHERE id=?", (shot_id,)).fetchone():
+                        raise ObservationPlannerError("observation_plan_duplicate_id", "A planned shot UUID already exists.", {"shot_id": shot_id})
+                for contract_id in contract_ids:
+                    if conn.execute("SELECT 1 FROM observation_contracts WHERE id=?", (contract_id,)).fetchone():
+                        raise ObservationPlannerError("observation_plan_duplicate_id", "A planned contract UUID already exists.", {"contract_id": contract_id})
+
+                # Validate every exact source and item location before writes.
+                source_endpoints = {}
+                for item, _, field_values, _, _ in prepared:
+                    self.service._validate_location(conn, field_values)
                     for edge in item.source_edges:
                         self._validate_exact_source(conn, edge)
+                        if edge.node_id not in source_endpoints:
+                            source_endpoints[edge.node_id] = self.provenance._endpoint(conn, "node", edge.node_id)
 
-                created = []
+                scene_endpoints = {scene_id: self.provenance._endpoint(conn, "entity", scene_id)
+                                   for scene_id in scene_revisions}
+                for edge_id, spec in edge_specs.items():
+                    edge_input = spec["input"]
+                    if edge_input.source_scope != "scene-context":
+                        continue
+                    source = source_endpoints[edge_input.node_id]
+                    target_id = spec["identity"][-1]
+                    target = scene_endpoints[target_id]
+                    try:
+                        self.provenance._semantics(source, target, "visualizes")
+                    except StoryboardError as exc:
+                        raise ObservationPlannerError("observation_group_source_edge_invalid", str(exc),
+                                                      {"edge_id": edge_id, "node_id": edge_input.node_id,
+                                                       "target_id": target_id}) from exc
+
+                # A caller may name an existing edge only to reuse an exact,
+                # active scene-context link to the requested scene. Never
+                # substitute another edge ID or accept stale snapshots.
+                reusable_edges = {}
+                for edge_id, spec in edge_specs.items():
+                    edge_input = spec["input"]
+                    existing = conn.execute("SELECT * FROM provenance_edges WHERE id=?", (edge_id,)).fetchone()
+                    if existing is None:
+                        if edge_input.source_scope == "scene-context":
+                            matching = conn.execute("""SELECT id FROM provenance_edges
+                              WHERE source_type='node' AND source_id=? AND target_type='entity' AND target_id=?
+                                AND relation='visualizes' AND retired=0""",
+                                                    (edge_input.node_id, spec["identity"][-1])).fetchone()
+                            if matching:
+                                raise ObservationPlannerError("observation_group_existing_edge_mismatch", "An exact active scene-context edge already exists under another UUID; name that edge UUID to reuse it.",
+                                                              {"edge_id": edge_id, "existing_edge_id": matching["id"]})
+                        continue
+                    if edge_input.source_scope != "scene-context":
+                        raise ObservationPlannerError("observation_group_existing_edge_mismatch", "Only an exact active scene-context edge can be reused by a grouped plan.",
+                                                      {"edge_id": edge_id, "source_scope": edge_input.source_scope})
+                    target_id = spec["identity"][-1]
+                    source = source_endpoints[edge_input.node_id]
+                    target = scene_endpoints[target_id]
+                    try:
+                        source_snapshot = json.loads(existing["source_snapshot"])
+                        target_snapshot = json.loads(existing["target_snapshot"])
+                    except (TypeError, ValueError):
+                        source_snapshot = target_snapshot = None
+                    if (existing["source_type"] != "node" or existing["source_id"] != edge_input.node_id
+                            or existing["target_type"] != "entity" or existing["target_id"] != target_id
+                            or existing["relation"] != "visualizes" or existing["retired"]
+                            or source_snapshot != source or target_snapshot != target):
+                        raise ObservationPlannerError("observation_group_existing_edge_mismatch", "The existing edge UUID does not identify a current exact scene-context link to the requested scene.",
+                                                      {"edge_id": edge_id, "target_id": target_id})
+                    reusable_edges[edge_id] = dict(existing)
+
+                # Create every shot before any contract version is captured,
+                # so continuity may refer forward or backward within the plan.
+                shots = {}
                 for item, body, field_values, shot_title, description in prepared:
-                    self.service._validate_location(conn, field_values)
                     position = conn.execute("SELECT coalesce(max(position),-1)+1 FROM entities WHERE kind='shot' AND parent_id=?",
                                             (item.scene_id,)).fetchone()[0]
                     stamp = now()
@@ -475,29 +555,40 @@ class ObservationPlanner:
                         "fields": field_values, "created_at": stamp, "updated_at": stamp,
                     })
                     self.repo.event(conn, "shot.created", shot["id"])
-                    edge_rows = []
-                    for edge_input in item.source_edges:
-                        source = self.provenance._endpoint(conn, "node", edge_input.node_id)
-                        target_id = item.shot_id if edge_input.source_scope == "direct-element" else item.scene_id
-                        target = self.provenance._endpoint(conn, "entity", target_id)
-                        try:
-                            self.provenance._semantics(source, target, "visualizes")
-                        except StoryboardError as exc:
-                            raise ObservationPlannerError("observation_group_source_edge_invalid", str(exc),
-                                                          {"edge_id": edge_input.edge_id, "node_id": edge_input.node_id,
-                                                           "target_id": target_id}) from exc
-                        edge_row = {"id": edge_input.edge_id, "source_type": "node", "source_id": edge_input.node_id,
-                                    "target_type": "entity", "target_id": target_id, "relation": "visualizes",
-                                    "source_snapshot": dumps(source), "target_snapshot": dumps(target),
-                                    "notes": "", "retired": 0, "revision": 1, "created_at": now()}
-                        conn.execute("""INSERT INTO provenance_edges
-                          (id,source_type,source_id,target_type,target_id,relation,source_snapshot,target_snapshot,notes,retired,revision,created_at)
-                          VALUES(:id,:source_type,:source_id,:target_type,:target_id,:relation,:source_snapshot,:target_snapshot,
-                                 :notes,:retired,:revision,:created_at)""", edge_row)
-                        self.repo.event(conn, "provenance.linked", edge_row["id"],
-                                        {"source": f"node:{edge_input.node_id}", "target": f"entity:{target_id}", "relation": "visualizes"})
-                        edge_rows.append(edge_row)
+                    shots[item.shot_id] = shot
 
+                # Create each requested exact edge once. A context edge may be
+                # shared by multiple items or reused from an exact existing
+                # active edge; direct edges always target their new shot.
+                completed_edge_ids = set(reusable_edges)
+                for edge_id, spec in edge_specs.items():
+                    if edge_id in completed_edge_ids:
+                        continue
+                    edge_input = spec["input"]
+                    target_id = spec["identity"][-1]
+                    source = source_endpoints[edge_input.node_id]
+                    target = self.provenance._endpoint(conn, "entity", target_id)
+                    try:
+                        self.provenance._semantics(source, target, "visualizes")
+                    except StoryboardError as exc:
+                        raise ObservationPlannerError("observation_group_source_edge_invalid", str(exc),
+                                                      {"edge_id": edge_id, "node_id": edge_input.node_id,
+                                                       "target_id": target_id}) from exc
+                    edge_row = {"id": edge_id, "source_type": "node", "source_id": edge_input.node_id,
+                                "target_type": "entity", "target_id": target_id, "relation": "visualizes",
+                                "source_snapshot": dumps(source), "target_snapshot": dumps(target),
+                                "notes": "", "retired": 0, "revision": 1, "created_at": now()}
+                    conn.execute("""INSERT INTO provenance_edges
+                      (id,source_type,source_id,target_type,target_id,relation,source_snapshot,target_snapshot,notes,retired,revision,created_at)
+                      VALUES(:id,:source_type,:source_id,:target_type,:target_id,:relation,:source_snapshot,:target_snapshot,
+                             :notes,:retired,:revision,:created_at)""", edge_row)
+                    self.repo.event(conn, "provenance.linked", edge_row["id"],
+                                    {"source": f"node:{edge_input.node_id}", "target": f"entity:{target_id}", "relation": "visualizes"})
+                    completed_edge_ids.add(edge_id)
+
+                created = []
+                for item, body, _, _, _ in prepared:
+                    shot = shots[item.shot_id]
                     stamp = now()
                     header = {"id": item.contract_id, "shot_id": item.shot_id, "current_version_id": None,
                               "revision": 1, "created_at": stamp, "updated_at": stamp}
@@ -513,7 +604,8 @@ class ObservationPlanner:
                     created.append({"shot_id": item.shot_id, "shot_revision": shot["revision"],
                                     "scene_id": item.scene_id, "expected_scene_revision": item.expected_scene_revision,
                                     "contract_id": item.contract_id, "contract_revision": 1,
-                                    "version_id": version["id"], "edge_ids": [row["id"] for row in edge_rows],
+                                    "version_id": version["id"],
+                                    "edge_ids": list(dict.fromkeys(edge.edge_id for edge in item.source_edges)),
                                     "contract": shown})
                 self.repo.event(conn, "observation_group.created", None,
                                 {"shot_ids": shot_ids, "contract_ids": contract_ids,

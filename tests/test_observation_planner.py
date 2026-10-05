@@ -168,9 +168,9 @@ def test_group_invalid_item_rolls_back_all_entities_edges_contracts_and_events(s
     imported, nodes = imported_screenplay
     valid = plan_item(uid(601), uid(602), story["scene"], [exact_edge(uid(603), imported, nodes[uid(4)])])
     invalid = plan_item(uid(604), uid(605), story["scene"], [exact_edge(uid(606), imported, nodes[uid(6)])])
-    # The second item reaches core reference validation only after its shot
-    # and edge have been inserted, proving the outer transaction rolls back
-    # writes from both items rather than just rejecting a preflight error.
+    # The second contract reaches core reference validation after the batch
+    # has staged all shots and exact edges, proving the outer transaction
+    # rolls back every earlier row and event.
     invalid["contract"]["references"] = [uid(607)]
     with service.repo.transaction(False) as conn:
         before = {table: conn.execute(query).fetchone()[0] for table, query in {
@@ -305,3 +305,150 @@ def test_group_context_edge_is_exact_parent_scene_context(story, imported_screen
     link = next(row for row in report["authored_links"]["items"] if row["edge_id"] == uid(901))
     assert link["coverage_kind"] == "scene-context"
     assert uid(902) in link["inherited_shot_ids"]
+
+
+def test_grouped_create_resolves_forward_and_backward_cross_shot_continuity(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    first = plan_item(uid(1001), uid(1002), story["scene"],
+                      [exact_edge(uid(1003), imported, nodes[uid(4)])], title="First shot")
+    second = plan_item(uid(1011), uid(1012), story["scene"],
+                       [exact_edge(uid(1013), imported, nodes[uid(6)])], title="Second shot")
+    first["contract"]["continuity"] = [{"id": uid(1004), "related_shot_ids": [uid(1011)],
+                                        "statement": "The next planned shot continues this action."}]
+    second["contract"]["continuity"] = [{"id": uid(1014), "related_shot_ids": [uid(1001)],
+                                         "statement": "This shot follows the first planned action."}]
+
+    result = ObservationPlanner(service).create_group([first, second])
+
+    assert [item["shot_id"] for item in result["items"]] == [uid(1001), uid(1011)]
+    assert result["items"][0]["contract"]["contract"]["continuity"][0]["related_shot_ids"] == [uid(1011)]
+    assert result["items"][1]["contract"]["contract"]["continuity"][0]["related_shot_ids"] == [uid(1001)]
+
+
+def test_grouped_create_shares_one_exact_context_edge_across_same_scene_shots(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    shared = exact_edge(uid(1101), imported, nodes[uid(3)], scope="scene-context")
+    first = plan_item(uid(1102), uid(1103), story["scene"], [shared], title="Shared context one")
+    first["source_edges"].append(shared)
+    second = plan_item(uid(1104), uid(1105), story["scene"], [shared], title="Shared context two")
+
+    result = ObservationPlanner(service).create_group([first, second])
+
+    assert [item["edge_ids"] for item in result["items"]] == [[uid(1101)], [uid(1101)]]
+    assert [item["contract"]["source_pins"][0]["edge_id"] for item in result["items"]] == [uid(1101), uid(1101)]
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT count(*) FROM provenance_edges WHERE id=? AND retired=0", (uid(1101),)).fetchone()[0] == 1
+        assert conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked' AND entity_id=?", (uid(1101),)).fetchone()[0] == 1
+
+
+def test_grouped_create_reuses_preexisting_exact_active_context_edge(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    edge = exact_edge(existing["id"], imported, source, scope="scene-context")
+    item = plan_item(uid(1201), uid(1202), story["scene"], [edge])
+    with service.repo.transaction(False) as conn:
+        before_link_events = conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0]
+
+    result = ObservationPlanner(service).create_group([item])
+
+    assert result["items"][0]["edge_ids"] == [existing["id"]]
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT count(*) FROM provenance_edges WHERE id=?", (existing["id"],)).fetchone()[0] == 1
+        assert conn.execute("SELECT count(*) FROM events WHERE action='provenance.linked'").fetchone()[0] == before_link_events
+
+
+def test_grouped_create_requires_the_existing_context_edge_uuid(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    replacement_id = uid(1251)
+    edge = exact_edge(replacement_id, imported, source, scope="scene-context")
+    item = plan_item(uid(1252), uid(1253), story["scene"], [edge])
+
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group([item])
+
+    assert error.value.code == "observation_group_existing_edge_mismatch"
+    assert error.value.details["existing_edge_id"] == existing["id"]
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT 1 FROM entities WHERE id=?", (uid(1252),)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM provenance_edges WHERE id=?", (replacement_id,)).fetchone() is None
+
+
+def test_grouped_create_rejects_shared_edge_id_with_different_scene_target_before_writes(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    sequence = service.create_entity("sequence", "Another sequence")
+    other_scene = service.create_entity("scene", "Another scene", sequence["id"])
+    shared_id = uid(1301)
+    source = nodes[uid(3)]
+    first = plan_item(uid(1302), uid(1303), story["scene"],
+                      [exact_edge(shared_id, imported, source, scope="scene-context")])
+    second = plan_item(uid(1304), uid(1305), other_scene,
+                       [exact_edge(shared_id, imported, source, scope="scene-context")])
+
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group([first, second])
+
+    assert error.value.code == "observation_plan_edge_id_mismatch"
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT count(*) FROM entities WHERE id IN (?,?)", (uid(1302), uid(1304))).fetchone()[0] == 0
+        assert conn.execute("SELECT 1 FROM provenance_edges WHERE id=?", (shared_id,)).fetchone() is None
+
+
+def test_grouped_create_rejects_existing_context_edge_for_another_scene(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    sequence = service.create_entity("sequence", "Another sequence")
+    other_scene = service.create_entity("scene", "Another scene", sequence["id"])
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    edge = exact_edge(existing["id"], imported, source, scope="scene-context")
+    item = plan_item(uid(1401), uid(1402), other_scene, [edge])
+
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group([item])
+
+    assert error.value.code == "observation_group_existing_edge_mismatch"
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT 1 FROM entities WHERE id=?", (uid(1401),)).fetchone() is None
+        assert conn.execute("SELECT 1 FROM observation_contracts WHERE id=?", (uid(1402),)).fetchone() is None
+
+
+def test_grouped_create_rejects_stale_snapshot_on_existing_context_edge(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(3)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["scene"]["id"], "visualizes")
+    changed_scene = service.update_entity(story["scene"]["id"], story["scene"]["revision"],
+                                          {"fields": {"summary": "The scene context changed."}})
+    edge = exact_edge(existing["id"], imported, source, scope="scene-context")
+    item = plan_item(uid(1501), uid(1502), changed_scene, [edge])
+
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group([item])
+
+    assert error.value.code == "observation_group_existing_edge_mismatch"
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT 1 FROM entities WHERE id=?", (uid(1501),)).fetchone() is None
+
+
+def test_grouped_create_does_not_reuse_preexisting_direct_edge(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(4)]
+    existing = Provenance(service).link("node", source["id"], "entity", story["shot"]["id"], "visualizes")
+    edge = exact_edge(existing["id"], imported, source, scope="direct-element")
+    item = plan_item(uid(1601), uid(1602), story["scene"], [edge])
+
+    with pytest.raises(ObservationPlannerError) as error:
+        ObservationPlanner(service).create_group([item])
+
+    assert error.value.code == "observation_group_existing_edge_mismatch"
+    with service.repo.transaction(False) as conn:
+        assert conn.execute("SELECT 1 FROM entities WHERE id=?", (uid(1601),)).fetchone() is None
