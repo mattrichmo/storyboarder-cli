@@ -4786,6 +4786,37 @@
       "read_only": true
     },
     {
+      "name": "observation.rebase-preview",
+      "label": "Review basis changes before rebasing a contract",
+      "fields": [
+        {
+          "name": "contract_id",
+          "label": "Observation contract",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "contract",
+          "label": "Versioned observation contract",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
       "name": "observation.rebase",
       "label": "Rebase a contract with explicit source pins",
       "fields": [
@@ -4813,6 +4844,16 @@
           "name": "contract",
           "label": "Versioned observation contract",
           "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Reviewed basis token",
+          "type": "text",
           "required": true,
           "options": [],
           "source": "",

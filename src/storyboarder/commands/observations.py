@@ -28,9 +28,23 @@ register("observation.validate", "Check declared observation links and basis", [
          ID("story", "contract_id", "Observation contract"), F("version_id", "Contract version")],
          lambda s, p: ObservationContracts(s).validate(p["contract_id"], p.get("version_id")),
          browser=False, api_safe=True, read_only=True, page="coverage")
+
+
+def _review_rebase(s, p):
+    return ObservationContracts(s).review_rebase(p["contract_id"], p["contract"])
+
+
+def _rebase(s, p):
+    return ObservationContracts(s).rebase(p["contract_id"], p["revision"], p["contract"],
+                                           p["expected_basis_sha256"])
+
+
+register("observation.rebase-preview", "Review basis changes before rebasing a contract", [
+         ID("story", "contract_id", "Observation contract"), BODY], _review_rebase,
+         browser=False, api_safe=True, read_only=True, page="coverage")
 register("observation.rebase", "Rebase a contract with explicit source pins", [
-         ID("story", "contract_id", "Observation contract"), REV, BODY],
-         lambda s, p: ObservationContracts(s).rebase(p["contract_id"], p["revision"], p["contract"]),
+         ID("story", "contract_id", "Observation contract"), REV, BODY,
+         F("expected_basis_sha256", "Reviewed basis token", required=True)], _rebase,
          browser=False, api_safe=True, page="coverage")
 register("observation.diff", "Compare two observation contract versions", [
          ID("story", "contract_id", "Observation contract"),

@@ -85,3 +85,15 @@ remains an advanced CLI/API request. The planner does not expose import/export o
 updates to existing shots. Exact-history transfer of a scene-context pin authored before
 a shot moved remains a separate core/schema concern; ordinary grouped authoring always
 targets the current parent scene.
+
+## Reviewing contract rebases
+
+The shared agent-only command catalog exposes contract `create`, `show`, `list`, `revise`,
+`validate`, `diff`, `rebase-preview`, and `rebase` operations as JSON/API-safe commands
+with `browser=false`. `observation.rebase-preview` takes the contract ID and a complete
+proposed body, returns field-level saved/current basis changes and the requested exact edge
+IDs, and does not write. The page displays that diff and asks before saving. The subsequent
+`observation.rebase` call must carry the same complete body, the header revision read before
+review, and the opaque `expected_basis_sha256` token returned by preview. A 409 means the
+header or reviewed proposal changed; retain the draft, preview again, and explicitly
+approve the refreshed proposal. Rebase never chooses a newer source version automatically.

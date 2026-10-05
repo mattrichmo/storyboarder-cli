@@ -4,12 +4,15 @@ import hashlib
 import json
 import sys
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
 from storyboarder.application.documents import Documents
 from storyboarder.application.observation_contracts import CONTRACT_SCHEMA, ObservationContractError, ObservationContracts
+from storyboarder.application.projects import Project
 from storyboarder.application.observation_planner import (
     ObservationPlanner,
     ObservationPlannerError,
@@ -17,6 +20,7 @@ from storyboarder.application.observation_planner import (
 import storyboarder.application.observation_contracts as contract_module
 from storyboarder.application.provenance import Provenance
 from storyboarder.application.source_workflows import SourceWorkflows
+from storyboarder.application.service import Service
 from storyboarder.domain.errors import Conflict
 
 
@@ -166,6 +170,37 @@ def test_grouped_create_spans_scenes_reuses_exact_source_and_creates_multiple_pi
     assert after_camera == before_camera
     with service.repo.transaction(False) as conn:
         assert conn.execute("SELECT count(*) FROM frames WHERE shot_id=?", (story["shot"]["id"],)).fetchone()[0] == before_frames
+
+
+def test_two_connection_grouped_creates_are_complete_under_one_scene_revision(story, imported_screenplay):
+    service = story["service"]
+    imported, nodes = imported_screenplay
+    source = nodes[uid(4)]
+    expected_revision = story["scene"]["revision"]
+    items = [
+        plan_item(uid(1881), uid(1882), story["scene"],
+                  [exact_edge(uid(1883), imported, source)], title="Concurrent plan A",
+                  expected_revision=expected_revision),
+        plan_item(uid(1884), uid(1885), story["scene"],
+                  [exact_edge(uid(1886), imported, source)], title="Concurrent plan B",
+                  expected_revision=expected_revision),
+    ]
+    planners = [ObservationPlanner(Service(Project(service.root))) for _ in range(2)]
+    barrier = Barrier(2)
+
+    def create(index):
+        barrier.wait(timeout=5)
+        return planners[index].create_group([items[index]])
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(create, range(2)))
+
+    assert {item["shot_id"] for outcome in outcomes for item in outcome["items"]} == {uid(1881), uid(1884)}
+    with service.repo.readonly_transaction() as conn:
+        assert conn.execute("SELECT count(*) FROM entities WHERE id IN (?,?)", (uid(1881), uid(1884))).fetchone()[0] == 2
+        assert conn.execute("SELECT count(*) FROM observation_contracts WHERE id IN (?,?)", (uid(1882), uid(1885))).fetchone()[0] == 2
+        assert conn.execute("SELECT count(*) FROM provenance_edges WHERE id IN (?,?)", (uid(1883), uid(1886))).fetchone()[0] == 2
+        assert conn.execute("SELECT count(*) FROM events WHERE action='observation_group.created'").fetchone()[0] == 2
 
 
 def test_group_invalid_item_rolls_back_all_entities_edges_contracts_and_events(story, imported_screenplay):

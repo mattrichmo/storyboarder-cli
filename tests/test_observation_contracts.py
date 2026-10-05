@@ -664,6 +664,120 @@ def test_observation_contract_cli_uses_http_status_exit_codes(story):
     assert stale.returncode == 3
     assert json.loads(stale.stderr)["error"]["code"] == "revision_conflict"
 
+    help_result = subprocess.run([sys.executable, "-m", "storyboarder", "observation", "rebase", "--help"],
+                                 capture_output=True, text=True, timeout=15)
+    assert help_result.returncode == 0
+    assert "--expected-basis-sha256 ARG_EXPECTED_BASIS_SHA256" in help_result.stdout
+    assert "Reviewed basis token [required]" in help_result.stdout
+    preview_help = subprocess.run([sys.executable, "-m", "storyboarder", "observation", "rebase-preview", "--help"],
+                                  capture_output=True, text=True, timeout=15)
+    assert preview_help.returncode == 0
+    assert "--contract ARG_CONTRACT" in preview_help.stdout
+    assert "Versioned observation contract [required]" in preview_help.stdout
+
+
+def test_rebase_preview_api_cli_share_reviewed_basis_conflict(story, screenplay):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    body = _contract([(edge, "direct-element")])
+    created = ObservationContracts(service).create(story["shot"]["id"], story["shot"]["revision"], body)
+
+    app = create_app(project=service.project, port=7430)
+    with TestClient(app, base_url="http://127.0.0.1:7430") as client:
+        client.headers["X-Storyboarder-Token"] = client.get("/api/v1/session").json()["token"]
+        prefix = f"/api/v1/projects/{service.project.id}/commands"
+        metadata = client.get("/api/v1/meta").json()
+        api_commands = {row["name"]: row for row in metadata["api_commands"]}
+        browser_names = {row["name"] for row in metadata["commands"]}
+        assert "observation.review_rebase" not in api_commands
+        assert "observation.rebase-preview" not in browser_names
+        preview_command = api_commands["observation.rebase-preview"]
+        assert preview_command["browser"] is False and preview_command["api_safe"] is True
+        assert preview_command["read_only"] is True
+        assert [field["name"] for field in preview_command["fields"]] == ["contract_id", "contract"]
+        rebase_command = api_commands["observation.rebase"]
+        assert [field["name"] for field in rebase_command["fields"]] == [
+            "contract_id", "revision", "contract", "expected_basis_sha256"]
+        assert rebase_command["fields"][-1]["required"] is True
+
+        preview_response = client.post(prefix + "/observation.rebase-preview",
+                                       json={"contract_id": created["id"], "contract": body})
+        assert preview_response.status_code == 200
+        preview = preview_response.json()
+        assert preview["basis_changed"] is False
+        service.update_entity(story["shot"]["id"], story["shot"]["revision"],
+                              {"fields": {"action": "Changed after the saved contract."}})
+
+        stale_payload = {"contract_id": created["id"], "revision": created["revision"],
+                         "contract": body, "expected_basis_sha256": preview["expected_basis_sha256"]}
+        cli = subprocess.run([sys.executable, "-m", "storyboarder", "--project", str(service.root),
+                              "observation", "rebase", "--payload", json.dumps(stale_payload), "--json"],
+                             capture_output=True, text=True, timeout=15)
+        assert cli.returncode == 3
+        cli_error = json.loads(cli.stderr)["error"]
+        assert cli_error["code"] == "contract_basis_changed"
+        stale_response = client.post(prefix + "/observation.rebase", json=stale_payload)
+        assert stale_response.status_code == 409
+        assert stale_response.json()["error"] == cli_error
+
+        refreshed = client.post(prefix + "/observation.rebase-preview",
+                                json={"contract_id": created["id"], "contract": body})
+        assert refreshed.status_code == 200
+        assert any(change["path"] == "/shot/action" for change in refreshed.json()["changes"])
+        refreshed_payload = stale_payload | {
+            "expected_basis_sha256": refreshed.json()["expected_basis_sha256"]}
+        rebased = client.post(prefix + "/observation.rebase", json=refreshed_payload)
+        assert rebased.status_code == 200, rebased.text
+        assert rebased.json()["revision"] == created["revision"] + 1
+        assert rebased.json()["source_pins"][0]["edge_id"] == edge["id"]
+
+
+def test_rebase_review_token_binds_requirement_body_and_exact_pins(story, screenplay):
+    service = story["service"]
+    _, source = _source_rows(service, screenplay)
+    first_edge = _new_edge(service, source[uid(4)]["id"], story["shot"]["id"])
+    second_edge = _new_edge(service, source[uid(6)]["id"], story["shot"]["id"])
+    original_requirement = {"id": uid(9691), "priority": "must", "basis": "direct",
+                            "source_edge_ids": [first_edge["id"]], "statement": "Keep the key visible."}
+    proposed_requirement = {"id": uid(9691), "priority": "must", "basis": "direct",
+                            "source_edge_ids": [second_edge["id"]], "statement": "Show Mara's hand."}
+    original = _contract([(first_edge, "direct-element")], requirements=[original_requirement])
+    proposed = _contract([(second_edge, "direct-element")], requirements=[proposed_requirement])
+    created = ObservationContracts(service).create(story["shot"]["id"], story["shot"]["revision"], original)
+
+    app = create_app(project=service.project, port=7430)
+    with TestClient(app, base_url="http://127.0.0.1:7430") as client:
+        client.headers["X-Storyboarder-Token"] = client.get("/api/v1/session").json()["token"]
+        prefix = f"/api/v1/projects/{service.project.id}/commands"
+        preview = client.post(prefix + "/observation.rebase-preview",
+                              json={"contract_id": created["id"], "contract": proposed})
+        assert preview.status_code == 200
+        reviewed = preview.json()["expected_basis_sha256"]
+
+        stale = client.post(prefix + "/observation.rebase", json={
+            "contract_id": created["id"], "revision": created["revision"],
+            "contract": original, "expected_basis_sha256": reviewed,
+        })
+        assert stale.status_code == 409
+        assert stale.json()["error"]["code"] == "contract_basis_changed"
+        unchanged = ObservationContracts(service).show(created["id"])
+        assert unchanged["revision"] == created["revision"]
+        assert unchanged["version"]["id"] == created["version"]["id"]
+        assert len(unchanged["history"]) == 1
+
+        refreshed = client.post(prefix + "/observation.rebase-preview",
+                                json={"contract_id": created["id"], "contract": original})
+        assert refreshed.status_code == 200
+        applied = client.post(prefix + "/observation.rebase", json={
+            "contract_id": created["id"], "revision": created["revision"],
+            "contract": original, "expected_basis_sha256": refreshed.json()["expected_basis_sha256"],
+        })
+        assert applied.status_code == 200, applied.text
+        result = applied.json()
+        assert result["contract"]["requirements"][0]["statement"] == "Keep the key visible."
+        assert result["source_pins"][0]["edge_id"] == first_edge["id"]
+
 
 def test_planner_command_schemas_are_json_api_safe_but_agent_only(story, screenplay):
     service = story["service"]

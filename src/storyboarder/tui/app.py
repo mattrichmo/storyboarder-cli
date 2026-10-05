@@ -225,6 +225,7 @@ class Desk:
     def build_coverage_page(self, page):
         buttons = [
             Button('Plan shot + contract', handler=lambda: self.spawn(self.create_observation_plan())),
+            Button('Contract for existing shot', handler=lambda: self.spawn(self.create_existing_shot_contract())),
             Button('Show exact pins', handler=lambda: self.spawn(self.show_observation())),
             Button('Validate', handler=lambda: self.spawn(self.validate_observation())),
             Button('Edit one field', handler=lambda: self.spawn(self.edit_observation_field())),
@@ -236,7 +237,7 @@ class Desk:
         ]
         standard_observation_forms = {
             'observation.create', 'observation.show', 'observation.list', 'observation.revise',
-            'observation.validate', 'observation.rebase', 'observation.diff',
+            'observation.validate', 'observation.rebase-preview', 'observation.rebase', 'observation.diff',
             'observation.coverage', 'observation.create-group',
         }
         for name, command in COMMANDS.items():
@@ -267,6 +268,14 @@ class Desk:
         if kind == 'group':
             item = self.observation_draft['payload']['request']['items'][0]
             return f"Saved draft · {item['title']} · exact source pins retained · scene revision {item['expected_scene_revision']}"
+        if kind == 'create_existing':
+            return (f"Saved contract draft · shot {self.observation_draft['shot_id']} · "
+                    f"shot revision {self.observation_draft['expected_shot_revision']} · "
+                    f"{len(self.observation_draft['contract']['source_pins'])} exact pins retained")
+        if kind == 'rebase':
+            pins = self.observation_draft['contract']['source_pins']
+            return (f"Saved rebase review · contract {self.observation_draft['contract_id']} · "
+                    f"header revision {self.observation_draft['revision']} · {len(pins)} exact pins retained")
         return f"Saved edit draft · contract {self.observation_draft['contract_id']} · header revision {self.observation_draft['revision']}"
 
     async def refresh_observation_rows(self):
@@ -294,7 +303,17 @@ class Desk:
         return None
 
     @staticmethod
+    def _observation_scope_label(source_scope):
+        return 'Scene context' if source_scope == 'scene-context' else 'Direct shot link'
+
+    @staticmethod
     def _format_observation_show(record):
+        pins = []
+        for pin in record['source_pins']:
+            details = dict(pin)
+            details['relationship_label'] = Desk._observation_scope_label(pin['source_scope'])
+            details['screenplay_node_kind'] = pin.get('source_node_type', 'unknown')
+            pins.append(details)
         sections = [f"Contract {record['id']} · header revision {record['revision']}",
                     f"Shot {record['shot_id']} · version {record['version']['number']} · {record['version']['id']}",
                     f"Version hash {record['version']['content_sha256']} · basis hash {record['version']['basis_sha256']}",
@@ -303,7 +322,7 @@ class Desk:
                         'script_intents': record['contract']['script_intents'],
                         'requirements': record['contract']['requirements'],
                     }, ensure_ascii=False, indent=2), '', 'Exact source pins (document/version/node/hash/edge)',
-                    json.dumps(record['source_pins'], ensure_ascii=False, indent=2), '', 'Saved history',
+                    json.dumps(pins, ensure_ascii=False, indent=2), '', 'Saved history',
                     json.dumps(record['history'], ensure_ascii=False, indent=2)]
         return '\n'.join(sections)
 
@@ -417,10 +436,83 @@ class Desk:
             await self.message_dialog('Contract edit was not saved', str(exc))
 
     async def rebase_observation(self):
-        if not self._selected_contract_id():
+        draft = self.observation_draft
+        contract_id = (draft['contract_id'] if draft and draft.get('kind') == 'rebase'
+                       else self._selected_contract_id())
+        if not contract_id:
             return
-        await self.message_dialog('Rebase preview unavailable',
-                                  'This build is waiting for the shared basis-preview and compare-and-swap API. No pins or basis were changed.')
+        try:
+            if draft and draft.get('kind') == 'rebase' and draft['contract_id'] == contract_id:
+                saved = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+                if saved['revision'] != draft['revision']:
+                    diff_text = ''
+                    previous_version_id = draft.get('saved_version_id')
+                    current_version_id = saved['version']['id']
+                    if previous_version_id and previous_version_id != current_version_id:
+                        diff = await self.run_worker(ObservationContracts(self.service).diff,
+                                                      contract_id, previous_version_id, current_version_id)
+                        diff_text = '\n\nSaved version diff:\n' + json.dumps(diff, ensure_ascii=False, indent=2)
+                    await self.message_dialog(
+                        'Contract revision changed',
+                        f"The retained rebase draft uses header revision {draft['revision']}; the current contract is at revision {saved['revision']}.\n\nCurrent saved version:\n{self._format_observation_show(saved)}{diff_text}\n\nThe draft still holds its original exact pins until you explicitly reload.",
+                    )
+                    decision = await self.choose('Reload this saved version and review a new rebase?', [
+                        ('yes', 'Reload current body and pins'), ('no', 'Keep the old draft')], 'no')
+                    if decision != 'yes':
+                        return
+                    body = copy.deepcopy(saved['contract'])
+                    revision = saved['revision']
+                    saved_version_id = current_version_id
+                else:
+                    body = copy.deepcopy(draft['contract'])
+                    revision = draft['revision']
+                    saved_version_id = draft.get('saved_version_id', saved['version']['id'])
+            else:
+                saved = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+                body = copy.deepcopy(saved['contract'])
+                revision = saved['revision']
+                saved_version_id = saved['version']['id']
+
+            preview = await self.run_worker(execute, self.service, 'observation.rebase-preview', {
+                'contract_id': contract_id, 'contract': body})
+            await self.message_dialog('Review authored basis changes', self._format_rebase_preview(preview))
+            decision = await self.choose('Rebase this exact contract body and pin set?', [
+                ('yes', 'Save with this reviewed basis'), ('no', 'Keep current version')], 'no')
+            if decision != 'yes':
+                return
+            self.observation_draft = {
+                'kind': 'rebase', 'contract_id': contract_id, 'revision': revision,
+                'saved_version_id': saved_version_id, 'contract': body,
+                'expected_basis_sha256': preview['expected_basis_sha256'],
+            }
+            await self._apply_observation_draft()
+        except (StoryboardError, OSError) as exc:
+            await self.message_dialog('Could not review contract rebase', str(exc))
+
+    @staticmethod
+    def _format_rebase_preview(preview):
+        lines = [
+            f"Contract {preview['contract_id']} · header revision {preview['revision']}",
+            f"Saved basis SHA-256: {preview['saved_basis_sha256']}",
+            f"Current basis SHA-256: {preview['current_basis_sha256']}",
+            f"Basis changed: {'yes' if preview['basis_changed'] else 'no'}",
+            f"Validation: {preview['validation_context']['status']}",
+            '', 'Exact source pins retained in the proposed body:',
+        ]
+        lines.extend(f"  {pin['edge_id']} · {pin['source_scope']}" for pin in preview['requested_source_pins'])
+        lines += ['', 'Saved and current values:']
+        if preview['changes']:
+            for change in preview['changes']:
+                before = json.dumps(change['saved_value'], ensure_ascii=False, sort_keys=True)
+                after = json.dumps(change['current_value'], ensure_ascii=False, sort_keys=True)
+                lines.append(f"  {change['path']}: {before} → {after}")
+        else:
+            lines.append('  No supported basis fields changed.')
+        if preview['changes_truncated']:
+            lines.append('  Additional basis changes were omitted from this bounded preview.')
+        lines += ['', 'Rebase review token:', preview['expected_basis_sha256'],
+                  'The save is checked against this token. A changed basis keeps the draft for another explicit review.']
+        return '\n'.join(lines)
 
     async def retry_observation_draft(self):
         if not self.observation_draft:
@@ -435,6 +527,20 @@ class Desk:
             if draft['kind'] == 'group':
                 result = await self.run_worker(execute, self.service, 'observation.create-group', draft['payload'])
                 self.set_message(f"Created shot {result['items'][0]['shot_id']} and its exact observation contract.")
+            elif draft['kind'] == 'create_existing':
+                result = await self.run_worker(execute, self.service, 'observation.create', {
+                    'shot_id': draft['shot_id'],
+                    'expected_shot_revision': draft['expected_shot_revision'],
+                    'contract': draft['contract'],
+                })
+                self.set_message(f"Created observation contract {result['id']} at revision {result['revision']}.")
+            elif draft['kind'] == 'rebase':
+                result = await self.run_worker(execute, self.service, 'observation.rebase', {
+                    'contract_id': draft['contract_id'], 'revision': draft['revision'],
+                    'contract': draft['contract'],
+                    'expected_basis_sha256': draft['expected_basis_sha256'],
+                })
+                self.set_message(f"Saved contract rebase {result['revision']} with the reviewed basis and exact pins.")
             else:
                 result = await self.run_worker(execute, self.service, 'observation.revise', {
                     'contract_id': draft['contract_id'], 'revision': draft['revision'], 'contract': draft['contract']})
@@ -495,10 +601,12 @@ class Desk:
                 if not edges:
                     return
                 break
-            self.set_message(f"Exact source selected: {source['document_id']} / {source['version_id']} / {source['node_id']} · {source['source_sha256']}")
+            scope = 'scene-context' if source['node_type'] == 'scene' else 'direct-element'
+            scope_label = self._observation_scope_label(scope)
+            self.set_message(f"Exact source selected: {source['document_id']} / {source['version_id']} / {source['node_id']} · {source['source_sha256']} · {source['node_type']} · {scope_label}")
             fields = await self.simple_form('Describe this exact source', [
                 ('purpose', 'Purpose', ''), ('communication', 'How the visual should read', '')],
-                f"Pinned source: {source['document_id']} · version {source['version_id']} · node {source['node_id']} · hash {source['source_sha256']}")
+                f"Pinned source: {source['document_id']} · version {source['version_id']} · node {source['node_id']} · hash {source['source_sha256']}\nScreenplay node kind: {source['node_type']} · Relationship: {scope_label}")
             if not fields:
                 return
             intent_basis = await self.choose('Purpose basis', [('direct', 'Directly stated'), ('interpreted', 'Interpreted'), ('unknown', 'Unknown')], 'unknown')
@@ -517,7 +625,7 @@ class Desk:
             edge_id = str(uuid.uuid4())
             edges.append({'edge_id': edge_id, 'document_id': source['document_id'], 'version_id': source['version_id'],
                           'node_id': source['node_id'], 'source_sha256': source['source_sha256'],
-                          'source_scope': 'scene-context' if source['node_type'] == 'scene' else 'direct-element'})
+                          'source_scope': scope})
             intents.append({'id': str(uuid.uuid4()), 'source_edge_id': edge_id, 'source_scope': edges[-1]['source_scope'],
                             'purpose': fields['purpose'], 'communication': fields['communication'], 'basis': intent_basis})
             requirement = {'id': str(uuid.uuid4()), 'priority': priority, 'basis': req_basis,
@@ -538,6 +646,140 @@ class Desk:
                              'references': [], 'continuity': [], 'notes': ''}}
         self.observation_draft = {'kind': 'group', 'payload': {'request': {'items': [item]}}}
         await self._apply_observation_draft()
+
+    async def create_existing_shot_contract(self):
+        if not self.service or not self.state:
+            return
+        shots = [(item['id'], f"{item['title']} · shot revision {item['revision']}")
+                 for item in self.state['entities'] if item['kind'] == 'shot' and not item['archived']]
+        shot_id = await self.choose('Choose an existing storyboard shot', shots)
+        if not shot_id:
+            return
+        try:
+            shot = await self.run_worker(self.service.get, 'entities', shot_id)
+            if shot['kind'] != 'shot' or shot['archived']:
+                await self.message_dialog('Choose an active shot', 'Restore the selected shot before creating a contract.')
+                return
+            source_result = await self.run_worker(execute, self.service, 'shot.sources', {'id': shot_id})
+            candidates, documents = [], {}
+            for edge in source_result['items']:
+                if edge['inherited']:
+                    if edge['target_id'] != shot['parent_id']:
+                        continue
+                    scope = 'scene-context'
+                else:
+                    if edge['target_id'] != shot_id:
+                        continue
+                    scope = 'direct-element'
+                node = await self.run_worker(source_record, self.service, 'document_nodes', edge['node_id'], {
+                    'document_id': edge['document_id'], 'version_id': edge['version_id']})
+                if node.get('identity') != 'explicit' or node.get('content_sha256') != edge['content_sha256']:
+                    continue
+                document = documents.get(edge['document_id'])
+                if document is None:
+                    document = await self.run_worker(source_record, self.service, 'documents', edge['document_id'])
+                    documents[edge['document_id']] = document
+                if document.get('kind') != 'screenplay' or document.get('archived'):
+                    continue
+                candidates.append({**edge, 'source_scope': scope, 'document_title': document['title'],
+                                   'identity': node['identity']})
+            if not candidates:
+                await self.message_dialog(
+                    'No exact screenplay links',
+                    'This shot has no active, explicitly identified screenplay visualizes edges to itself or its parent scene. Link an exact source first, then create the contract.',
+                )
+                return
+
+            choices = []
+            by_edge = {}
+            for edge in candidates:
+                by_edge[edge['edge_id']] = edge
+                scope_label = self._observation_scope_label(edge['source_scope'])
+                stale = ' · older exact source version' if edge['stale'] else ''
+                choices.append((edge['edge_id'],
+                                f"{scope_label} · {edge['node_type']} · {edge['title']} · "
+                                f"doc {edge['document_id']} · version {edge['version_id']} · "
+                                f"node {edge['node_id']} · hash {edge['content_sha256']} · edge {edge['edge_id']}{stale}"))
+
+            selected_edges, intents = [], []
+            available = list(choices)
+            while available and len(selected_edges) < 128:
+                selection = await self.choose('Select an existing exact source link or finish',
+                                              [*available, ('finish', 'Finish source selection')], 'finish')
+                if not selection or selection == 'finish':
+                    break
+                edge = by_edge[selection]
+                fields = await self.simple_form('Describe this exact shot source', [
+                    ('purpose', 'Purpose', ''), ('communication', 'How it should read visually', '')],
+                    f"Shot revision captured: {shot['revision']}\n{self._observation_scope_label(edge['source_scope'])} · screenplay node kind {edge['node_type']}\nExact document/version/node/hash/edge: {edge['document_id']} / {edge['version_id']} / {edge['node_id']} / {edge['content_sha256']} / {edge['edge_id']}")
+                if not fields:
+                    return
+                basis = await self.choose('Purpose basis', [
+                    ('direct', 'Directly stated'), ('interpreted', 'Interpreted'), ('unknown', 'Unknown')], 'unknown')
+                if basis is None:
+                    return
+                selected_edges.append(edge)
+                intents.append({
+                    'id': str(uuid.uuid4()), 'source_edge_id': edge['edge_id'],
+                    'source_scope': edge['source_scope'], 'purpose': fields['purpose'],
+                    'communication': fields['communication'], 'basis': basis,
+                })
+                available = [(value, label) for value, label in available if value != selection]
+                if not available:
+                    break
+                more = await self.choose('Add another exact source link?', [
+                    ('yes', 'Choose another source link'), ('no', 'Finish source selection')], 'no')
+                if more != 'yes':
+                    break
+            if len(selected_edges) == 128 and available:
+                self.set_message('This contract has reached the 128 exact source-pin limit.')
+            if not selected_edges:
+                return
+
+            requirements = []
+            while await self.choose('Add a requirement?', [
+                    ('yes', 'Add requirement'), ('no', 'Finish contract')], 'no') == 'yes':
+                priority = await self.choose('Requirement priority', [
+                    ('must', 'Must include'), ('prefer', 'Prefer'), ('unknown', 'Unknown / open question')], 'must')
+                if priority is None:
+                    return
+                basis = await self.choose('Requirement basis', [
+                    ('direct', 'Directly stated'), ('interpreted', 'Interpreted'), ('unknown', 'Unknown')], 'unknown')
+                if basis is None:
+                    return
+                field_name = 'topic' if priority == 'unknown' else 'statement'
+                content = await self.simple_form('State this requirement', [(
+                    field_name, 'Open question topic' if priority == 'unknown' else 'Requirement statement', '')])
+                if not content:
+                    return
+                mapping_choices = [(edge['edge_id'],
+                                    f"{self._observation_scope_label(edge['source_scope'])} · {edge['node_type']} · {edge['title']} · {edge['edge_id']}")
+                                   for edge in selected_edges]
+                mapping = await self.choose('Choose an exact source for this requirement', [
+                    *mapping_choices, ('all', 'All selected source links'), ('none', 'No exact source mapping')], 'none')
+                if mapping is None:
+                    return
+                source_edge_ids = ([edge['edge_id'] for edge in selected_edges] if mapping == 'all'
+                                   else [] if mapping == 'none' else [mapping])
+                requirements.append({
+                    'id': str(uuid.uuid4()), 'priority': priority, 'basis': basis,
+                    'source_edge_ids': source_edge_ids, field_name: content[field_name],
+                })
+
+            body = {
+                'schema': 'storyboarder.observation-contract/v1',
+                'source_pins': [{'edge_id': edge['edge_id'], 'source_scope': edge['source_scope']}
+                                for edge in selected_edges],
+                'script_intents': intents, 'requirements': requirements,
+                'references': [], 'continuity': [], 'notes': '',
+            }
+            self.observation_draft = {
+                'kind': 'create_existing', 'shot_id': shot_id,
+                'expected_shot_revision': shot['revision'], 'contract': body,
+            }
+            await self._apply_observation_draft()
+        except (StoryboardError, OSError) as exc:
+            await self.message_dialog('Could not create the shot contract', str(exc))
 
     def rebuild_rows(self):
         previous = self.selected.id if self.selected else None
@@ -568,7 +810,8 @@ class Desk:
                                     "Choose Show to inspect exact pins, basis, and saved history.\n"
                                     "Validate checks the saved declarations against current source and shot context.")
             else:
-                self.detail.text = 'No observation contracts yet. Choose “Plan shot + contract” to create a shot with exact source links and its first contract version.'
+                self.detail.text = ('No observation contracts yet. Choose “Plan shot + contract” to create a new shot with exact links, '
+                                    'or “Contract for existing shot” to use exact screenplay links already connected to a shot.')
             self.detail.buffer.cursor_position = 0
             return
         if self.page == 'workspace':

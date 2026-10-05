@@ -35,8 +35,16 @@ versions. **Plan shot + contract** captures the selected scene revision, lets th
 choose multiple exact screenplay nodes, and atomically creates one shot, its source links,
 and its first contract. A conflict keeps the complete draft and its exact IDs and pins for
 an explicit retry. Editing one purpose or requirement field preserves every untouched
-row, source pin, reference, continuity note, and note. Rebase is a separate explicit
-review action.
+row, source pin, reference, continuity note, and note. **Contract for existing shot** lets
+the editor choose an active shot, captures its current revision, and builds a first contract
+from that shot’s existing exact screenplay links. It labels direct shot links separately
+from parent-scene context, then collects purpose, communication, and multiple requirements
+with priority and basis labels. A stale shot revision keeps that exact draft for retry.
+Rebase is a separate explicit
+review action: the page shows saved/current basis values and the exact retained edge IDs,
+then asks before saving with its review token. A conflict keeps the draft and pins for a
+fresh review. Source labels distinguish **Direct shot link** from **Scene context** and
+show the screenplay node kind, so a whole-scene context link is not presented as beat coverage.
 
 Source actions use searchable, paginated document, draft, element, provenance and note
 pickers. Selecting a mutable source record supplies its current revision automatically.

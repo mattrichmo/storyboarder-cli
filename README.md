@@ -231,7 +231,7 @@ with a conflict instead of overwriting newer work. See the
 ## Command map
 
 Every group and subcommand has `--help`. The
-[full CLI reference](docs/CLI.md#command-catalog) documents all **100 shared application
+[full CLI reference](docs/CLI.md#command-catalog) documents all **108 shared application
 commands**, including their flags, choices, defaults, and required fields, plus lifecycle commands.
 
 | Area | Commands to reach for |

@@ -1,7 +1,7 @@
 # CLI reference
 
 `storyboarder` is the installed command. This reference includes lifecycle commands
-and all **100 commands** in the shared application catalog. The flag tables are
+and all **108 commands** in the shared application catalog. The flag tables are
 generated from that catalog. Run `storyboarder --help`, `storyboarder GROUP --help`,
 or `storyboarder GROUP ACTION --help` for the commands in your installed checkout.
 
@@ -108,6 +108,13 @@ source-edge references per call. Both commands are JSON/API-safe and remain agen
 (`browser=false`). Contract-specific 404 and 409 errors use the same CLI exit mapping as
 their HTTP status: missing contract exits 2; already-exists, stale-revision, and reviewed
 basis-token conflicts exit 3. Other contract validation failures keep the legacy exit 1.
+
+`observation.rebase-preview` accepts `contract_id` and the complete proposed `contract`
+body. It is read-only and returns saved/current basis values, exact requested pins, and an
+opaque `expected_basis_sha256` rebase-review token. Pass that exact token with the same
+body and header `revision` to `observation.rebase`. If the reviewed basis or contract
+revision changes before the write, the command returns a 409 contract conflict (CLI exit
+3); preview again before retrying. Both commands are JSON/API-safe and agent-only.
 
 ## Command catalog
 
