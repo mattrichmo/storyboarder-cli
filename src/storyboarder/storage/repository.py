@@ -12,8 +12,15 @@ from storyboarder import SCHEMA_VERSION
 from storyboarder.domain.models import now, dumps
 from storyboarder.domain.errors import Conflict, NotFound, StoryboardError
 
-JSON_COLUMNS = {"fields", "tags", "positions", "settings", "request", "result", "provenance", "details"}
+JSON_COLUMNS = {"fields", "tags", "positions", "settings", "request", "result", "provenance", "details",
+                "contract_json", "basis_json", "snapshot_json", "source_snapshot",
+                "edge_source_snapshot", "edge_target_snapshot"}
 TABLES = {"entities", "media", "intake", "asset_media", "links", "assignments", "context_blocks", "frames", "layouts", "jobs", "events"}
+# Observation versions, exact pins, and references are read through their
+# bounded domain queries. Their immutable history is intentionally absent from
+# generic state snapshots used by the browser and TUI.
+OBSERVATION_HISTORY_TABLES = {"observation_contract_versions", "observation_source_pins", "observation_reference_pins"}
+SNAPSHOT_TABLES = TABLES - {"events"}
 
 
 def unpack(row):
@@ -69,6 +76,7 @@ class Repository:
     def connect(self):
         conn = sqlite3.connect(self.path, timeout=10, isolation_level=None)
         conn.row_factory = sqlite3.Row
+        conn.create_function("observation_restore_authorized", 0, lambda: 0)
         conn.execute("PRAGMA foreign_keys=ON")
         conn.execute("PRAGMA busy_timeout=10000")
         return conn
@@ -91,6 +99,21 @@ class Repository:
             raise
         finally:
             conn.close()
+
+    @contextmanager
+    def observation_restore_transaction(self):
+        """Open the internal, transaction-scoped gate for exact history restore.
+
+        This is a database adapter for a future importer, not a user command.
+        Its connection-local authorization is reset before commit/rollback and
+        cannot survive the connection that owns the write transaction.
+        """
+        with self.transaction() as conn:
+            conn.create_function("observation_restore_authorized", 0, lambda: 1)
+            try:
+                yield conn
+            finally:
+                conn.create_function("observation_restore_authorized", 0, lambda: 0)
 
     @contextmanager
     def readonly_transaction(self):
@@ -347,7 +370,7 @@ class Repository:
     def snapshot(self):
         with self.transaction(False) as conn:
             result = {}
-            for table in sorted(TABLES - {"events"}):
+            for table in sorted(SNAPSHOT_TABLES):
                 result[table] = [unpack(r) for r in conn.execute(f"SELECT * FROM {table} ORDER BY id")]
             tags, aliases = {}, {}
             for row in conn.execute("SELECT * FROM entity_tags ORDER BY tag"):

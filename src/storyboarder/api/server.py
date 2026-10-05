@@ -126,7 +126,11 @@ def create_app(project=None, workspace=None, port=7430):
 
     @app.get("/api/v1/meta")
     def metadata():
-        return {"commands": [c.public() for c in COMMANDS.values() if c.browser], "entity_fields": {k: m.model_json_schema() for k, m in FIELD_MODELS.items()}, "formats": sorted(FORMATS), "max_file_bytes": MAX_FILE_BYTES, "scripts": [{k: r[k] for k in ("name", "description", "timeout", "env_keys")} for r in ScriptRegistry().list()]}
+        return {"commands": [c.public() for c in COMMANDS.values() if c.browser],
+                "api_commands": [c.public() for c in COMMANDS.values() if c.api_safe],
+                "entity_fields": {k: m.model_json_schema() for k, m in FIELD_MODELS.items()},
+                "formats": sorted(FORMATS), "max_file_bytes": MAX_FILE_BYTES,
+                "scripts": [{k: r[k] for k in ("name", "description", "timeout", "env_keys")} for r in ScriptRegistry().list()]}
 
     @app.get("/api/v1/projects")
     def projects():
@@ -175,7 +179,7 @@ def create_app(project=None, workspace=None, port=7430):
 
     @app.post("/api/v1/projects/{project_id}/commands/{name}")
     def command(project_id: str, name: str, payload: dict):
-        return execute(launch.service(project_id), name, payload, browser=True)
+        return execute(launch.service(project_id), name, payload, api=True)
 
     def choice_field(name, field_name, values):
         from storyboarder.commands.core import _PAGED_SOURCES

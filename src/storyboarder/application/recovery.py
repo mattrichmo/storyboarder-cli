@@ -116,6 +116,16 @@ def doctor(service, hashes=False):
     integrity, foreign_keys, version, migrations, database_opened = _sqlite_health(service, issues)
     from .document_recovery import document_health
     issues.extend(document_health(service, hashes))
+    # Contract history has a dedicated, read-only integrity walk. It is not
+    # included in Repository.snapshot(), which remains a compact client view.
+    if database_opened and version == SCHEMA_VERSION:
+        try:
+            from .observation_contracts import ObservationContracts
+            issues.extend(ObservationContracts(service).integrity_issues())
+        except Exception as exc:
+            issues.append({"severity": "error", "code": "observation_contract_integrity_check",
+                           "message": "Observation contract history could not be checked safely. Preserve the project folder and inspect a verified backup.",
+                           "details": {"error_type": type(exc).__name__}})
     known = set()
 
     snapshot = None

@@ -35,10 +35,11 @@ class Command:
     page: str = ""
     destructive: bool = False
     browser: bool = True
+    api_safe: bool = True
     read_only: bool = False
 
     def public(self):
-        return {"name": self.name, "label": self.label, "fields": [asdict(f) for f in self.fields], "page": self.page, "destructive": self.destructive, "browser": self.browser, "read_only": self.read_only}
+        return {"name": self.name, "label": self.label, "fields": [asdict(f) for f in self.fields], "page": self.page, "destructive": self.destructive, "browser": self.browser, "api_safe": self.api_safe, "read_only": self.read_only}
 
 COMMANDS: dict[str, Command] = {}
 
@@ -64,6 +65,10 @@ def F(name, label=None, type="text", required=False, options=(), source="", help
     return InputField(name, label or name.replace("_", " ").title(), type, required, list(options), source, help, default)
 
 def register(name, label, fields, handler, **kwargs):
+    # Browser-visible actions remain API-safe by default. CLI-only path and
+    # filesystem actions stay excluded unless a JSON-safe handler opts in.
+    if "api_safe" not in kwargs:
+        kwargs["api_safe"] = kwargs.get("browser", True)
     COMMANDS[name] = Command(name, label, fields, handler, **kwargs)
 
 def record_id(source="entities", name="id", label=None):
@@ -110,12 +115,14 @@ def update_handler(kind):
         return s.update_entity(p["id"], p["revision"], changes)
     return handler
 
-def execute(service, name, payload=None, browser=False):
+def execute(service, name, payload=None, browser=False, api=False):
     if name not in COMMANDS:
         raise StoryboardError("That action is no longer available. Refresh the project and try again.")
     command = COMMANDS[name]
     if browser and not command.browser:
         raise StoryboardError("This file or folder action is available from the command line or TUI. In the app, use image upload instead.")
+    if api and not command.api_safe:
+        raise StoryboardError("This action is not available through the JSON API.")
     payload = payload or {}
     if not isinstance(payload, dict):
         raise StoryboardError("The action could not be completed. Refresh the project and try again.")
