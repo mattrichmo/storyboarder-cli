@@ -233,6 +233,88 @@ def test_existing_valid_preupgrade_backup_is_never_replaced(tmp_path, monkeypatc
         assert conn.execute('PRAGMA quick_check').fetchone()[0] == 'ok'
 
 
+def test_foreign_preupgrade_backup_is_preserved_and_blocks_upgrade(tmp_path, monkeypatch):
+    import storyboarder.storage.repository as repository
+
+    with monkeypatch.context() as legacy:
+        legacy.setattr(repository, 'SCHEMA_VERSION', SCHEMA_VERSION - 1)
+        project = Project.create(tmp_path / 'current-project', 'Current project')
+        foreign = Project.create(tmp_path / 'foreign-project', 'Different project')
+
+    backup_path = Path(str(project.repo.path) + f'.before-v{SCHEMA_VERSION}.bak')
+    shutil.copy2(foreign.repo.path, backup_path)
+    original_database = project.repo.path.read_bytes()
+    original_backup = backup_path.read_bytes()
+
+    with pytest.raises(StoryboardError, match='different or invalid project identity'):
+        Project(project.root)
+
+    assert project.repo.path.read_bytes() == original_database
+    assert backup_path.read_bytes() == original_backup
+    with sqlite3.connect(project.repo.path) as conn:
+        assert conn.execute('PRAGMA user_version').fetchone()[0] == SCHEMA_VERSION - 1
+
+
+def test_preupgrade_backup_newer_than_current_database_blocks_upgrade(tmp_path, monkeypatch):
+    import storyboarder.storage.repository as repository
+
+    with monkeypatch.context() as legacy:
+        legacy.setattr(repository, 'SCHEMA_VERSION', SCHEMA_VERSION - 2)
+        project = Project.create(tmp_path / 'current-project', 'Current project')
+    future_root = tmp_path / 'future-copy'
+    shutil.copytree(project.root, future_root)
+    with monkeypatch.context() as newer:
+        newer.setattr(repository, 'SCHEMA_VERSION', SCHEMA_VERSION - 1)
+        future = Project(future_root)
+
+    backup_path = Path(str(project.repo.path) + f'.before-v{SCHEMA_VERSION}.bak')
+    shutil.copy2(future.repo.path, backup_path)
+    original_database = project.repo.path.read_bytes()
+    original_backup = backup_path.read_bytes()
+
+    with pytest.raises(StoryboardError, match='newer than this project database'):
+        Project(project.root)
+
+    assert project.repo.path.read_bytes() == original_database
+    assert backup_path.read_bytes() == original_backup
+    with sqlite3.connect(project.repo.path) as conn:
+        assert conn.execute('PRAGMA user_version').fetchone()[0] == SCHEMA_VERSION - 2
+
+
+def test_interrupted_upgrade_retry_keeps_older_same_project_backup(tmp_path, monkeypatch):
+    import storyboarder.storage.repository as repository
+
+    with monkeypatch.context() as legacy:
+        legacy.setattr(repository, 'SCHEMA_VERSION', SCHEMA_VERSION - 2)
+        project = Project.create(tmp_path / 'interrupted-upgrade', 'Interrupted upgrade')
+    marker = Service(project).create_entity('asset', 'Kept through retry', tags=['preserved'])
+    backup_path = Path(str(project.repo.path) + f'.before-v{SCHEMA_VERSION}.bak')
+    shutil.copy2(project.repo.path, backup_path)
+    original_backup = backup_path.read_bytes()
+    migration = next(Path(repository.__file__).with_name('migrations').glob(f'{SCHEMA_VERSION:03d}_*.sql'))
+    interrupted_migration = migration.read_bytes().decode('utf-8')
+    real_statements = repository.sql_statements
+
+    def interrupt_final_migration(script):
+        if script == interrupted_migration:
+            raise sqlite3.OperationalError('simulated interruption after earlier migrations committed')
+        yield from real_statements(script)
+
+    with monkeypatch.context() as interruption:
+        interruption.setattr(repository, 'sql_statements', interrupt_final_migration)
+        with pytest.raises(StoryboardError, match='migration failed'):
+            Project(project.root)
+
+    with sqlite3.connect(project.repo.path) as conn:
+        assert conn.execute('PRAGMA user_version').fetchone()[0] == SCHEMA_VERSION - 1
+    with sqlite3.connect(backup_path) as conn:
+        assert conn.execute('PRAGMA user_version').fetchone()[0] == SCHEMA_VERSION - 2
+
+    reopened = Project(project.root)
+    assert Service(reopened).get('entities', marker['id'])['tags'] == ['preserved']
+    assert backup_path.read_bytes() == original_backup
+
+
 def test_preupgrade_backup_uses_exclusive_copy_when_hard_links_are_unsupported(tmp_path, monkeypatch):
     import storyboarder.storage.repository as repository
 

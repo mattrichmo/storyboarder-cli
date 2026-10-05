@@ -114,8 +114,14 @@ class Repository:
             conn.close()
 
     @staticmethod
-    def _verify_preupgrade_backup(backup_path, target_version, migrations):
-        """Accept only an intact, internally consistent older Storyboarder backup."""
+    def _verify_preupgrade_backup(backup_path, expected_version, target_version, expected_project_id, migrations):
+        """Accept only this project's intact backup at or before the current schema.
+
+        An older same-project backup is valid after a partially completed upgrade:
+        earlier numbered migrations commit separately, while this backup remains
+        the original recovery point for the target release. A foreign or newer
+        backup must stop migration and remain untouched.
+        """
         if backup_path.is_symlink() or not backup_path.is_file():
             raise StoryboardError("A pre-upgrade backup path already exists but is not a regular file; preserve it and inspect it before upgrading.")
         try:
@@ -123,11 +129,18 @@ class Repository:
                 version = check.execute("PRAGMA user_version").fetchone()[0]
                 if version < 1 or version >= target_version:
                     raise StoryboardError("The existing pre-upgrade backup is not an older supported schema; it was preserved and migration stopped.")
+                if version > expected_version:
+                    raise StoryboardError("The existing pre-upgrade backup is newer than this project database; it was preserved and migration stopped.")
                 if check.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                     raise StoryboardError("The existing pre-upgrade backup failed SQLite integrity checks; it was preserved and migration stopped.")
                 tables = {row[0] for row in check.execute("SELECT name FROM sqlite_master WHERE type='table'")}
                 if "schema_migrations" not in tables:
                     raise StoryboardError("The existing pre-upgrade backup has no migration ledger; it was preserved and migration stopped.")
+                if "entities" not in tables:
+                    raise StoryboardError("The existing pre-upgrade backup has no project identity; it was preserved and migration stopped.")
+                project_ids = [row[0] for row in check.execute("SELECT id FROM entities WHERE kind='project' ORDER BY id")]
+                if project_ids != [expected_project_id]:
+                    raise StoryboardError("The existing pre-upgrade backup belongs to a different or invalid project identity; it was preserved and migration stopped.")
                 applied = [row[0] for row in check.execute("SELECT version FROM schema_migrations ORDER BY version")]
                 if applied != list(range(1, version + 1)):
                     raise StoryboardError("The existing pre-upgrade backup has an incomplete migration ledger; it was preserved and migration stopped.")
@@ -146,8 +159,15 @@ class Repository:
     @classmethod
     def _create_preupgrade_backup(cls, conn, backup_path, expected_version, target_version, migrations):
         """Install a consistent backup without ever replacing an existing one."""
+        current_version = conn.execute("PRAGMA user_version").fetchone()[0]
+        if current_version != expected_version:
+            raise StoryboardError("The project database changed before its pre-upgrade backup could be checked; migration stopped.")
+        project_ids = [row[0] for row in conn.execute("SELECT id FROM entities WHERE kind='project' ORDER BY id")]
+        if len(project_ids) != 1:
+            raise StoryboardError("The project database has no unique project identity; preserve it and repair or restore it before upgrading.")
+        expected_project_id = project_ids[0]
         if backup_path.exists() or backup_path.is_symlink():
-            cls._verify_preupgrade_backup(backup_path, target_version, migrations)
+            cls._verify_preupgrade_backup(backup_path, expected_version, target_version, expected_project_id, migrations)
             return
         fd, temporary = tempfile.mkstemp(prefix=f".{backup_path.name}.", suffix=".tmp", dir=backup_path.parent)
         os.close(fd)
@@ -160,7 +180,7 @@ class Repository:
                 os.link(temporary, backup_path)
                 created = True
             except FileExistsError:
-                cls._verify_preupgrade_backup(backup_path, target_version, migrations)
+                cls._verify_preupgrade_backup(backup_path, expected_version, target_version, expected_project_id, migrations)
                 return
             except OSError:
                 # Some filesystems (including FAT variants) do not support hard
@@ -169,7 +189,7 @@ class Repository:
                 try:
                     descriptor = os.open(backup_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 except FileExistsError:
-                    cls._verify_preupgrade_backup(backup_path, target_version, migrations)
+                    cls._verify_preupgrade_backup(backup_path, expected_version, target_version, expected_project_id, migrations)
                     return
                 except OSError as create_error:
                     raise StoryboardError(
@@ -199,7 +219,7 @@ class Repository:
                         ) from copy_error
                     raise
             try:
-                found_version = cls._verify_preupgrade_backup(backup_path, target_version, migrations)
+                found_version = cls._verify_preupgrade_backup(backup_path, expected_version, target_version, expected_project_id, migrations)
                 if found_version != expected_version:
                     raise StoryboardError("The newly created pre-upgrade backup has an unexpected schema version.")
             except Exception:
