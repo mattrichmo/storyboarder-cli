@@ -26,15 +26,20 @@
 
 <p align="center"><em>The story flow canvas, using the included fictional Winter Station demo.</em></p>
 
-Storyboarder helps filmmakers, storyboard artists, and small production teams organize
-visual planning in a project folder they own. Build a sequence → scene → shot outline,
-collect character and location references, compare storyboard images, and export boards
-and production handoffs.
+Storyboarder is a local storyboard planning desk for filmmakers, storyboard artists, and
+small production teams. Organize sequences into scenes, then plan multiple shots and
+angles in each scene. Collect character, location, prop, and other references; record
+framing and camera intent; compare storyboard images; and export boards and production
+handoffs. Each project lives in a folder you choose. A shot can link to source elements
+in an imported screenplay. Source links and production provenance are available through
+the CLI and local API as preview workflows. Storyboarder records intent and connections;
+it does not solve camera moves, render a film, or integrate with Blender.
 
-Work in the **browser**, a **full-screen terminal desk**, or the **CLI**. The original
-authoring workflows share the same application services and project database across all
-three. After installation, core authoring and exports work offline. There is no account,
-subscription, or required generation provider.
+People use the **browser** for visual planning and the **full-screen terminal desk** for
+keyboard authoring. The **CLI** supports repeatable work by scripts and agents with
+structured JSON output. All three work with the same project data. After installation,
+core authoring and exports work offline. There is no account, subscription, or bundled
+image-generation provider.
 
 ## What you can do
 
@@ -82,7 +87,7 @@ python -m pip install .
 
 storyboarder workspace init ./stories
 storyboarder project create --workspace ./stories --slug my-film --title "My Film"
-storyboarder ui --workspace ./stories
+storyboarder ui --project ./stories/projects/my-film
 ```
 
 <details>
@@ -94,13 +99,17 @@ py -3 -m venv .venv
 
 .\.venv\Scripts\storyboarder.exe workspace init .\stories
 .\.venv\Scripts\storyboarder.exe project create --workspace .\stories --slug my-film --title "My Film"
-.\.venv\Scripts\storyboarder.exe ui --workspace .\stories
+.\.venv\Scripts\storyboarder.exe ui --project .\stories\projects\my-film
 ```
 
 Use `.\.venv\Scripts\storyboarder.exe` in place of `storyboarder` in the examples
 below, or activate the virtual environment with `.\.venv\Scripts\Activate.ps1`.
 
 </details>
+
+The CLI walkthrough below uses POSIX shell syntax. On Windows, run it in Git Bash after
+activating the virtual environment, or adapt the variable and pipeline syntax for
+PowerShell.
 
 Open **http://127.0.0.1:7430** if your browser does not launch automatically.
 Keep the terminal running; **Ctrl+C** stops the server. Add `--port 7431` to use
@@ -128,9 +137,9 @@ the script refuses to overwrite an existing project. Its generated panels are de
 
 | Interface | Start it | Best for |
 |---|---|---|
-| Browser | `storyboarder ui --workspace ./stories` | Visual planning, reference review, canvas arrangement, and frame comparison. |
-| Terminal | `storyboarder tui --workspace ./stories` | Authoring and reviewing a project from a full-screen terminal. |
-| CLI | `storyboarder --project ./stories/projects/my-film shot list` | Repeatable operations, shell workflows, and integrations. |
+| Browser | `storyboarder ui --project ./stories/projects/my-film` | Visual planning, reference review, canvas arrangement, and frame comparison for people. |
+| Terminal | `storyboarder tui --project ./stories/projects/my-film` | Full-screen authoring and project review for people. |
+| CLI | `storyboarder --project ./stories/projects/my-film shot list --json` | Repeatable commands for scripts and agents, with structured output. |
 
 A standalone project works too: create it with
 `storyboarder project create ./stories/standalone --title "My Film"`, then open it
@@ -144,25 +153,47 @@ Commands discover a project from its folder or descendants. Use `--project/-p PA
 to select one explicitly, or `--workspace/-w PATH` to use a workspace's current project.
 These options, `--json`, `--jsonl`, and `--no-color` work before or after command groups.
 
-### Build a scene and its first shot
+### Build a scene with three shots
 
-After the quick start, enter the project folder. Commands that create records return
-an `id`; replace `SEQUENCE_ID` and `SCENE_ID` below with those returned values.
+After the quick start, run this from the repository folder. It creates one sequence,
+one scene, and three shots with distinct angles; the shell captures each returned ID so
+the commands can run in order without editing placeholders. If you chose a different
+workspace or project slug in the quick start, update `PROJECT` below to that project folder.
 
 ```sh
-cd stories/projects/my-film
+set -eu
+PROJECT=./stories/projects/my-film
 
-storyboarder sequence create --title "The last morning" --json
-storyboarder scene create --parent-id "SEQUENCE_ID" --title "Before the first arrival" --json
-storyboarder shot create --parent-id "SCENE_ID" --title "The platform waits" \
-  --number "01" --framing "Locked wide" --duration 12 \
-  --action "Mara enters from frame left." --camera "Hold before she enters." --json
+id_from_json() {
+  python3 -c 'import json, sys; print(json.load(sys.stdin)["id"])'
+}
 
-storyboarder shot list --json
+SEQUENCE_ID=$(storyboarder --project "$PROJECT" sequence create \
+  --title "Arrival" --json | id_from_json)
+SCENE_ID=$(storyboarder --project "$PROJECT" scene create \
+  --parent-id "$SEQUENCE_ID" --title "The station wakes" --json | id_from_json)
+SHOT_ONE_ID=$(storyboarder --project "$PROJECT" shot create \
+  --parent-id "$SCENE_ID" --title "Empty platform" --number "01" \
+  --framing "Extreme wide" --camera "Locked off" --duration 8 \
+  --action "The first train is due in minutes." --json | id_from_json)
+SHOT_TWO_ID=$(storyboarder --project "$PROJECT" shot create \
+  --parent-id "$SCENE_ID" --title "Mara arrives" --number "02" \
+  --framing "Medium profile" --camera "Slow lateral track" --duration 6 \
+  --action "Mara crosses the platform toward the signal box." --json | id_from_json)
+SHOT_THREE_ID=$(storyboarder --project "$PROJECT" shot create \
+  --parent-id "$SCENE_ID" --title "Signal detail" --number "03" \
+  --framing "Close-up" --camera "Gentle push in" --duration 4 \
+  --action "The signal changes from red to green." --json | id_from_json)
+
+storyboarder --project "$PROJECT" shot list --parent-id "$SCENE_ID" --json
+storyboarder --project "$PROJECT" shot show --id "$SHOT_ONE_ID" --json
+storyboarder --project "$PROJECT" doctor --hashes --json
+storyboarder --project "$PROJECT" export board --owner-id "$SCENE_ID" --format html --json
 ```
 
-Keep the returned `SHOT_ID` for the frame and provenance examples. Each command's
-`--help` describes its flags:
+The list returns all three shots. The `show` command reads the first shot, `doctor`
+checks project health, and the HTML export writes a board under the project's
+`exports/boards` folder. Each command's `--help` describes its flags:
 
 ```sh
 storyboarder --help
@@ -172,20 +203,24 @@ storyboarder document --help
 
 ### Bring in references and storyboard images
 
-Run these from the project folder. Substitute your reference directory, image path,
-and the shot ID created above.
+Continue in the same shell as the previous walkthrough. The shell variables `$PROJECT`
+and `$SHOT_ONE_ID` name that project and the first generated shot. Replace the two input
+paths below with an existing reference folder and an image file you want to add.
 
 ```sh
+REFERENCE_DIR="/path/to/references"
+FRAME_PATH="/path/to/frame.png"
+
 # Import still images into the intake queue for review.
-storyboarder import /path/to/references --recursive --json
-storyboarder intake list --state pending --json
+storyboarder --project "$PROJECT" import "$REFERENCE_DIR" --recursive --json
+storyboarder --project "$PROJECT" intake list --state pending --json
 
 # Create a library item, or accept imported images into one through intake accept.
-storyboarder asset create --title "Mara" --type character --tags "winter,caretaker" --json
+storyboarder --project "$PROJECT" asset create --title "Mara" --type character --tags "winter,caretaker" --json
 
 # Add a storyboard candidate to a specific shot.
-storyboarder frame add --shot-id "SHOT_ID" --path /path/to/frame.png --json
-storyboarder frame list --shot-id "SHOT_ID" --json
+storyboarder --project "$PROJECT" frame add --shot-id "$SHOT_ONE_ID" --path "$FRAME_PATH" --json
+storyboarder --project "$PROJECT" frame list --shot-id "$SHOT_ONE_ID" --json
 ```
 
 Imported references and storyboard candidates have separate roles. Review intake with
@@ -195,14 +230,13 @@ an exact reference image to a shot. Use `frame state --id FRAME_ID --revision RE
 
 ### Export, check, and back up
 
-`SCENE_ID` can also be a project, sequence, or shot ID for composition and export commands.
+Continue in the same shell as the walkthrough so `$PROJECT` and `$SCENE_ID` are set.
+The HTML export reports the board path. `backup` writes an archive into the project.
 
 ```sh
-storyboarder compose "SCENE_ID" --json
-storyboarder export board --owner-id "SCENE_ID" --format pdf --json
-storyboarder export bundle --owner-id "SCENE_ID" --include-media --json
-storyboarder doctor --hashes --json
-storyboarder backup --json
+storyboarder --project "$PROJECT" doctor --hashes --json
+storyboarder --project "$PROJECT" export board --owner-id "$SCENE_ID" --format html --json
+storyboarder --project "$PROJECT" backup --json
 ```
 
 Export and backup results include their output paths. Restore a backup into a **new**
@@ -255,7 +289,8 @@ editorial timelines as separate documents. Imports preserve original bytes and h
 creative revisions create immutable versions. Explicit links connect source elements
 to storyboard shots and frames, and can connect those results to editorial clips.
 
-From a project folder, using your own supported source files:
+From a project folder, using your own supported source files. Replace uppercase ID
+placeholders with values returned by the preceding import, tree, and shot commands:
 
 ```sh
 # Validate without creating a document, then import a screenplay draft.
@@ -277,9 +312,11 @@ storyboarder coverage report --json
 storyboarder document export --document-id "DOCUMENT_ID" --json
 ```
 
-Source-node IDs identify elements in a particular immutable draft. Existing links stay
-pinned when a new draft arrives; `document diff` and `provenance impact` help review
-what changed. Coverage reports describe explicit links, rather than infer missing footage.
+Source-node IDs identify elements in a particular immutable draft. A link records an
+explicit relationship; it does not by itself assert that the shot semantically covers a
+story beat. Existing links stay pinned when a new draft arrives; `document diff` and
+`provenance impact` help review what changed. Coverage reports describe explicit links,
+rather than infer missing footage.
 OTIO imports preserve media references without fetching or playing the referenced media.
 
 Dedicated source-document workspaces and visual draft comparison remain unfinished; the
