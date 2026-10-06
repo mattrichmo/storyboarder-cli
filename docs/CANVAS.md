@@ -46,9 +46,18 @@ visual proximity or a drag never changes narrative order.
 
 Save a name for each view. Positions, hidden/collapsed IDs, filters and viewport are
 stored independently from story records with their own revision. Tidy is deterministic
-and does not rewrite canonical order. Save before leaving a page; unsaved arrangements
-are temporary. Switching canvas modes/loading another layout warns before replacing
-unsaved positions. Closing the browser warns while a layout is dirty.
+and does not rewrite canonical order. App keeps a separate presentation draft per project
+for the open session. Page/hash/history navigation and project switching retain positions,
+filters, viewport, layout identity, revision baseline, and conflict-review choices without
+saving canonical records. Save arrangement persists the draft across app sessions.
+Closing or reloading warns if any project has a dirty draft, including inactive projects.
+
+Switching Canvas modes or loading another saved arrangement replaces the current draft
+and therefore offers Save and continue / Discard changes / Stay. An in-flight save also
+blocks page navigation until it settles; Discard is disabled during that request. Changes
+made during a save remain dirty. Revision conflicts retain the exact baseline and require
+comparison and explicit choices for overlapping fields before a CAS retry. Navigation
+does not reset that lock or overwrite a newer saved layout.
 
 Delete/Backspace opens usage review. **Hide** changes this layout only. **Archive**
 changes the record's lifecycle across all interfaces. **Delete** is available only

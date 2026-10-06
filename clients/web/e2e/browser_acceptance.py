@@ -392,6 +392,12 @@ async def exercise_authoring(page,report,output,url):
         await source.focus();await source.press('ArrowRight')
         edited_during_save=await source.evaluate("el=>el.style.transform")
         assert edited_during_save!=first_snapshot_position
+        await page.get_by_role('button',name='Story outline',exact=True).click()
+        pending_save=page.get_by_role('dialog',name='Unsaved canvas arrangement')
+        await pending_save.wait_for()
+        assert await pending_save.get_by_role('button',name='Discard changes',exact=True).is_disabled()
+        await pending_save.get_by_role('button',name='Stay',exact=True).click()
+        assert await source.evaluate('el=>el.style.transform')==edited_during_save
         await page.evaluate('window.__canvasSaveMetrics.delay=false;window.__canvasSaveMetrics.release()')
         await page.get_by_role('button',name='Save arrangement',exact=True).wait_for()
         await page.locator('.canvas-layout-bar').get_by_text('Unsaved changes',exact=True).wait_for()
@@ -523,73 +529,51 @@ async def exercise_authoring(page,report,output,url):
         await source.focus();await source.press('ArrowRight')
         post_recovery_transform=await source.evaluate("el=>el.style.transform")
         await page.get_by_role('button',name='Story outline',exact=True).click()
-        navigation=page.get_by_role('dialog',name='Unsaved canvas arrangement')
-        await navigation.wait_for()
-        assert await source.evaluate("el=>el.style.transform")==post_recovery_transform
-        await navigation.get_by_role('button',name='Stay',exact=True).click()
-        await navigation.wait_for(state='hidden')
-        assert await page.get_by_role('heading',name='Canvas',exact=True).count()==1
-        assert await source.evaluate("el=>el.style.transform")==post_recovery_transform
-        report['checks'].append('Stay closes the navigation prompt while keeping the edited card geometry in Canvas.')
-        await page.get_by_role('button',name='Story outline',exact=True).click()
-        navigation=page.get_by_role('dialog',name='Unsaved canvas arrangement')
-        await navigation.get_by_role('button',name='Discard changes',exact=True).click()
         await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
-        await page.get_by_role('button',name='Story canvas',exact=True).click()
-        await page.wait_for_selector('.graph-node')
-        await page.get_by_role('button',name='Story outline',exact=True).click()
         assert await page.get_by_role('dialog',name='Unsaved canvas arrangement').count()==0
-        await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
-        report['checks'].append('Discard leaves Canvas; clean Canvas navigation proceeds without a prompt.')
         await page.get_by_role('button',name='Story canvas',exact=True).click()
-        await page.wait_for_selector('.graph-node')
-        history_node=page.locator('.graph-node').first
-        await history_node.focus();await history_node.press('ArrowRight')
-        history_transform=await history_node.evaluate('el=>el.style.transform')
+        await source.wait_for()
+        assert await source.evaluate("el=>el.style.transform")==post_recovery_transform
+        report['checks'].append('Dirty page navigation retains geometry without a replacement prompt or canonical save.')
         await page.evaluate('history.back()')
-        history_prompt=page.get_by_role('dialog',name='Unsaved canvas arrangement')
-        await history_prompt.wait_for()
-        assert await page.evaluate('location.hash')=='#canvas'
-        assert await history_node.evaluate('el=>el.style.transform')==history_transform
-        await history_prompt.get_by_role('button',name='Stay',exact=True).click()
-        assert await history_node.evaluate('el=>el.style.transform')==history_transform
-        await page.get_by_role('button',name='Story outline',exact=True).click()
-        await page.get_by_role('dialog',name='Unsaved canvas arrangement').get_by_role('button',name='Discard changes',exact=True).click()
-        await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
-        report['checks'].append('Browser Back to a different hash is blocked while dirty, restores the Canvas URL, and preserves geometry through Stay.')
-        await page.get_by_role('button',name='Story canvas',exact=True).click()
-        await page.get_by_role('button',name='Reference map',exact=True).click()
-        await page.wait_for_selector(f'[data-node-id="{asset["id"]}"]')
+        await page.locator('.canvas-page').wait_for(state='detached')
+        await page.evaluate('history.forward()')
+        await source.wait_for()
+        assert await source.evaluate("el=>el.style.transform")==post_recovery_transform
+        report['checks'].append('Browser Back and Forward preserve the same dirty draft.')
+        await page.get_by_role('button',name='Save arrangement',exact=True).click()
+        await page.locator('.canvas-layout-bar').get_by_text('Unsaved changes',exact=True).wait_for(state='hidden')
+
         nav_layout_name='Acceptance navigation layout '+stamp
-        await page.get_by_label('Saved arrangement',exact=True).select_option(label='Acceptance layout '+stamp)
-        await page.get_by_label('Arrangement name',exact=True).fill(nav_layout_name)
         await page.get_by_role('button',name='Save as new',exact=True).click()
-        nav_layout_name=await page.get_by_label('Arrangement name',exact=True).input_value()
+        await page.get_by_label('Arrangement name',exact=True).fill(nav_layout_name)
         await page.get_by_role('button',name='Save arrangement',exact=True).click()
         await wait_for_page_state(page,f"Array.from(document.querySelectorAll('.canvas-layout-bar select option')).some(option=>option.textContent==={json.dumps(nav_layout_name)})","the explicit navigation layout copy to save")
         nav_node=page.locator(f'[data-node-id="{asset["id"]}"]')
         await nav_node.focus();await nav_node.press('ArrowRight')
         nav_transform=await nav_node.evaluate("el=>el.style.transform")
-        await page.get_by_role('button',name='Story outline',exact=True).click()
-        navigation=page.get_by_role('dialog',name='Unsaved canvas arrangement')
-        await navigation.wait_for()
         nav_base=next(l for l in (await state())['layouts'] if l['name']==nav_layout_name)
         nav_external=await verify.post(f'/api/v1/projects/{pid}/commands/canvas.save',headers={'X-Storyboarder-Token':session['token']},json={'name':nav_layout_name,'mode':'assets','positions':nav_base['positions'],'settings':nav_base['settings'],'layout_id':nav_base['id'],'revision':nav_base['revision']})
         assert nav_external.status_code==200,nav_external.text
-        await navigation.get_by_role('button',name='Save and continue',exact=True).click()
-        await navigation.get_by_role('alert').filter(has_text='changed elsewhere').wait_for()
-        await navigation.get_by_role('button',name='Refresh latest saved revision',exact=True).click()
-        nav_review=navigation.locator('.layout-conflict-review')
-        await nav_review.get_by_text('These edits do not overlap and will be merged automatically.',exact=True).wait_for()
-        await nav_review.get_by_role('button',name='Reapply merged arrangement',exact=True).click()
+        await page.get_by_role('button',name='Save arrangement',exact=True).click()
+        await page.get_by_role('alert').filter(has_text='changed elsewhere').wait_for()
+        await page.get_by_role('button',name='Story outline',exact=True).click()
         await page.get_by_role('heading',name='Build the story, scene by scene.',exact=True).wait_for()
+        await page.get_by_role('button',name='Story canvas',exact=True).click()
+        await nav_node.wait_for()
+        assert await nav_node.evaluate("el=>el.style.transform")==nav_transform
+        assert await page.get_by_role('button',name='Save arrangement',exact=True).is_disabled()
+        await page.get_by_role('button',name='Refresh latest saved revision',exact=True).click()
+        nav_review=page.locator('.layout-conflict-review')
+        await nav_review.get_by_role('button',name='Reapply merged arrangement',exact=True).click()
+        await page.locator('.canvas-layout-bar').get_by_text('Unsaved changes',exact=True).wait_for(state='hidden')
         nav_layout=next(l for l in (await state())['layouts'] if l['name']==nav_layout_name)
         assert nav_layout['revision']==nav_base['revision']+2
         nav_xy=[float(part) for part in re.search(r'translate\(([-\d.]+)px,\s*([\-\d.]+)px\)',nav_transform).groups()]
         nav_saved=nav_layout['positions'][asset['id']]
-        nav_deltas=(nav_saved['x']-nav_xy[0],nav_saved['y']-nav_xy[1])
-        assert all(math.isclose(a,b,abs_tol=0.02) for a,b in zip((nav_saved['x'],nav_saved['y']),nav_xy)),f'Save-and-continue CSSOM coordinate deltas: {nav_deltas}'
-        report['checks'].append('A 409 inside the Save-and-continue prompt exposes field choices and saved/local recovery, then persists the draft before completing navigation.')
+        assert all(math.isclose(a,b,abs_tol=0.02) for a,b in zip((nav_saved['x'],nav_saved['y']),nav_xy))
+        report['checks'].append('A restored 409 keeps its exact layout baseline and dirty geometry locked until comparison and CAS reapply.')
+        await page.get_by_role('button',name='Story outline',exact=True).click()
         await page.get_by_role('button',name='Story canvas',exact=True).click()
         await page.get_by_role('button',name='Reference map',exact=True).click()
         await page.wait_for_selector(f'[data-node-id="{asset["id"]}"]')

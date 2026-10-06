@@ -79,6 +79,16 @@ UI interactions and HTTP effects, but not ordinary page navigation, browser CSP 
 or browser-download behavior. Independent API tests cover returned files and headers.
 The normal-navigation test still needs to be run on an unrestricted target machine.
 
+## Canvas navigation regression
+
+`python clients/web/e2e/canvas_navigation.py --chromium /path/to/chromium`
+creates its own disposable workspace and loopback API. It verifies page/hash/history
+navigation, per-project isolation, filters/viewport, failed-save recovery with the saved
+revision baseline, and unload protection for inactive drafts. The broader
+`browser_acceptance.py` also exercises in-flight saves, two-writer layout conflicts,
+and Save / Discard / Stay for arrangement and mode replacement. Normal loopback
+navigation was used for the combined PR #20/#21 verification.
+
 ## Platform and operational caveats
 
 Linux/Python 3.13 was executed here. The project includes platform-neutral Python paths
