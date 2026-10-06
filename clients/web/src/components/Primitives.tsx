@@ -23,6 +23,8 @@ export function Icon({name,size=18}:{name:string;size?:number}){
   chevron:<path d="m9 5 7 7-7 7"/>,
   search:<><circle cx="10" cy="10" r="6"/><path d="m15 15 6 6"/></>,
   check:<path d="m4 12 5 5L20 6"/>,
+  warning:<><circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/></>,
+  stop:<rect x="5" y="5" width="14" height="14" rx="2"/>,
   arrow:<path d="M3 12h18m-7-7 7 7-7 7"/>,
   refresh:<><path d="M20 8a8 8 0 1 0 1 7M20 3v5h-5"/></>,
   menu:<path d="M3 5h18M3 12h18M3 19h18"/>,
@@ -33,10 +35,18 @@ export function Empty({title,children,action}:{title:string;children?:ReactNode;
 export function PageHeading({eyebrow,title,description,actions}:{eyebrow:string;title:string;description?:string;actions?:ReactNode}){return <header className="page-heading"><div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1>{description&&<p className="lede">{description}</p>}</div>{actions&&<div className="heading-actions">{actions}</div>}</header>;}
 export function Badge({kind,children}:{kind?:string;children:ReactNode}){return <span className={`badge ${kind||''}`}>{children}</span>;}
 export function ErrorNotice({error,children}:{error:string;children?:ReactNode}){return <div className="notice error" role="alert"><strong>We couldn’t complete that.</strong><p>{error}</p>{children}</div>;}
-export function Modal({title,children,onClose,wide=false}:{title:string;children:ReactNode;onClose:()=>void;wide?:boolean}){
+export function Modal({title,children,onClose,wide=false,returnFocusSelector}:{title:string;children:ReactNode;onClose:()=>void;wide?:boolean;returnFocusSelector?:string}){
  const dialog=useRef<HTMLDivElement|null>(null);const closeRef=useRef(onClose);closeRef.current=onClose;
- useEffect(()=>{const previous=document.activeElement as HTMLElement|null;const el=dialog.current;const focusable=()=>Array.from(el?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]')||[]).filter(x=>x.offsetParent!==null);
- (focusable()[0]||el)?.focus();const handler=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();closeRef.current();}if(event.key==='Tab'){const items=focusable();const first=items[0],last=items[items.length-1];if(event.shiftKey&&document.activeElement===first){event.preventDefault();last?.focus();}else if(!event.shiftKey&&document.activeElement===last){event.preventDefault();first?.focus();}}};el?.addEventListener('keydown',handler);return()=>{el?.removeEventListener('keydown',handler);previous?.focus();};},[]);
+ // Capture the opener during render: React may already have applied an input's
+ // autoFocus prop by the time this component's passive effect runs.
+ const opener=useRef(document.activeElement instanceof HTMLElement?document.activeElement:null);
+ useEffect(()=>{const el=dialog.current;const visible=(node:HTMLElement)=>node.getClientRects().length>0&&getComputedStyle(node).visibility!=='hidden'&&!node.closest('[inert]');const focusable=()=>Array.from(el?.querySelectorAll<HTMLElement>('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]')||[]).filter(visible);
+ const active=document.activeElement instanceof HTMLElement&&el?.contains(document.activeElement)?document.activeElement:null;
+ const requested=el?.querySelector<HTMLElement>('[autofocus]');
+ // Preserve React's native autoFocus result if it focused an element even when
+ // the renderer did not leave an [autofocus] attribute in the DOM.
+ (requested&&visible(requested)?requested:active&&active!==el?active:focusable()[0]||el)?.focus({preventScroll:true});
+ const handler=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();closeRef.current();}if(event.key==='Tab'){const items=focusable();const first=items[0],last=items[items.length-1];if(!items.length){event.preventDefault();el?.focus();}else if(event.shiftKey&&(document.activeElement===first||!el?.contains(document.activeElement))){event.preventDefault();last?.focus();}else if(!event.shiftKey&&(document.activeElement===last||!el?.contains(document.activeElement))){event.preventDefault();first?.focus();}}};el?.addEventListener('keydown',handler);return()=>{el?.removeEventListener('keydown',handler);const saved=opener.current;const target=saved?.isConnected?saved:returnFocusSelector?document.querySelector<HTMLElement>(returnFocusSelector):null;if(target?.isConnected&&!target.matches(':disabled')&&!target.closest('[inert]')&&visible(target))target.focus({preventScroll:true});};},[]);
  return <div className="modal-backdrop" onMouseDown={(e:any)=>{if(e.target===e.currentTarget)onClose();}}><div ref={dialog} className={`modal ${wide?'wide':''}`} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabIndex={-1}><div className="modal-heading"><h2 id="modal-title">{title}</h2><button className="icon-button" onClick={onClose} aria-label="Close dialog"><Icon name="close"/></button></div>{children}</div></div>;
 }
 export function Validation({issues}:{issues:Issue[]}){if(!issues.length)return <p className="success-line"><Icon name="check"/> All selected images are available.</p>;return <div className="validation"><h3>Production checks <span className="count">{issues.length}</span></h3>{issues.map((i,n)=><div key={`${i.code}-${n}`} className={`check-row ${i.severity}`}><Badge>{human(i.severity)}</Badge><span>{i.message}</span></div>)}</div>;}

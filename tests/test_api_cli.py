@@ -1,4 +1,4 @@
-from pathlib import Path
+import argparse
 import json
 import subprocess
 import sys
@@ -7,6 +7,8 @@ from fastapi.testclient import TestClient
 from storyboarder.api.server import create_app
 from storyboarder.application.projects import Project
 from storyboarder.application.service import Service
+from storyboarder.application.commands import COMMANDS
+from storyboarder.cli.main import COMMAND_GROUP_HELP, CONVENIENCE_HELP, build_parser
 
 @pytest.fixture
 def client(workspace):
@@ -19,7 +21,8 @@ def client(workspace):
 def test_workspace_browser_project_creation_switching_shared_core(client,workspace):
     a=client.post('/api/v1/projects',json={'title':'First','slug':'first'})
     assert a.status_code==201,a.text
-    first=a.json();second=client.post('/api/v1/projects',json={'title':'Second','slug':'second'}).json()
+    first=a.json()
+    second=client.post('/api/v1/projects',json={'title':'Second','slug':'second'}).json()
     assert client.post('/api/v1/active',json={'id':first['id']}).status_code==200
     assert workspace.current().id==first['id']
     created=client.post(f"/api/v1/projects/{first['id']}/commands/asset.create",json={'title':'Browser asset','type':'character'})
@@ -67,7 +70,8 @@ def test_api_revision_conflict_returns_current_record(client,workspace):
 
 
 def test_multipart_import_exact_media_and_export_routes(client,workspace,image_factory):
-    project=workspace.create('Images','images');prefix=f'/api/v1/projects/{project.id}'
+    project=workspace.create('Images','images')
+    prefix=f'/api/v1/projects/{project.id}'
     source=image_factory()
     response=client.post(prefix+'/upload',files={'file':('image.png',source.read_bytes(),'image/png')},data={'original_path':'local-folder/image.png'})
     assert response.status_code==201,response.text
@@ -98,8 +102,102 @@ def test_packaged_frontend_no_remote_assets_and_security_headers(client):
     assert client.get('/api/v1/openapi.json').json()['info']['title']=='Storyboarder local API'
 
 
+def test_observation_plan_commands_share_api_cli_json_contract(client, workspace):
+    project = workspace.create('Observation transfer', 'observation-transfer')
+    prefix = f'/api/v1/projects/{project.id}/commands'
+    metadata = client.get('/api/v1/meta').json()
+    browser_names = {item['name'] for item in metadata['commands']}
+    api_commands = {item['name']: item for item in metadata['api_commands']}
+    names = {
+        'observation.plan-export',
+        'observation.plan-import-preview',
+        'observation.plan-import-apply',
+    }
+    assert names <= api_commands.keys()
+    assert not names & browser_names
+    assert all(api_commands[name]['browser'] is False and api_commands[name]['api_safe'] is True for name in names)
+    assert all('path' not in {field['name'] for field in api_commands[name]['fields']} for name in names)
+
+    exported = client.post(prefix + '/observation.plan-export', json={})
+    assert exported.status_code == 200, exported.text
+    plan = exported.json()['plan']
+    assert plan['project_id'] == project.id
+
+    service = Service(project)
+    with service.repo.readonly_transaction() as conn:
+        before_events = conn.execute('SELECT count(*) FROM events').fetchone()[0]
+    preview_response = client.post(prefix + '/observation.plan-import-preview', json={'plan': plan})
+    assert preview_response.status_code == 200, preview_response.text
+    preview = preview_response.json()
+    assert preview['ready'] is True and preview['contracts'] == []
+    with service.repo.readonly_transaction() as conn:
+        assert conn.execute('SELECT count(*) FROM events').fetchone()[0] == before_events
+
+    applied = client.post(prefix + '/observation.plan-import-apply', json={'plan': plan, 'preview': preview})
+    assert applied.status_code == 200, applied.text
+    assert applied.json()['applied'] is False
+
+    cli_export = cli('--project', project.root, 'observation', 'plan-export', '--json')
+    assert cli_export.returncode == 0, cli_export.stderr
+    assert json.loads(cli_export.stdout) == exported.json()
+    cli_preview = cli('--project', project.root, 'observation', 'plan-import-preview',
+                      '--payload', json.dumps({'plan': plan}), '--json')
+    assert cli_preview.returncode == 0, cli_preview.stderr
+    assert json.loads(cli_preview.stdout)['ready'] is True
+
+
 def cli(*args,cwd=None):
     return subprocess.run([sys.executable,'-m','storyboarder',*map(str,args)],cwd=cwd,text=True,capture_output=True,timeout=20)
+
+
+def _leaf_parser(parser, group, action):
+    group_subparsers = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    action_subparsers = next(
+        a for a in group_subparsers.choices[group]._actions
+        if isinstance(a, argparse._SubParsersAction)
+    )
+    return action_subparsers.choices[action]
+
+
+def test_catalog_cli_help_shows_field_rules_and_all_commands_parse():
+    parser = build_parser()
+    catalog_groups = {name.split('.', 1)[0] for name in COMMANDS}
+    assert catalog_groups <= COMMAND_GROUP_HELP.keys()
+    root_help = parser.format_help()
+    for description in (*COMMAND_GROUP_HELP.values(), *CONVENIENCE_HELP.values()):
+        assert description in root_help
+    for name, command in COMMANDS.items():
+        group, action = name.split('.', 1)
+        leaf = _leaf_parser(parser, group, action)
+        help_text = leaf.format_help()
+        named_args = [group, action]
+        for field in command.fields:
+            option = '--' + field.name.replace('_', '-')
+            argument = leaf._option_string_actions[option]
+            assert argument.default is argparse.SUPPRESS
+            assert argument.choices == (field.options or None)
+            assert option in help_text
+            if field.required:
+                assert '[required]' in argument.help
+                if field.type != 'boolean':
+                    if field.options:
+                        value = field.options[0]
+                    elif field.type in ('integer', 'number'):
+                        value = '1'
+                    elif field.type == 'json':
+                        value = '{}'
+                    else:
+                        value = 'sample'
+                    named_args.extend((option, value))
+                else:
+                    named_args.append(option)
+            if field.default is not None:
+                marker = '[default: ' + json.dumps(field.default, ensure_ascii=False) + ']'
+                assert marker in argument.help
+
+        # Payloads and named flags both remain valid ways to invoke every catalog command.
+        assert parser.parse_args([group, action, '--payload', '{}']).command == name
+        assert parser.parse_args(named_args).command == name
 
 
 def test_bare_cli_noninteractive_help_not_tui():

@@ -79,24 +79,21 @@ UI interactions and HTTP effects, but not ordinary page navigation, browser CSP 
 or browser-download behavior. Independent API tests cover returned files and headers.
 The normal-navigation test still needs to be run on an unrestricted target machine.
 
-Canvas navigation regression (issue #19) uses its own disposable workspace and
-loopback server, so no running app or demo preparation is required:
+## Canvas navigation regression
 
-```sh
-python clients/web/e2e/canvas_navigation.py --output artifacts/canvas-navigation
-```
-
-It checks page/hash/history navigation, per-project draft isolation, restored
-filters/viewport, failed saves, layout revisions after returning, and unload warnings
-for dirty drafts on inactive pages/projects. The same `--chromium` and
-`--transport-bridge` options are available.
+`python clients/web/e2e/canvas_navigation.py --chromium /path/to/chromium`
+creates its own disposable workspace and loopback API. It verifies page/hash/history
+navigation, per-project isolation, filters/viewport, failed-save recovery with the saved
+revision baseline, and unload protection for inactive drafts. The broader
+`browser_acceptance.py` also exercises in-flight saves, two-writer layout conflicts,
+and Save / Discard / Stay for arrangement and mode replacement. Normal loopback
+navigation was used for the combined PR #20/#21 verification.
 
 ## Platform and operational caveats
 
-Linux/Python 3.13 was executed here. The project includes platform-neutral Python paths,
-Windows startup instructions, and CI definitions for Linux/macOS/Windows; those remote
-CI jobs were not run in this environment. System image-viewer handoff depends on the
-host desktop configuration. The TUI benefits from at least 110×35 terminal cells.
+Linux/Python 3.13 was executed here. The project includes platform-neutral Python paths
+and Windows startup instructions. System image-viewer handoff depends on the host
+desktop configuration. The TUI benefits from at least 110×35 terminal cells.
 PDF core fonts do not guarantee arbitrary Unicode glyph coverage; full HTML/JSON is
 available for international productions.
 

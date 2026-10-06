@@ -5,7 +5,6 @@ import logging
 import os
 from pathlib import Path
 import sys
-import webbrowser
 from rich.console import Console
 from rich.table import Table
 from storyboarder import __version__
@@ -24,6 +23,59 @@ class UsageError(Exception):
 class ArgumentParser(argparse.ArgumentParser):
     def error(self, message):
         raise UsageError(message)
+
+
+COMMAND_GROUP_HELP = {
+    "annotation": "Add and review pinned notes",
+    "asset": "Find and manage library items and their images",
+    "assignment": "Place library references in shots",
+    "cache": "Rebuild or clear image previews",
+    "canvas": "View and save story canvases",
+    "composition": "Preview a storyboard",
+    "context": "Set and review story direction",
+    "coverage": "Review source and delivery coverage",
+    "document": "Import, inspect, revise, and export source documents",
+    "edit": "Import and list editorial cut documents",
+    "entity": "Edit, archive, restore, and remove story items",
+    "export": "Create storyboard and project handoff files",
+    "frame": "Add and review storyboard images",
+    "intake": "Review imported images",
+    "job": "Prepare and review image tool runs",
+    "link": "Connect library items",
+    "media": "Import and tag images",
+    "observation": "Plan and review shot intent and portable history",
+    "project": "Create, select, and maintain projects",
+    "provenance": "Connect and trace production sources",
+    "scene": "Create and edit scenes",
+    "screenplay": "Import and list screenplay documents",
+    "script": "Register, inspect, and remove trusted external scripts",
+    "sequence": "Create and edit sequences",
+    "shot": "Create and edit shots and their references",
+    "story": "Move and reorder story items",
+    "workspace": "Select and organize projects",
+}
+
+CONVENIENCE_HELP = {
+    "ui": "Open the browser app on this computer",
+    "tui": "Open the terminal app",
+    "doctor": "Check project health",
+    "backup": "Create project backup",
+    "restore": "Restore backup to a new folder",
+    "import": "Import still images into intake",
+    "compose": "Preview the selected story's composition",
+}
+
+
+def field_help(field):
+    """Describe catalog requirements and defaults without changing payload syntax."""
+    description = field.label
+    if field.help:
+        description += ". " + field.help
+    if field.required:
+        description += " [required]"
+    if field.default is not None:
+        description += " [default: " + json.dumps(field.default, ensure_ascii=False) + "]"
+    return description
 
 
 def output(value, as_json=False, as_jsonl=False):
@@ -74,6 +126,27 @@ def get_service(args):
     return Service(discover())
 
 
+def get_doctor_service(args):
+    """Reach doctor without Project's migration or canonical-row open checks."""
+    if getattr(args, "project", None):
+        root = args.project
+    elif getattr(args, "workspace", None):
+        entries = Workspace(args.workspace).list()
+        recent = next((row for row in entries if row.get("recent")), None)
+        available = [row for row in entries if row.get("available")]
+        if recent:
+            root = recent["path"]
+        elif len(available) == 1:
+            root = available[0]["path"]
+        elif len(entries) == 1:
+            root = entries[0]["path"]
+        else:
+            raise NotFound("Choose a workspace project with project switch, or pass --project PATH.")
+    else:
+        root = discover()
+    return Service(Project.diagnostic(root))
+
+
 def build_parser():
     parser = ArgumentParser(prog="storyboarder", description="A local story production desk. No arguments opens the TUI in an interactive terminal.", formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument("--version", action="version", version=__version__)
@@ -83,7 +156,7 @@ def build_parser():
     group_parsers, subparsers = {}, {}
     def add(group, action, help):
         if group not in group_parsers:
-            parent = groups.add_parser(group, help=group.title() + " workflows")
+            parent = groups.add_parser(group, help=COMMAND_GROUP_HELP.get(group, group.title() + " commands"))
             common(parent)
             group_parsers[group] = parent
             subparsers[group] = parent.add_subparsers(dest="verb")
@@ -96,7 +169,7 @@ def build_parser():
         child = add(group, action, command.label)
         child.add_argument("--payload", help="JSON object or @path/to/payload.json; named flags override it")
         for f in command.fields:
-            kwargs = {"dest": "arg_" + f.name, "default": argparse.SUPPRESS, "help": f.label + (". " + f.help if f.help else "")}
+            kwargs = {"dest": "arg_" + f.name, "default": argparse.SUPPRESS, "help": field_help(f)}
             if f.type == "boolean":
                 kwargs["action"] = argparse.BooleanOptionalAction
             elif f.type == "integer":
@@ -137,7 +210,7 @@ def build_parser():
     p = add("script", "remove", "Unregister a script")
     p.add_argument("name")
     for name in ("ui", "tui", "doctor", "backup", "restore", "import", "compose"):
-        p = groups.add_parser(name, help={"ui": "Start loopback API and bundled React app", "tui": "Open the multi-page terminal app", "doctor": "Check project health", "backup": "Create project backup", "restore": "Restore backup to a new folder", "import": "Import still images into intake", "compose": "Preview resolved story composition"}[name])
+        p = groups.add_parser(name, help=CONVENIENCE_HELP[name])
         common(p)
         p.set_defaults(command=name)
         if name == "ui":
@@ -234,7 +307,7 @@ def main(argv=None):
             if workspace:
                 workspace.register(result["path"])
         else:
-            service = get_service(args)
+            service = get_doctor_service(args) if command == "doctor" else get_service(args)
             if command == "doctor":
                 result = service.doctor(args.hashes)
             elif command == "backup":
@@ -268,7 +341,14 @@ def main(argv=None):
             print(json.dumps({"error": exc.as_dict()}, ensure_ascii=False), file=sys.stderr)
         else:
             Console(stderr=True).print("[bold red]Could not complete this action.[/] " + str(exc), markup=True, highlight=False)
-        raise SystemExit(3 if isinstance(exc, Conflict) else 2 if isinstance(exc, NotFound) else 1)
+        status = getattr(exc, "status", None)
+        if isinstance(exc, Conflict) or status == 409:
+            exit_code = 3
+        elif isinstance(exc, NotFound) or status == 404:
+            exit_code = 2
+        else:
+            exit_code = 1
+        raise SystemExit(exit_code)
     except (OSError, ValueError) as exc:
         message = {"code": "input_or_io", "message": str(exc)}
         print(json.dumps({"error": message}) if as_json else "Could not complete this action: " + str(exc), file=sys.stderr)

@@ -10,7 +10,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/mattrichmo/storyboarder/actions/workflows/verify.yml"><img src="https://github.com/mattrichmo/storyboarder/actions/workflows/verify.yml/badge.svg?branch=main" alt="Verification status"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.11%2B-49654f?style=flat-square" alt="Python 3.11 or later"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-49654f?style=flat-square" alt="MIT license"></a>
 </p>
@@ -231,7 +230,7 @@ with a conflict instead of overwriting newer work. See the
 ## Command map
 
 Every group and subcommand has `--help`. The
-[full CLI reference](docs/CLI.md#command-catalog) documents all **98 shared application
+[full CLI reference](docs/CLI.md#command-catalog) documents all **111 shared application
 commands**, including their flags, choices, defaults, and required fields, plus lifecycle commands.
 
 | Area | Commands to reach for |
@@ -283,8 +282,8 @@ pinned when a new draft arrives; `document diff` and `provenance impact` help re
 what changed. Coverage reports describe explicit links, rather than infer missing footage.
 OTIO imports preserve media references without fetching or playing the referenced media.
 
-Dedicated source-document browser/TUI workspaces, visual draft comparison, and broader
-format adapters remain unfinished. Fountain, FDX, PDF screenplay imports, and general
+Dedicated source-document workspaces and visual draft comparison remain unfinished; the
+terminal desk includes a focused exact Observation coverage page. Fountain, FDX, PDF screenplay imports, and general
 NLE interoperability are not implemented. Read the [format profiles](docs/FORMATS.md)
 and [implementation status](docs/V2_IMPLEMENTATION_STATUS.md) before adopting these
 preview workflows. Back up existing projects before opening them with the newer schema.
@@ -330,12 +329,12 @@ or outside the checkout, and keep separate backups of material you care about.
 | Import screenplay and editorial sources | [Format profiles](docs/FORMATS.md) · [Implementation status](docs/V2_IMPLEMENTATION_STATUS.md) |
 | Integrate a local tool | [Local API](docs/API.md) · [External script contract](docs/AUTOMATION.md) |
 | Understand the product and its internals | [Product contract](docs/PRODUCT_CONTRACT.md) · [Architecture](docs/ARCHITECTURE.md) · [Design brief](docs/DESIGN_BRIEF.md) |
-| Develop, package, or inspect verification | [Development](docs/DEVELOPMENT.md) · [Implementation matrix](docs/IMPLEMENTATION.md) · [Verification report](docs/TEST_REPORT.md) · [GitHub CI](https://github.com/mattrichmo/storyboarder/actions/workflows/verify.yml) |
+| Develop, package, or inspect verification | [Development](docs/DEVELOPMENT.md) · [Implementation matrix](docs/IMPLEMENTATION.md) · [Verification report](docs/TEST_REPORT.md) |
 
 ## Development
 
 Use an active Python virtual environment. **Node 20+** is recommended for rebuilding
-the frontend; CI uses Node 22. End users can run the checked-in client without Node.
+the frontend. End users can run the checked-in client without Node.
 
 ```sh
 python -m pip install -e '.[dev]'
@@ -355,9 +354,6 @@ archive in the ignored `dist/` directory; those files are generated, not include
 fresh Git clone. Install a generated wheel with
 `python -m pip install dist/storyboarder_desk-1.0.0-py3-none-any.whl`.
 
-[GitHub CI](https://github.com/mattrichmo/storyboarder/actions/workflows/verify.yml)
-builds the frontend, tests Python and canvas geometry, checks packaging on Linux,
-macOS, and Windows, and preserves committed-source checkpoints.
 
 ## Scope and trust
 

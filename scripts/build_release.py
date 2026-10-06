@@ -9,6 +9,8 @@ import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT/'src'))
+from storyboarder import SCHEMA_VERSION
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -37,6 +39,14 @@ def main():
             raise SystemExit('Frontend build manifest points to an invalid stylesheet.')
         if hashlib.sha256((static/style).read_bytes()).hexdigest() != build.get('style_sha256') or f'/{build["style"]}' not in index:
             raise SystemExit('Frontend stylesheet hash or index reference does not match its manifest.')
+    migration_dir = ROOT/'src/storyboarder/storage/migrations'
+    migration_files = sorted(migration_dir.glob('*.sql'))
+    try:
+        migration_versions = [int(path.name.split('_', 1)[0]) for path in migration_files]
+    except ValueError:
+        raise SystemExit('Migration files must begin with their numeric schema version.')
+    if sorted(migration_versions) != list(range(1, SCHEMA_VERSION + 1)) or len(set(migration_versions)) != len(migration_versions):
+        raise SystemExit(f'Incomplete migration set: release schema {SCHEMA_VERSION} requires migrations 1 through {SCHEMA_VERSION}.')
     os.chdir(ROOT)
     destination = ROOT/'dist'
     destination.mkdir(exist_ok=True)
@@ -46,8 +56,7 @@ def main():
     required = {'storyboarder/static/index.html', 'storyboarder/static/'+build['entry'],
                 'storyboarder/static/assets/react-runtime.js',
                 'storyboarder/static/THIRD_PARTY_LICENSES.txt',
-                'storyboarder/storage/migrations/001_core.sql',
-                'storyboarder/storage/migrations/002_automation.sql'}
+                *{'storyboarder/storage/migrations/'+path.name for path in migration_files}}
     if style:
         required.add('storyboarder/static/'+build['style'])
     with zipfile.ZipFile(wheel) as archive:

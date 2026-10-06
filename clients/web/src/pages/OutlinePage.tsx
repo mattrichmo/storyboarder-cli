@@ -90,7 +90,7 @@ export function OutlinePage(p:PageProps){
   const number=String(entity.fields.number||String(entity.position+1).padStart(2,'0'));
   const title=outlineTitle(entity);
 
-  return <div key={entity.id} className={`story-node node-${entity.kind}`}>
+  return <div key={entity.id} className={`story-node ${entity.kind}`}>
    <div className={`story-row ${p.selected===entity.id?'is-selected':''}`}>
     {entity.kind==='shot'
      ? <span className="shot-order">{number}</span>

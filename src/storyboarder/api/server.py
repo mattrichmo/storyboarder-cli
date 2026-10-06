@@ -126,7 +126,11 @@ def create_app(project=None, workspace=None, port=7430):
 
     @app.get("/api/v1/meta")
     def metadata():
-        return {"commands": [c.public() for c in COMMANDS.values() if c.browser], "entity_fields": {k: m.model_json_schema() for k, m in FIELD_MODELS.items()}, "formats": sorted(FORMATS), "max_file_bytes": MAX_FILE_BYTES, "scripts": [{k: r[k] for k in ("name", "description", "timeout", "env_keys")} for r in ScriptRegistry().list()]}
+        return {"commands": [c.public() for c in COMMANDS.values() if c.browser],
+                "api_commands": [c.public() for c in COMMANDS.values() if c.api_safe],
+                "entity_fields": {k: m.model_json_schema() for k, m in FIELD_MODELS.items()},
+                "formats": sorted(FORMATS), "max_file_bytes": MAX_FILE_BYTES,
+                "scripts": [{k: r[k] for k in ("name", "description", "timeout", "env_keys")} for r in ScriptRegistry().list()]}
 
     @app.get("/api/v1/projects")
     def projects():
@@ -175,7 +179,43 @@ def create_app(project=None, workspace=None, port=7430):
 
     @app.post("/api/v1/projects/{project_id}/commands/{name}")
     def command(project_id: str, name: str, payload: dict):
-        return execute(launch.service(project_id), name, payload, browser=True)
+        return execute(launch.service(project_id), name, payload, api=True)
+
+    def choice_field(name, field_name, values):
+        from storyboarder.commands.core import _PAGED_SOURCES
+        command = COMMANDS.get(name)
+        if command is None or not command.browser:
+            raise NotFound("This browser action is not available.")
+        field = next((f for f in command.fields if f.name == field_name), None)
+        if field is None or field.source not in _PAGED_SOURCES:
+            raise NotFound("This action does not have that record picker.")
+        try:
+            context = json.loads(values)
+        except json.JSONDecodeError as exc:
+            raise StoryboardError("Record picker details must be a JSON object.") from exc
+        if not isinstance(context, dict) or set(context) - {f.name for f in command.fields}:
+            raise StoryboardError("Record picker details do not match this action.")
+        if any(not isinstance(value, (str, int, float, bool, type(None))) for value in context.values()):
+            raise StoryboardError("Record picker details must contain simple field values.")
+        return field, context
+
+    @app.get("/api/v1/projects/{project_id}/commands/{name}/fields/{field_name}/choices")
+    def command_choices(project_id: str, name: str, field_name: str,
+                        values: str = Query('{}', max_length=10000), query: str = Query('', max_length=240),
+                        limit: int = Query(100, ge=1, le=100), offset: int = Query(0, ge=0)):
+        from storyboarder.commands.core import source_options
+        field, context = choice_field(name, field_name, values)
+        return source_options(launch.service(project_id), field.source, context, query, limit, offset)
+
+    @app.get("/api/v1/projects/{project_id}/commands/{name}/fields/{field_name}/choices/{record_id}")
+    def command_choice(project_id: str, name: str, field_name: str, record_id: str,
+                       values: str = Query('{}', max_length=10000)):
+        from storyboarder.commands.core import source_record
+        field, context = choice_field(name, field_name, values)
+        record = source_record(launch.service(project_id), field.source, record_id, context)
+        if record is None:
+            raise NotFound("This picker record is not available.")
+        return record
 
     @app.get("/api/v1/projects/{project_id}/graph")
     def graph(project_id: str, mode: str = "story", query: str = "", asset_type: str | None = None, tag: str | None = None, relation: str | None = None, scene_id: str | None = None, sequence_id: str | None = None, limit: int = Query(250, ge=1, le=500)):

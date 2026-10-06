@@ -1,14 +1,14 @@
 # CLI reference
 
 `storyboarder` is the installed command. This reference includes lifecycle commands
-and all **98 commands** in the shared application catalog. The flag tables are
+and all **111 commands** in the shared application catalog. The flag tables are
 generated from that catalog. Run `storyboarder --help`, `storyboarder GROUP --help`,
 or `storyboarder GROUP ACTION --help` for the commands in your installed checkout.
 
 The original authoring workflows are available through the CLI, browser, and TUI.
-Source documents and provenance are currently a CLI/local API preview; dedicated
-browser and TUI workspaces are unfinished. Catalog availability in the local API does
-not imply a finished graphical workflow. See [implementation status](V2_IMPLEMENTATION_STATUS.md).
+Source documents and provenance remain CLI/local API previews; the TUI now has a focused
+Observation coverage page for exact source pins and first contract authoring. A dedicated
+browser workspace remains unfinished. See [implementation status](V2_IMPLEMENTATION_STATUS.md).
 
 ## Project selection and common options
 
@@ -91,13 +91,49 @@ the last-read **document revision**. Revising a draft does not repoint existing 
 | `0` | Operation or help completed successfully. |
 | `1` | Validation, domain, input, or I/O failure. |
 | `2` | Record/path not found, or argument parsing failure. |
-| `3` | Revision conflict. Re-read the record before editing again. |
+| `3` | Revision or contract conflict, including already-existing contracts. Re-read before retrying. |
 | `4` | Unhealthy doctor result, partial import, or failed job result. |
 | `130` | Interrupted. |
+
+Exit `0` means the requested operation completed. For observation validation, coverage,
+or import preview, inspect structured `status`, `ready`, `findings`, and loss fields to
+understand stale, unresolved, or conflicting records; a successful report is not a claim
+of semantic or visual verification. An explicitly aborted import and an idempotent
+already-present import can also complete without changing project data.
 
 With JSON output enabled, errors use an `error` object on stderr. The command schema
 is also available as [commands.json](commands.json). See [format profiles](FORMATS.md)
 for source import limits and [the README](../README.md#cli-workflows) for a walkthrough.
+
+Observation planning commands accept JSON objects through `--payload`. `observation.coverage`
+uses `{"request":{"anchors":[...]}}` with exact document/version/node/hash pins; `limit`
+and `offset` default to 500 and 0. `observation.create-group` uses
+`{"request":{"items":[...]}}`, with caller-supplied shot, contract, and edge UUIDs and
+the scene revision read before planning. The planner accepts up to 50 items and 512 total
+source-edge references per call. Both commands are JSON/API-safe and remain agent-only
+(`browser=false`). Contract-specific 404 and 409 errors use the same CLI exit mapping as
+their HTTP status: missing contract exits 2; already-exists, stale-revision, and reviewed
+basis-token conflicts exit 3. Other contract validation failures keep the legacy exit 1.
+
+`observation.plan-export` returns a portable exact-history plan in the `plan` property.
+`observation.plan-import-preview` accepts that JSON object as `plan`, plus optional
+contract-ID-to-choice `choices`; it is read-only and returns an explicit reconciliation
+receipt. `observation.plan-import-apply` takes the unchanged `plan` and exact `preview`
+receipt. All three commands are available in the CLI and JSON API, and appear in the TUI
+Coverage page. The CLI export result already wraps the sidecar under `plan`; save that
+JSON as `export.json` and pass `--payload @export.json` to preview. Apply uses a payload
+with both the unchanged `plan` object and returned `preview` receipt. Export and import preserve
+IDs, immutable history, operations, timestamps, and exact pins. API request bodies are
+capped at 2 MiB, including the plan and receipt; larger plans up to the application
+48 MiB limit can be passed to the CLI. These commands are API-safe and remain outside
+the browser command catalog.
+
+`observation.rebase-preview` accepts `contract_id` and the complete proposed `contract`
+body. It is read-only and returns saved/current basis values, exact requested pins, and an
+opaque `expected_basis_sha256` rebase-review token. Pass that exact token with the same
+body and header `revision` to `observation.rebase`. If the reviewed basis or contract
+revision changes before the write, the command returns a 409 contract conflict (CLI exit
+3); preview again before retrying. Both commands are JSON/API-safe and agent-only.
 
 ## Command catalog
 
@@ -107,7 +143,7 @@ catalog default or choices. The CLI always supports these commands; commands mar
 as local-file operations require explicit filesystem access and are not exposed through
 the generic browser command endpoint.
 
-[asset](#asset) · [sequence](#sequence) · [scene](#scene) · [shot](#shot) · [project](#project) · [entity](#entity) · [story](#story) · [link](#link) · [assignment](#assignment) · [context](#context) · [frame](#frame) · [canvas](#canvas) · [media](#media) · [intake](#intake) · [composition](#composition) · [export](#export) · [cache](#cache) · [job](#job) · [document](#document) · [screenplay](#screenplay) · [edit](#edit) · [provenance](#provenance) · [coverage](#coverage) · [annotation](#annotation)
+[asset](#asset) · [sequence](#sequence) · [scene](#scene) · [shot](#shot) · [project](#project) · [entity](#entity) · [story](#story) · [link](#link) · [assignment](#assignment) · [context](#context) · [frame](#frame) · [canvas](#canvas) · [media](#media) · [intake](#intake) · [composition](#composition) · [export](#export) · [cache](#cache) · [job](#job) · [document](#document) · [screenplay](#screenplay) · [edit](#edit) · [provenance](#provenance) · [coverage](#coverage) · [observation](#observation) · [annotation](#annotation)
 
 ### `asset`
 
@@ -1137,6 +1173,129 @@ Read-only operation.
 | Flag | Required | Type | Description | Default / choices |
 |---|---|---|---|---|
 | `--limit` | no | integer | Limit | default: `100` |
+
+### `observation`
+
+#### `observation create` — Create a shot observation contract
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | yes | text | Storyboard shot | — |
+| `--expected-shot-revision` | yes | integer | Last-read storyboard shot revision | — |
+| `--contract` | yes | json | Versioned observation contract | — |
+
+#### `observation show` — Show a shot observation contract
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--contract-id` | yes | text | Observation contract | — |
+| `--version-id` | no | text | Contract version | — |
+
+#### `observation list` — List shot observation contracts
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | no | text | Storyboard shot | — |
+| `--include-archived` | no | boolean | Include archived shots | default: false |
+| `--limit` | no | integer | Page size | default: 100 |
+| `--offset` | no | integer | Offset | default: 0 |
+
+#### `observation revise` — Revise a shot observation contract
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--contract-id` | yes | text | Observation contract | — |
+| `--revision` | yes | integer | Version check. Keeps a newer edit from being overwritten. | — |
+| `--contract` | yes | json | Versioned observation contract | — |
+
+#### `observation validate` — Check declared observation links and basis
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--contract-id` | yes | text | Observation contract | — |
+| `--version-id` | no | text | Contract version | — |
+
+#### `observation rebase-preview` — Review basis changes before rebasing a contract
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--contract-id` | yes | text | Observation contract | — |
+| `--contract` | yes | json | Versioned observation contract | — |
+
+#### `observation rebase` — Rebase a contract with explicit source pins
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--contract-id` | yes | text | Observation contract | — |
+| `--revision` | yes | integer | Version check. Keeps a newer edit from being overwritten. | — |
+| `--contract` | yes | json | Versioned observation contract | — |
+| `--expected-basis-sha256` | yes | text | Reviewed basis token | — |
+
+#### `observation diff` — Compare two observation contract versions
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--contract-id` | yes | text | Observation contract | — |
+| `--before-version-id` | yes | text | Earlier version | — |
+| `--after-version-id` | yes | text | Later version | — |
+
+#### `observation coverage` — Report exact observation coverage
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--request` | yes | json | Request-scoped exact anchors. JSON object: {"anchors": [{"document_id", "version_id", "node_id", "source_sha256", "priority", "basis"}]}. | — |
+| `--limit` | no | integer | Page size | default: 500 |
+| `--offset` | no | integer | Offset | default: 0 |
+
+#### `observation create-group` — Create planned shots, source links, and contracts
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--request` | yes | json | Atomic grouped plan. JSON object: {"items": [GroupItem, ...]}; include caller-generated shot_id, contract_id, edge_id, and expected_scene_revision. | — |
+
+#### `observation plan-export` — Export exact observation history plan
+
+Read-only operation.
+
+This command has no command-specific fields.
+
+#### `observation plan-import-preview` — Preview observation plan reconciliation
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--plan` | yes | json | Portable observation plan | — |
+| `--choices` | no | json | Explicit conflict choices by contract ID | — |
+
+#### `observation plan-import-apply` — Apply a reviewed observation plan import
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--plan` | yes | json | Portable observation plan | — |
+| `--preview` | yes | json | Exact preview receipt | — |
 
 ### `annotation`
 

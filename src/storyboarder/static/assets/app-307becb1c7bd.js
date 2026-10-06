@@ -48,34 +48,55 @@ const NAV = [['overview', 'Project overview', 'home'], ['intake', 'Image intake'
 function App() {
     const [session, setSession] = (0, react_1.useState)(null), [meta, setMeta] = (0, react_1.useState)(null), [state, setState] = (0, react_1.useState)(null);
     const [page, setPage] = (0, react_1.useState)(location.hash.slice(1) || 'workspace'), [selected, setSelected] = (0, react_1.useState)(null), [loading, setLoading] = (0, react_1.useState)(true), [error, setError] = (0, react_1.useState)('');
-    const [dialog, setDialog] = (0, react_1.useState)(null), [resultModal, setResultModal] = (0, react_1.useState)(null), [result, setResult] = (0, react_1.useState)(null), [palette, setPalette] = (0, react_1.useState)(false), [paletteQuery, setPaletteQuery] = (0, react_1.useState)(''), [toast, setToast] = (0, react_1.useState)(''), [mobileNav, setMobileNav] = (0, react_1.useState)(false), [changed, setChanged] = (0, react_1.useState)(false);
-    const navRef = (0, react_1.useRef)(null);
-    // Presentation drafts survive page unmounts and stay isolated when projects switch.
-    const canvasDrafts = (0, react_1.useRef)({});
-    (0, react_1.useEffect)(() => { const before = (e) => { if (Object.values(canvasDrafts.current).some(draft => draft.dirty)) {
-        e.preventDefault();
-        e.returnValue = '';
-    } }; window.addEventListener('beforeunload', before); return () => window.removeEventListener('beforeunload', before); }, []);
+    const [dialog, setDialog] = (0, react_1.useState)(null), [resultModal, setResultModal] = (0, react_1.useState)(null), [result, setResult] = (0, react_1.useState)(null), [palette, setPalette] = (0, react_1.useState)(false), [paletteQuery, setPaletteQuery] = (0, react_1.useState)(''), [toast, setToast] = (0, react_1.useState)(null), [mobileNav, setMobileNav] = (0, react_1.useState)(false), [changed, setChanged] = (0, react_1.useState)(false), [writeRefreshError, setWriteRefreshError] = (0, react_1.useState)(null);
+    const navRef = (0, react_1.useRef)(null), mobileNavOpener = (0, react_1.useRef)(null), mobileNavWasOpen = (0, react_1.useRef)(false);
     (0, react_1.useEffect)(() => { const media = window.matchMedia('(max-width:800px)'); const update = () => { if (navRef.current)
         navRef.current.inert = media.matches && !mobileNav; }; update(); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, [mobileNav]);
     (0, react_1.useEffect)(() => { if (mobileNav) {
+        mobileNavWasOpen.current = true;
         const first = navRef.current?.querySelector('button:not(:disabled)');
         first?.focus();
+        return;
+    } if (mobileNavWasOpen.current) {
+        mobileNavWasOpen.current = false;
+        const opener = mobileNavOpener.current;
+        mobileNavOpener.current = null;
+        if (opener?.isConnected && !opener.matches(':disabled') && !opener.closest('[inert]') && opener.getClientRects().length > 0)
+            opener.focus({ preventScroll: true });
     } }, [mobileNav]);
     const stateRef = (0, react_1.useRef)(null);
     stateRef.current = state;
     const dialogRef = (0, react_1.useRef)(dialog);
     dialogRef.current = dialog;
-    function notify(message) { setToast(message); }
-    function go(next) { if (next !== page)
-        location.hash = next; setPage(next); setMobileNav(false); }
+    const pageRef = (0, react_1.useRef)(page);
+    pageRef.current = page;
+    const canvasNavigationGuard = (0, react_1.useRef)(null);
+    const registerCanvasNavigationGuard = (0, react_1.useCallback)((guard) => { canvasNavigationGuard.current = guard; return () => { if (canvasNavigationGuard.current === guard)
+        canvasNavigationGuard.current = null; }; }, []);
+    function notify(message, outcome = 'success') { setToast({ message, outcome }); }
+    function commitNavigation(next) { if (next !== pageRef.current) {
+        if (location.hash !== `#${next}`)
+            location.hash = next;
+        pageRef.current = next;
+        setPage(next);
+    } setMobileNav(false); }
+    function go(next) { if (next === pageRef.current) {
+        setMobileNav(false);
+        return;
+    } const commit = () => commitNavigation(next); const guard = canvasNavigationGuard.current; if (guard && !guard(commit)) {
+        setMobileNav(false);
+        return;
+    } commit(); }
     async function load(id) { const next = await (0, api_1.api)((0, api_1.projectPath)(id, '/state')); setState(next); setChanged(false); return next; }
     async function refresh() { const id = stateRef.current?.project.id; if (!id)
-        throw new Error('Open a project first.'); return load(id); }
+        throw new Error('Open a project first.'); const next = await load(id); setWriteRefreshError(current => current?.projectId === id ? null : current); return next; }
     async function refreshSession() { const s = await (0, api_1.openSession)(); setSession(s); setMeta(await (0, api_1.api)('/meta')); }
     async function open(id) { setError(''); setLoading(true); try {
         await (0, api_1.api)('/active', 'POST', { id });
+        const previousId = stateRef.current?.project.id;
         await load(id);
+        if (previousId !== id)
+            setWriteRefreshError(null);
         setSelected(null);
         setResult(null);
         await refreshSession();
@@ -105,9 +126,13 @@ function App() {
     finally {
         if (alive)
             setLoading(false);
-    } })(); const h = () => setPage(location.hash.slice(1) || 'workspace'); window.addEventListener('hashchange', h); return () => { alive = false; window.removeEventListener('hashchange', h); }; }, []);
+    } })(); const h = () => { const next = location.hash.slice(1) || 'workspace'; if (next === pageRef.current)
+        return; const previous = pageRef.current; const commit = () => commitNavigation(next); const guard = canvasNavigationGuard.current; if (guard && !guard(commit)) {
+        history.replaceState(null, '', `${location.pathname}${location.search}${previous ? `#${previous}` : ''}`);
+        return;
+    } commit(); }; window.addEventListener('hashchange', h); return () => { alive = false; window.removeEventListener('hashchange', h); }; }, []);
     (0, react_1.useEffect)(() => { if (!toast)
-        return; const timer = setTimeout(() => setToast(''), 6500); return () => clearTimeout(timer); }, [toast]);
+        return; const timer = setTimeout(() => setToast(null), 6500); return () => clearTimeout(timer); }, [toast]);
     (0, react_1.useEffect)(() => { const keys = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPalette(v => !v);
@@ -133,18 +158,48 @@ function App() {
         notify('Open a project first.');
         return;
     } setDialog({ command, defaults }); }
-    async function done(data, name) { await refresh(); if (name.startsWith('export.')) {
+    async function done(data, name) { const command = meta?.commands.find(c => c.name === name), label = command?.label || 'Changes', projectId = stateRef.current?.project.id; const readOnly = !!command?.read_only, exportAction = name.startsWith('export.'), failed = data?.status === 'failed', cancelled = data?.status === 'cancelled', inProgress = ['queued', 'running'].includes(data?.status); const outcomeMessage = failed ? 'The image tool run needs attention.' : cancelled ? 'The image tool run was stopped.' : name === 'job.run' && inProgress ? 'The image tool is still running.' : name === 'job.run' && data?.status === 'succeeded' ? 'The image tool run finished.' : 'Your changes were saved.'; let refreshFailure = ''; if (!readOnly && !exportAction && projectId) {
+        try {
+            await refresh();
+        }
+        catch (e) {
+            refreshFailure = e?.message || 'The project view could not be refreshed.';
+            if (stateRef.current?.project.id === projectId)
+                setWriteRefreshError({ projectId, message: refreshFailure, summary: outcomeMessage });
+        }
+    } if (exportAction) {
         setResult(data);
         setResultModal({ title: 'Export ready', data });
     }
-    else if (meta?.commands.find(c => c.name === name)?.read_only) {
-        setResultModal({ title: meta?.commands.find(c => c.name === name)?.label || 'Project details', data });
+    else if (readOnly) {
+        setResultModal({ title: label || 'Project details', data });
     }
-    else if (data?.status === 'failed' || data?.status === 'cancelled') {
-        notify(data.status === 'failed' ? 'The image tool needs attention. Review its run details.' : 'The image tool run was stopped.');
+    else if (refreshFailure) {
+        const outcome = failed ? 'failed' : cancelled ? 'cancelled' : name === 'job.run' && inProgress ? 'running' : 'success';
+        notify(`${outcomeMessage} The project view could not refresh; use Retry project refresh.`, outcome);
+    }
+    else if (failed) {
+        notify('The image tool needs attention. Review its run details.', 'failed');
+    }
+    else if (cancelled) {
+        notify('The image tool run was stopped.', 'cancelled');
+    }
+    else if (name === 'job.run' && inProgress) {
+        notify('The image tool is still running. You can review its status in Recent activity.', 'running');
+    }
+    else if (name === 'job.run' && data?.status === 'succeeded') {
+        notify('The image tool run finished. Review its results.');
     }
     else {
-        notify(`${meta?.commands.find(c => c.name === name)?.label || 'Changes'} saved to the project.`);
+        notify(`${label} saved to the project.`);
+    } }
+    async function retryWriteRefresh(warning) { if (stateRef.current?.project.id !== warning.projectId)
+        return; try {
+        await refresh();
+    }
+    catch (e) {
+        if (stateRef.current?.project.id === warning.projectId)
+            setWriteRefreshError({ ...warning, message: e?.message || 'The project view could not be refreshed.' });
     } }
     const props = state && session && meta ? { state, session, meta, action, select: setSelected, selected, refresh, notify, go, result, setResult } : null;
     const screens = { overview: Pages_1.OverviewPage, intake: Pages_1.IntakePage, library: Pages_1.LibraryPage, outline: Pages_1.OutlinePage, guide: Pages_1.GuidePage, editor: Pages_1.EditorPage, frames: Pages_1.FramesPage, composition: Pages_1.CompositionPage, settings: Pages_1.SettingsPage, automation: Pages_1.AutomationPage };
@@ -170,7 +225,7 @@ function App() {
                 react_1.default.createElement("span", null, label),
                 key === 'intake' && state?.project.counts.intake ? react_1.default.createElement("span", { className: "nav-count" }, state.project.counts.intake) : null))),
             react_1.default.createElement("div", { className: "nav-bottom" },
-                react_1.default.createElement("button", { onClick: () => setPalette(true), disabled: !state },
+                react_1.default.createElement("button", { "data-action-search": true, onClick: () => setPalette(true), disabled: !state },
                     react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
                     "Search actions ",
                     react_1.default.createElement("kbd", null, "\u2318/Ctrl K")),
@@ -181,7 +236,7 @@ function App() {
         mobileNav && react_1.default.createElement("button", { className: "nav-scrim", onClick: () => setMobileNav(false), "aria-label": "Close navigation" }),
         react_1.default.createElement("div", { className: "app-column" },
             react_1.default.createElement("header", { className: "topbar" },
-                react_1.default.createElement("button", { className: "mobile-menu icon-button", "aria-label": "Open navigation", onClick: () => setMobileNav(true) },
+                react_1.default.createElement("button", { className: "mobile-menu icon-button", "aria-label": "Open navigation", onClick: (e) => { mobileNavOpener.current = e.currentTarget; setMobileNav(true); } },
                     react_1.default.createElement(Primitives_1.Icon, { name: "menu" })),
                 react_1.default.createElement("div", { className: "breadcrumbs" },
                     react_1.default.createElement("button", { onClick: () => go('workspace') }, "Workspace"),
@@ -203,9 +258,14 @@ function App() {
                 react_1.default.createElement("main", { id: "main-content", tabIndex: -1, className: `main-content ${page === 'canvas' ? 'canvas-main' : ''}` },
                     error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error },
                         react_1.default.createElement("button", { onClick: () => location.reload() }, "Try again")),
+                    writeRefreshError && state && writeRefreshError.projectId === state.project.id && react_1.default.createElement("div", { className: "external-change", role: "status" },
+                        writeRefreshError.summary,
+                        " The project view could not refresh. ",
+                        writeRefreshError.message,
+                        react_1.default.createElement("button", { onClick: () => void retryWriteRefresh(writeRefreshError) }, "Retry project refresh")),
                     loading ? react_1.default.createElement("div", { className: "loading-state", role: "status" },
                         react_1.default.createElement(Primitives_1.Icon, { name: "grid", size: 30 }),
-                        react_1.default.createElement("h2", null, "Opening your project\u2026")) : session && meta && (page === 'workspace' || !state) ? react_1.default.createElement(Pages_1.WorkspacePage, { session: session, projects: session.projects, onOpen: open, onRefresh: refreshSession }) : props && page === 'canvas' ? react_1.default.createElement(Canvas_1.Canvas, { key: props.state.project.id, state: props.state, draft: canvasDrafts.current[props.state.project.id], onDraftChange: draft => { canvasDrafts.current[props.state.project.id] = draft; }, selected: selected, onSelect: setSelected, action: action, refresh: refresh, notify: notify }) : props && Page ? react_1.default.createElement(Page, { ...props }) : props ? react_1.default.createElement(Pages_1.OverviewPage, { ...props }) : !error ? react_1.default.createElement(Primitives_1.Empty, { title: "Open a project" }, "Choose a project from Workspace or create a new one.") : null),
+                        react_1.default.createElement("h2", null, "Opening your project\u2026")) : session && meta && (page === 'workspace' || !state) ? react_1.default.createElement(Pages_1.WorkspacePage, { session: session, projects: session.projects, onOpen: open, onRefresh: refreshSession }) : props && page === 'canvas' ? react_1.default.createElement(Canvas_1.Canvas, { state: props.state, selected: selected, onSelect: setSelected, action: action, refresh: refresh, notify: notify, registerNavigationGuard: registerCanvasNavigationGuard }) : props && Page ? react_1.default.createElement(Page, { ...props }) : props ? react_1.default.createElement(Pages_1.OverviewPage, { ...props }) : !error ? react_1.default.createElement(Primitives_1.Empty, { title: "Open a project" }, "Choose a project from Workspace or create a new one.") : null),
                 state && selected && page !== 'workspace' && react_1.default.createElement(Inspector_1.Inspector, { state: state, id: selected, onClose: () => setSelected(null), onSelect: setSelected, action: action })),
             react_1.default.createElement("footer", { className: "app-footer" },
                 page === 'canvas' && react_1.default.createElement("span", null, "Drag cards to arrange this view. The story sequence stays the same."),
@@ -214,10 +274,10 @@ function App() {
                     " reference images \u00B7 ",
                     state.frames.filter(f => f.state === 'approved').length,
                     " approved storyboard frames"))),
-        toast && react_1.default.createElement("div", { className: "toast", role: "status" },
-            react_1.default.createElement(Primitives_1.Icon, { name: "check" }),
-            react_1.default.createElement("span", null, toast),
-            react_1.default.createElement("button", { "aria-label": "Dismiss notification", onClick: () => setToast('') },
+        toast && react_1.default.createElement("div", { className: "toast", role: "status", "data-outcome": toast.outcome },
+            react_1.default.createElement(Primitives_1.Icon, { name: toast.outcome === 'cancelled' ? 'stop' : toast.outcome === 'failed' ? 'warning' : toast.outcome === 'running' ? 'refresh' : 'check' }),
+            react_1.default.createElement("span", null, toast.message),
+            react_1.default.createElement("button", { "aria-label": "Dismiss notification", onClick: () => setToast(null) },
                 react_1.default.createElement(Primitives_1.Icon, { name: "close", size: 16 }))),
         dialog && state && meta && react_1.default.createElement(ActionDialog_1.ActionDialog, { key: dialog.command.name + JSON.stringify(dialog.defaults), command: dialog.command, defaults: dialog.defaults, state: state, meta: meta, onClose: () => setDialog(null), onDone: done, onReload: refresh }),
         resultModal && react_1.default.createElement(Primitives_1.Modal, { title: resultModal.title, onClose: () => setResultModal(null), wide: true },
@@ -343,6 +403,55 @@ const api_1 = require("../api");
 const utils_1 = require("../utils");
 const Primitives_1 = require("../components/Primitives");
 const geometry_1 = require("./geometry");
+function clone(value) { return JSON.parse(JSON.stringify(value)); }
+function flatten(value, path = [], result = new Map()) {
+    const isObject = value !== null && typeof value === 'object' && !Array.isArray(value);
+    const entries = isObject ? Object.entries(value) : [];
+    if (entries.length) {
+        for (const [key, child] of entries)
+            flatten(child, [...path, key], result);
+    }
+    else if (path.length)
+        result.set(JSON.stringify(path), { path, value: { present: true, value: clone(value) } });
+    return result;
+}
+function valueAt(fields, key) { return fields.get(key)?.value || { present: false }; }
+function stableValue(value) { if (Array.isArray(value))
+    return value.map(stableValue); if (value && typeof value === 'object')
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableValue(value[key])])); return value; }
+function sameValue(a, b) { return a.present === b.present && (!a.present || JSON.stringify(stableValue(a.value)) === JSON.stringify(stableValue(b.value))); }
+function writePath(target, path, entry) { let parent = target; for (const key of path.slice(0, -1)) {
+    if (!parent[key] || typeof parent[key] !== 'object' || Array.isArray(parent[key]))
+        parent[key] = {};
+    parent = parent[key];
+} const leaf = path[path.length - 1]; if (!entry.present)
+    delete parent[leaf];
+else
+    parent[leaf] = clone(entry.value); }
+function compareLayouts(base, local, saved) {
+    const baseFields = flatten(base || {}), localFields = flatten(local), savedFields = flatten(saved), keys = new Set([...baseFields.keys(), ...localFields.keys(), ...savedFields.keys()]);
+    const merged = clone(base || local), changes = [];
+    for (const key of keys) {
+        const path = (localFields.get(key) || savedFields.get(key) || baseFields.get(key)).path;
+        const before = valueAt(baseFields, key), ours = valueAt(localFields, key), theirs = valueAt(savedFields, key);
+        const localChanged = !sameValue(ours, before), savedChanged = !sameValue(theirs, before), conflict = base ? localChanged && savedChanged && !sameValue(ours, theirs) : !sameValue(ours, theirs);
+        const selected = conflict ? ours : localChanged ? ours : theirs;
+        writePath(merged, path, selected);
+        if (!sameValue(ours, theirs) || localChanged || savedChanged) {
+            changes.push({ key, path, base: before, local: ours, saved: theirs, conflict, label: path.join('.') });
+        }
+    }
+    return { merged, changes };
+}
+function applyNewLocalEdits(reference, current, saved) { const before = flatten(reference), now = flatten(current), result = clone(saved); for (const key of new Set([...before.keys(), ...now.keys()])) {
+    const old = valueAt(before, key), next = valueAt(now, key);
+    if (!sameValue(old, next)) {
+        const path = (now.get(key) || before.get(key)).path;
+        writePath(result, path, next);
+    }
+} return result; }
+function asLayoutDraft(layout) { return { name: layout.name, mode: layout.mode, positions: clone(layout.positions), settings: clone(layout.settings) }; }
+function draftFromLayoutResult(layout) { return { id: layout.id, name: layout.name, mode: layout.mode, positions: clone(layout.positions), settings: clone(layout.settings), revision: layout.revision, updated_at: layout.updated_at }; }
 function edgeLabel(edge) {
     if (edge.kind === 'relationship')
         return (0, utils_1.human)(edge.label);
@@ -354,22 +463,32 @@ function edgeLabel(edge) {
         return 'Location';
     return edge.label;
 }
-function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refresh, notify }) {
-    const [newKind, setNewKind] = (0, react_1.useState)(draft?.mode === 'assets' ? 'asset' : draft?.mode === 'scene' ? 'shot' : 'sequence');
-    const [mode, setMode] = (0, react_1.useState)(draft?.mode || 'story'), [scene, setScene] = (0, react_1.useState)(draft?.scene || ''), [sequence, setSequence] = (0, react_1.useState)(draft?.sequence || '');
-    const [query, setQuery] = (0, react_1.useState)(draft?.query || ''), [assetType, setAssetType] = (0, react_1.useState)(draft?.assetType || ''), [tag, setTag] = (0, react_1.useState)(draft?.tag || ''), [relation, setRelation] = (0, react_1.useState)(draft?.relation || '');
+function Canvas({ state, selected, onSelect, action, refresh, notify, registerNavigationGuard }) {
+    const [newKind, setNewKind] = (0, react_1.useState)('sequence');
+    const [mode, setMode] = (0, react_1.useState)('story'), [scene, setScene] = (0, react_1.useState)(''), [sequence, setSequence] = (0, react_1.useState)('');
+    const [query, setQuery] = (0, react_1.useState)(''), [assetType, setAssetType] = (0, react_1.useState)(''), [tag, setTag] = (0, react_1.useState)(''), [relation, setRelation] = (0, react_1.useState)('');
     const [graph, setGraph] = (0, react_1.useState)({ nodes: [], edges: [], mode: 'story', total: 0, truncated: false });
-    const [positions, setPositions] = (0, react_1.useState)(draft?.positions || {}), [view, setView] = (0, react_1.useState)(draft?.view || { x: 50, y: 50, scale: .7 });
-    const [hidden, setHidden] = (0, react_1.useState)(draft?.hidden || []), [collapsed, setCollapsed] = (0, react_1.useState)(draft?.collapsed || []), [multi, setMulti] = (0, react_1.useState)([]);
-    const [error, setError] = (0, react_1.useState)(''), [loading, setLoading] = (0, react_1.useState)(false), [dirty, setDirty] = (0, react_1.useState)(draft?.dirty || false), [linkFrom, setLinkFrom] = (0, react_1.useState)(null);
-    const [layoutName, setLayoutName] = (0, react_1.useState)(draft?.layoutName || 'Working arrangement'), [layoutRevision, setLayoutRevision] = (0, react_1.useState)(draft?.layoutRevision), [layoutId, setLayoutId] = (0, react_1.useState)(draft?.layoutId || '');
-    const [selectedEdge, setSelectedEdge] = (0, react_1.useState)(null), [deleteId, setDeleteId] = (0, react_1.useState)(null), [usage, setUsage] = (0, react_1.useState)(null);
+    const [positions, setPositions] = (0, react_1.useState)({}), [view, setView] = (0, react_1.useState)({ x: 50, y: 50, scale: .7 });
+    const [hidden, setHidden] = (0, react_1.useState)([]), [collapsed, setCollapsed] = (0, react_1.useState)([]), [multi, setMulti] = (0, react_1.useState)([]);
+    const [error, setError] = (0, react_1.useState)(''), [loading, setLoading] = (0, react_1.useState)(false), [dirty, setDirty] = (0, react_1.useState)(false), [saving, setSaving] = (0, react_1.useState)(false), [layoutConflict, setLayoutConflict] = (0, react_1.useState)(false), [layoutUnavailable, setLayoutUnavailable] = (0, react_1.useState)(false), [conflictId, setConflictId] = (0, react_1.useState)(null), [review, setReview] = (0, react_1.useState)(null), [refreshingConflict, setRefreshingConflict] = (0, react_1.useState)(false), [pendingNavigation, setPendingNavigation] = (0, react_1.useState)(null), [linkFrom, setLinkFrom] = (0, react_1.useState)(null);
+    const [layoutName, setLayoutName] = (0, react_1.useState)('Working arrangement'), [layoutRevision, setLayoutRevision] = (0, react_1.useState)(undefined), [layoutId, setLayoutId] = (0, react_1.useState)('');
+    const layoutNameRef = (0, react_1.useRef)(layoutName);
+    layoutNameRef.current = layoutName;
+    const [selectedEdge, setSelectedEdge] = (0, react_1.useState)(null), [deleteId, setDeleteId] = (0, react_1.useState)(null), [usage, setUsage] = (0, react_1.useState)(null), [usageLoading, setUsageLoading] = (0, react_1.useState)(false), [usageError, setUsageError] = (0, react_1.useState)('');
+    const usageRequest = (0, react_1.useRef)(0), deleteTarget = (0, react_1.useRef)(null);
     const stage = (0, react_1.useRef)(null);
     const drag = (0, react_1.useRef)(null);
     const moved = (0, react_1.useRef)(false);
     const positionsRef = (0, react_1.useRef)(positions);
     positionsRef.current = positions;
-    const restoreView = (0, react_1.useRef)(!!draft);
+    const layoutBaseline = (0, react_1.useRef)(null);
+    const currentDraft = { name: layoutName, mode, positions, settings: { hidden, collapsed, viewport: view, filters: { query, asset_type: assetType, tag, relation }, scene_id: scene, sequence_id: sequence } };
+    const draftRef = (0, react_1.useRef)(currentDraft);
+    draftRef.current = currentDraft;
+    const dirtyRef = (0, react_1.useRef)(false), editVersion = (0, react_1.useRef)(0), savePromise = (0, react_1.useRef)(null);
+    function markDirty() { editVersion.current += 1; dirtyRef.current = true; setDirty(true); }
+    (0, react_1.useEffect)(() => registerNavigationGuard(commit => { if (!dirtyRef.current)
+        return true; setPendingNavigation(() => commit); return false; }), [registerNavigationGuard]);
     (0, react_1.useEffect)(() => { if (!scene)
         setScene((0, utils_1.activeEntities)(state, 'scene')[0]?.id || ''); }, [state.entities]);
     (0, react_1.useEffect)(() => {
@@ -390,20 +509,47 @@ function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refre
         if (mode === 'story' && sequence)
             params.set('sequence_id', sequence);
         const timer = setTimeout(() => { (0, api_1.api)((0, api_1.projectPath)(state.project.id, '/graph?' + params), 'GET', undefined, cancel.signal).then(next => { if (!active)
-            return; setGraph(next); const base = (0, geometry_1.tidy)(next.nodes, next.edges, mode); const merged = { ...base, ...positionsRef.current }; setPositions(merged); const rect = stage.current?.getBoundingClientRect(); if (rect && query && !restoreView.current)
-            setView((0, geometry_1.fit)(Object.fromEntries(next.nodes.map(n => [n.id, merged[n.id]])), rect.width, rect.height)); restoreView.current = false; setError(''); }).catch(e => active && setError(e.message)).finally(() => active && setLoading(false)); }, query ? 150 : 0);
+            return; setGraph(next); const base = (0, geometry_1.tidy)(next.nodes, next.edges, mode); const merged = { ...base, ...positionsRef.current }; setPositions(merged); const rect = stage.current?.getBoundingClientRect(); if (rect && query)
+            setView((0, geometry_1.fit)(Object.fromEntries(next.nodes.map(n => [n.id, merged[n.id]])), rect.width, rect.height)); setError(''); }).catch(e => active && setError(e.message)).finally(() => active && setLoading(false)); }, query ? 150 : 0);
         return () => { active = false; cancel.abort(); clearTimeout(timer); };
     }, [state, mode, scene, sequence, query, assetType, tag, relation]);
-    // Capture after each committed edit, before another event can navigate away.
-    (0, react_1.useLayoutEffect)(() => { onDraftChange({ mode, scene, sequence, query, assetType, tag, relation, positions, view, hidden, collapsed, layoutName, layoutRevision, layoutId, dirty }); }, [onDraftChange, mode, scene, sequence, query, assetType, tag, relation, positions, view, hidden, collapsed, layoutName, layoutRevision, layoutId, dirty]);
+    (0, react_1.useEffect)(() => { const before = (e) => { if (dirty) {
+        e.preventDefault();
+        e.returnValue = '';
+    } }; window.addEventListener('beforeunload', before); return () => window.removeEventListener('beforeunload', before); }, [dirty]);
     const suppressed = (0, react_1.useMemo)(() => new Set([...hidden, ...(0, geometry_1.descendants)(graph.nodes, collapsed)]), [hidden, collapsed, graph]);
     const visible = graph.nodes.filter(n => !suppressed.has(n.id)), visibleIds = new Set(visible.map(n => n.id));
     const edges = graph.edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target));
     const bounds = () => stage.current?.getBoundingClientRect();
-    const fitView = () => { const rect = bounds(); if (rect)
-        setView((0, geometry_1.fit)(Object.fromEntries(visible.map(n => [n.id, positions[n.id] || { x: 0, y: 0 }])), rect.width, rect.height)); };
-    function switchMode(next) { if (dirty && !window.confirm('Change canvas view? Save this arrangement first if you want to keep it.'))
-        return; setMode(next); setNewKind(next === 'assets' ? 'asset' : next === 'scene' ? 'shot' : 'sequence'); setPositions({}); setHidden([]); setCollapsed([]); setLayoutId(''); setLayoutRevision(undefined); setDirty(false); setSelectedEdge(null); setView({ x: 50, y: 50, scale: .65 }); }
+    const fitView = () => { const rect = bounds(); if (rect) {
+        setView((0, geometry_1.fit)(Object.fromEntries(visible.map(n => [n.id, positions[n.id] || { x: 0, y: 0 }])), rect.width, rect.height));
+        markDirty();
+    } };
+    function restoreSaved(saved) { layoutBaseline.current = draftFromLayoutResult(saved); setLayoutId(saved.id); setLayoutName(saved.name); layoutNameRef.current = saved.name; setLayoutRevision(saved.revision); setLayoutConflict(false); setLayoutUnavailable(false); setConflictId(null); setReview(null); setPositions(saved.positions); setHidden(saved.settings.hidden || []); setCollapsed(saved.settings.collapsed || []); if (saved.settings.viewport)
+        setView(saved.settings.viewport); setScene(saved.settings.scene_id || scene); setSequence(saved.settings.sequence_id || ''); const filters = saved.settings.filters || {}; setQuery(filters.query || ''); setAssetType(filters.asset_type || ''); setTag(filters.tag || ''); setRelation(filters.relation || ''); dirtyRef.current = false; setDirty(false); }
+    function switchMode(next) { if (next === mode)
+        return; const change = () => { setMode(next); setNewKind(next === 'assets' ? 'asset' : next === 'scene' ? 'shot' : 'sequence'); const sameName = state.layouts.find(layout => layout.mode === next && layout.name === layoutName); if (sameName)
+        restoreSaved(sameName);
+    else {
+        layoutBaseline.current = null;
+        setPositions({});
+        setHidden([]);
+        setCollapsed([]);
+        setLayoutId('');
+        setLayoutName('Working arrangement');
+        layoutNameRef.current = 'Working arrangement';
+        setLayoutRevision(undefined);
+        setLayoutConflict(false);
+        setLayoutUnavailable(false);
+        setConflictId(null);
+        setReview(null);
+        dirtyRef.current = false;
+        setDirty(false);
+        setView({ x: 50, y: 50, scale: .65 });
+    } setSelectedEdge(null); }; if (dirtyRef.current) {
+        setPendingNavigation(() => change);
+        return;
+    } change(); }
     function select(node, event) {
         if (moved.current) {
             moved.current = false;
@@ -448,7 +594,7 @@ function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refre
     }
     else {
         setPositions(old => { const next = { ...old }; d.ids.forEach((id) => { const p = d.positions[id] || { x: 0, y: 0 }; next[id] = { x: p.x + dx / d.view.scale, y: p.y + dy / d.view.scale }; }); return next; });
-    } setDirty(true); }
+    } markDirty(); }
     function end(e) { if (drag.current?.pointer === e.pointerId) {
         drag.current = null;
         try {
@@ -465,10 +611,11 @@ function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refre
     else {
         e.preventDefault();
         setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
-    } setDirty(true); }
+    } markDirty(); }
     (0, react_1.useEffect)(() => { const el = stage.current; if (!el)
         return; el.addEventListener('wheel', wheel, { passive: false }); return () => el.removeEventListener('wheel', wheel); }, []);
-    function key(e, node) { if (e.key === 'Enter') {
+    function key(e, node) { const target = e.target; if (target && target !== e.currentTarget && target.closest('button,a,input,select,textarea,[contenteditable="true"]'))
+        return; if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         e.stopPropagation();
         select(node, e);
@@ -486,24 +633,164 @@ function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refre
         e.preventDefault();
         const d = delta[e.key], step = e.shiftKey ? 50 : 10;
         setPositions(old => ({ ...old, [node.id]: { x: (old[node.id]?.x || 0) + d.x * step, y: (old[node.id]?.y || 0) + d.y * step } }));
-        setDirty(true);
+        markDirty();
     } }
-    function requestDelete(id) { setDeleteId(id); setUsage(null); (0, api_1.runCommand)(state.project.id, 'entity.usage', { id }).then(setUsage).catch(e => setError(e.message)); }
-    async function save() { try {
-        const result = await (0, api_1.runCommand)(state.project.id, 'canvas.save', { name: layoutName, mode, positions, settings: { hidden, collapsed, viewport: view, filters: { query, asset_type: assetType, tag, relation }, scene_id: scene, sequence_id: sequence }, ...(layoutRevision ? { revision: layoutRevision } : {}) });
+    async function refreshUsage(id) { const request = ++usageRequest.current; deleteTarget.current = id; setUsage(null); setUsageError(''); setUsageLoading(true); try {
+        const result = await (0, api_1.runCommand)(state.project.id, 'entity.usage', { id });
+        if (request === usageRequest.current && deleteTarget.current === id)
+            setUsage(result);
+    }
+    catch (e) {
+        if (request === usageRequest.current && deleteTarget.current === id)
+            setUsageError(e.message || 'Could not check where this item is used.');
+    }
+    finally {
+        if (request === usageRequest.current && deleteTarget.current === id)
+            setUsageLoading(false);
+    } }
+    function closeDelete() { usageRequest.current += 1; deleteTarget.current = null; setDeleteId(null); setUsage(null); setUsageError(''); setUsageLoading(false); }
+    function requestDelete(id) { deleteTarget.current = id; setDeleteId(id); void refreshUsage(id); }
+    async function refreshConflict() { setRefreshingConflict(true); try {
+        const latestState = await refresh();
+        const stableId = conflictId || layoutId;
+        const latest = stableId ? latestState.layouts.find(item => item.id === stableId) : latestState.layouts.find(item => item.name === layoutName && item.mode === mode);
+        if (!latest) {
+            setReview(null);
+            setLayoutUnavailable(true);
+            setError('This saved arrangement is no longer available. Your local Canvas edits remain. Use Save as new to keep them under a new name.');
+            return;
+        }
+        setLayoutUnavailable(false);
+        const local = clone(draftRef.current);
+        const base = layoutBaseline.current?.id === latest.id ? asLayoutDraft(layoutBaseline.current) : null;
+        const compared = compareLayouts(base, local, asLayoutDraft(latest));
+        setReview({ remote: draftFromLayoutResult(latest), local, merged: compared.merged, changes: compared.changes, choices: {}, editVersion: editVersion.current });
+        setConflictId(latest.id);
+        setError('Latest saved revision loaded. Compare the saved and local fields, choose each conflicting value, then reapply.');
+    }
+    catch (e) {
+        setError(`Could not refresh the saved arrangement. Your local Canvas edits remain: ${e.message}`);
+    }
+    finally {
+        setRefreshingConflict(false);
+    } }
+    function labelChange(path) { if (path[0] === 'positions') {
+        const id = path[1], node = state.entities.find(item => item.id === id);
+        return `Card ${node ? (0, utils_1.displayTitle)(node.title) : 'removed card'} (${id}) · ${path[2] === 'x' ? 'horizontal position (x)' : 'vertical position (y)'}`;
+    } if (path[0] === 'settings')
+        return `Canvas setting · ${path.slice(1).join(' · ')}`; if (path[0] === 'name')
+        return 'Arrangement name'; if (path[0] === 'mode')
+        return 'Canvas view'; return path.join(' · '); }
+    function resolvedReviewDraft(active) { const next = clone(active.merged); for (const change of active.changes) {
+        if (!change.conflict)
+            continue;
+        const choice = active.choices[change.key];
+        if (choice)
+            writePath(next, change.path, choice === 'local' ? change.local : change.saved);
+    } return next; }
+    function setCanvasDraft(next) { setLayoutName(next.name); layoutNameRef.current = next.name; setMode(next.mode); setPositions(clone(next.positions)); const settings = next.settings || {}; setHidden(settings.hidden || []); setCollapsed(settings.collapsed || []); if (settings.viewport)
+        setView(settings.viewport); const filters = settings.filters || {}; setQuery(filters.query || ''); setAssetType(filters.asset_type || ''); setTag(filters.tag || ''); setRelation(filters.relation || ''); setScene(settings.scene_id || ''); setSequence(settings.sequence_id || ''); }
+    function saveAsNew() { const base = `${layoutName.trim() || 'Working arrangement'} copy`; let next = base, index = 2; while (state.layouts.some(item => item.mode === mode && item.name === next)) {
+        next = `${base} ${index++}`;
+    } setLayoutId(''); setLayoutRevision(undefined); layoutBaseline.current = null; setLayoutConflict(false); setLayoutUnavailable(false); setConflictId(null); setReview(null); setLayoutName(next); layoutNameRef.current = next; setError(''); markDirty(); }
+    async function save(approved) { if (savePromise.current)
+        return savePromise.current; if (!layoutName.trim() || (layoutConflict && !approved))
+        return false; if (approved && review?.changes.some(change => change.conflict && !review.choices[change.key]))
+        return false; const version = editVersion.current, requested = approved ? applyNewLocalEdits(approved.reference, draftRef.current, approved.draft) : clone(draftRef.current), snapshot = { name: requested.name, mode: requested.mode, positions: requested.positions, settings: requested.settings, ...((approved?.revision ?? layoutRevision) !== undefined ? { revision: approved?.revision ?? layoutRevision } : {}), ...(approved?.id || layoutId ? { layout_id: approved?.id || layoutId } : {}) }; setSaving(true); setError(''); const operation = (async () => { try {
+        const result = await (0, api_1.runCommand)(state.project.id, 'canvas.save', snapshot);
+        const saved = draftFromLayoutResult(result);
+        const current = editVersion.current === version ? saved : applyNewLocalEdits(requested, draftRef.current, asLayoutDraft(result));
+        if (approved)
+            setCanvasDraft(current);
+        layoutBaseline.current = saved;
         setLayoutId(result.id);
+        setLayoutName(current.name);
+        layoutNameRef.current = current.name;
         setLayoutRevision(result.revision);
-        setDirty(false);
-        await refresh();
-        notify('Canvas arrangement saved. Story order and connections stay the same.');
+        setLayoutConflict(false);
+        setLayoutUnavailable(false);
+        setConflictId(null);
+        setReview(null);
+        const hasNewerEdits = editVersion.current !== version;
+        if (!hasNewerEdits) {
+            dirtyRef.current = false;
+            setDirty(false);
+        }
+        else {
+            dirtyRef.current = true;
+            setDirty(true);
+        }
+        let refreshFailure = '';
+        try {
+            await refresh();
+        }
+        catch (e) {
+            refreshFailure = e.message;
+            setError(`Arrangement saved, but the project view could not refresh: ${e.message}`);
+        }
+        notify(refreshFailure ? 'Arrangement saved, but the project view could not refresh.' : 'Canvas arrangement saved. Story order and connections stay the same.');
+        return true;
     }
     catch (e) {
         setError(e.message);
+        if (e.code === 'revision_conflict') {
+            setLayoutConflict(true);
+            setLayoutUnavailable(false);
+            setConflictId(e.details?.id ? String(e.details.id) : layoutId || null);
+            setReview(null);
+        }
+        return false;
+    }
+    finally {
+        savePromise.current = null;
+        setSaving(false);
+    } })(); savePromise.current = operation; return operation; }
+    async function reapplyConflict() { if (!review)
+        return; const active = review; if (active.changes.some(change => change.conflict && !active.choices[change.key]))
+        return; const draft = resolvedReviewDraft(active); const saved = await save({ draft, id: active.remote.id, revision: active.remote.revision, reference: active.local }); if (saved && pendingNavigation && !dirtyRef.current) {
+        const commit = pendingNavigation;
+        setPendingNavigation(null);
+        commit();
     } }
-    function load(id) { const saved = state.layouts.find(l => l.id === id); if (!saved)
-        return; if (dirty && !window.confirm('Replace your unsaved arrangement with this saved one?'))
-        return; setLayoutId(id); setLayoutName(saved.name); setLayoutRevision(saved.revision); setPositions(saved.positions); setHidden(saved.settings.hidden || []); setCollapsed(saved.settings.collapsed || []); if (saved.settings.viewport)
-        setView(saved.settings.viewport); setScene(saved.settings.scene_id || scene); setSequence(saved.settings.sequence_id || ''); const filters = saved.settings.filters || {}; setQuery(filters.query || ''); setAssetType(filters.asset_type || ''); setTag(filters.tag || ''); setRelation(filters.relation || ''); setDirty(false); }
+    async function saveAndNavigate() { if (layoutConflict && review) {
+        await reapplyConflict();
+        return;
+    } const saved = await save(); if (saved && pendingNavigation && !dirtyRef.current) {
+        const commit = pendingNavigation;
+        setPendingNavigation(null);
+        commit();
+    }
+    else if (saved && dirtyRef.current)
+        setError('Canvas changed while the save was pending. Save again to keep those edits before leaving.'); }
+    function discardAndNavigate() { dirtyRef.current = false; setDirty(false); const commit = pendingNavigation; setPendingNavigation(null); commit?.(); }
+    function load(id) { if (savePromise.current)
+        return; const saved = state.layouts.find(l => l.id === id); if (!saved)
+        return; const restore = () => restoreSaved(saved); if (dirtyRef.current) {
+        setPendingNavigation(() => restore);
+        return;
+    } restore(); }
+    const conflictPanel = layoutConflict ? react_1.default.createElement("div", { className: "notice warning", role: "status" },
+        react_1.default.createElement("p", null, layoutUnavailable ? 'This saved arrangement is no longer available. Your local Canvas edits remain. Save them as a new arrangement to keep them.' : 'The saved arrangement changed elsewhere. Your local Canvas edits remain. Refresh the latest saved version, compare the changed fields, and choose how to resolve each overlap.'),
+        react_1.default.createElement("button", { onClick: () => void refreshConflict(), disabled: saving || refreshingConflict }, refreshingConflict ? 'Refreshing saved version…' : 'Refresh latest saved revision'),
+        layoutUnavailable && react_1.default.createElement("button", { onClick: saveAsNew, disabled: saving }, "Save as new arrangement"),
+        review && react_1.default.createElement("div", { className: "layout-conflict-review", "aria-label": "Saved and local arrangement changes" },
+            react_1.default.createElement("h3", null,
+                "Saved version ",
+                review.remote.revision,
+                " \u00B7 compare changes"),
+            review.changes.length ? react_1.default.createElement("ul", null, review.changes.map(change => react_1.default.createElement("li", { key: change.key, "data-conflict-path": change.key },
+                react_1.default.createElement("strong", null, labelChange(change.path)),
+                react_1.default.createElement("div", { className: "layout-conflict-values" },
+                    react_1.default.createElement("span", null,
+                        "Saved: ",
+                        change.saved.present ? JSON.stringify(change.saved.value) : 'Not set'),
+                    react_1.default.createElement("span", null,
+                        "Local: ",
+                        change.local.present ? JSON.stringify(change.local.value) : 'Not set')),
+                change.conflict ? react_1.default.createElement("div", { className: "layout-conflict-choices" },
+                    react_1.default.createElement("button", { "aria-pressed": review.choices[change.key] === 'local', onClick: () => setReview(old => old ? { ...old, choices: { ...old.choices, [change.key]: 'local' } } : old) }, "Keep local"),
+                    react_1.default.createElement("button", { "aria-pressed": review.choices[change.key] === 'saved', onClick: () => setReview(old => old ? { ...old, choices: { ...old.choices, [change.key]: 'saved' } } : old) }, "Use saved")) : react_1.default.createElement("small", null, "These edits do not overlap and will be merged automatically.")))) : react_1.default.createElement("p", null, "The saved and local arrangement fields match. You can safely reapply the current draft."),
+            react_1.default.createElement("button", { className: "primary", onClick: () => void reapplyConflict(), disabled: saving || review.changes.some(change => change.conflict && !review.choices[change.key]) }, "Reapply merged arrangement"))) : null;
     const selectedNode = state.entities.find(n => n.id === selected);
     const tags = [...new Set(state.entities.flatMap(e => e.tags))].sort();
     return react_1.default.createElement("div", { className: "canvas-page" },
@@ -519,24 +806,24 @@ function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refre
                     (0, utils_1.human)(newKind).toLowerCase()),
                 react_1.default.createElement("button", { onClick: () => action('link.create') }, "Connect items")) }),
         react_1.default.createElement("div", { className: "canvas-controls" },
-            react_1.default.createElement("div", { className: "segmented", "aria-label": "Canvas view" }, [['story', 'Story flow'], ['assets', 'Reference map'], ['scene', 'Scene board']].map(([value, label]) => react_1.default.createElement("button", { key: value, "aria-pressed": mode === value, onClick: () => switchMode(value) }, label))),
+            react_1.default.createElement("div", { className: "segmented", "aria-label": "Canvas view" }, [['story', 'Story flow'], ['assets', 'Reference map'], ['scene', 'Scene board']].map(([value, label]) => react_1.default.createElement("button", { key: value, "aria-pressed": mode === value, onClick: () => switchMode(value), disabled: saving }, label))),
             react_1.default.createElement("label", { className: "search" },
                 react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
-                react_1.default.createElement("input", { "aria-label": "Search canvas cards", placeholder: "Find a card\u2026", value: query, onChange: (e) => setQuery(e.target.value) })),
-            mode === 'scene' && react_1.default.createElement("select", { "aria-label": "Scene to show", value: scene, onChange: (e) => setScene(e.target.value) },
+                react_1.default.createElement("input", { "aria-label": "Search canvas cards", placeholder: "Find a card\u2026", value: query, onChange: (e) => { setQuery(e.target.value); markDirty(); } })),
+            mode === 'scene' && react_1.default.createElement("select", { "aria-label": "Scene to show", value: scene, onChange: (e) => { setScene(e.target.value); markDirty(); } },
                 react_1.default.createElement("option", { value: "" }, "Choose a scene"),
                 (0, utils_1.activeEntities)(state, 'scene').map(n => react_1.default.createElement("option", { key: n.id, value: n.id }, n.title))),
-            mode === 'story' && react_1.default.createElement("select", { "aria-label": "Show sequence", value: sequence, onChange: (e) => setSequence(e.target.value) },
+            mode === 'story' && react_1.default.createElement("select", { "aria-label": "Show sequence", value: sequence, onChange: (e) => { setSequence(e.target.value); markDirty(); } },
                 react_1.default.createElement("option", { value: "" }, "All sequences"),
                 (0, utils_1.activeEntities)(state, 'sequence').map(n => react_1.default.createElement("option", { key: n.id, value: n.id }, n.title))),
             mode === 'assets' && react_1.default.createElement(react_1.default.Fragment, null,
-                react_1.default.createElement("select", { "aria-label": "Filter by item type", value: assetType, onChange: (e) => setAssetType(e.target.value) },
+                react_1.default.createElement("select", { "aria-label": "Filter by item type", value: assetType, onChange: (e) => { setAssetType(e.target.value); markDirty(); } },
                     react_1.default.createElement("option", { value: "" }, "All item types"),
                     ['character', 'location', 'prop', 'reference'].map(t => react_1.default.createElement("option", { key: t, value: t }, (0, utils_1.human)(t)))),
-                react_1.default.createElement("select", { "aria-label": "Tag filter", value: tag, onChange: (e) => setTag(e.target.value) },
+                react_1.default.createElement("select", { "aria-label": "Tag filter", value: tag, onChange: (e) => { setTag(e.target.value); markDirty(); } },
                     react_1.default.createElement("option", { value: "" }, "All tags"),
                     tags.map(t => react_1.default.createElement("option", { key: t, value: t }, (0, utils_1.human)(t)))),
-                react_1.default.createElement("select", { "aria-label": "Filter by connection", value: relation, onChange: (e) => setRelation(e.target.value) },
+                react_1.default.createElement("select", { "aria-label": "Filter by connection", value: relation, onChange: (e) => { setRelation(e.target.value); markDirty(); } },
                     react_1.default.createElement("option", { value: "" }, "All connections"),
                     ['appears-at', 'alternate-view-of', 'wears', 'part-of', 'related-to'].map(t => react_1.default.createElement("option", { key: t, value: t }, (0, utils_1.human)(t)))))),
         error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
@@ -547,20 +834,21 @@ function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refre
             ". Tab to a destination and press Enter, or click a node. ",
             react_1.default.createElement("button", { onClick: () => setLinkFrom(null) }, "Cancel link")),
         react_1.default.createElement("div", { className: "canvas-layout-bar" },
-            react_1.default.createElement("select", { "aria-label": "Saved arrangement", value: layoutId, onChange: (e) => load(e.target.value) },
+            react_1.default.createElement("select", { "aria-label": "Saved arrangement", value: layoutId, disabled: saving, onChange: (e) => load(e.target.value) },
                 react_1.default.createElement("option", { value: "" }, "New arrangement"),
+                layoutId && !state.layouts.some(l => l.id === layoutId) && react_1.default.createElement("option", { value: layoutId }, "Unavailable arrangement"),
                 state.layouts.filter(l => l.mode === mode).map(l => react_1.default.createElement("option", { key: l.id, value: l.id }, l.name))),
-            react_1.default.createElement("input", { "aria-label": "Arrangement name", value: layoutName, onChange: (e) => { setLayoutName(e.target.value); if (e.target.value !== state.layouts.find(l => l.id === layoutId)?.name) {
-                    setLayoutRevision(undefined);
-                    setLayoutId('');
-                } setDirty(true); } }),
-            react_1.default.createElement("button", { onClick: save, disabled: !layoutName.trim() }, "Save arrangement"),
-            react_1.default.createElement("button", { onClick: () => { setPositions((0, geometry_1.tidy)(graph.nodes, graph.edges, mode)); setDirty(true); } }, "Arrange cards"),
+            react_1.default.createElement("input", { "aria-label": "Arrangement name", value: layoutName, onChange: (e) => { layoutNameRef.current = e.target.value; setLayoutName(e.target.value); markDirty(); } }),
+            react_1.default.createElement("button", { onClick: () => void save(), disabled: !layoutName.trim() || saving || layoutConflict }, saving ? 'Saving…' : 'Save arrangement'),
+            layoutId && react_1.default.createElement("button", { onClick: saveAsNew, disabled: saving }, "Save as new"),
+            react_1.default.createElement("button", { onClick: () => { setPositions((0, geometry_1.tidy)(graph.nodes, graph.edges, mode)); markDirty(); } }, "Arrange cards"),
             react_1.default.createElement("button", { onClick: fitView }, "Fit canvas"),
-            hidden.length > 0 && react_1.default.createElement("button", { onClick: () => { setHidden([]); setDirty(true); } },
+            dirty && react_1.default.createElement("span", { role: "status" }, "Unsaved changes"),
+            hidden.length > 0 && react_1.default.createElement("button", { onClick: () => { setHidden([]); markDirty(); } },
                 "Show ",
                 hidden.length,
                 " hidden cards")),
+        conflictPanel,
         react_1.default.createElement("div", { ref: stage, className: `graph-stage ${linkFrom ? 'linking' : ''}`, tabIndex: 0, "aria-label": "Interactive story canvas. Use Tab to select a card, arrow keys to move it, L to connect it, and Delete to review removal.", onPointerDown: (e) => startDrag(e), onPointerMove: move, onPointerUp: end, onPointerCancel: end, onKeyDown: (e) => { if (e.key === 'Escape') {
                 setLinkFrom(null);
                 setSelectedEdge(null);
@@ -598,19 +886,18 @@ function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refre
                                 node.frame_state ? react_1.default.createElement(Primitives_1.Badge, { kind: node.frame_state },
                                     (0, utils_1.statusLabel)(node.frame_state),
                                     " image") : node.tags.slice(0, 2).map(t => react_1.default.createElement("span", { key: t, className: "tag" }, t)),
-                                node.child_count > 0 && node.kind !== 'asset' && react_1.default.createElement("button", { "aria-label": `${collapsed.includes(node.id) ? 'Expand' : 'Collapse'} ${(0, utils_1.displayTitle)(node.title)}`, onClick: (e) => { e.stopPropagation(); setCollapsed(v => v.includes(node.id) ? v.filter(id => id !== node.id) : [...v, node.id]); setDirty(true); } }, collapsed.includes(node.id) ? '+' : '−'))));
+                                node.child_count > 0 && node.kind !== 'asset' && react_1.default.createElement("button", { "aria-label": `${collapsed.includes(node.id) ? 'Expand' : 'Collapse'} ${(0, utils_1.displayTitle)(node.title)}`, onClick: (e) => { e.stopPropagation(); setCollapsed(v => v.includes(node.id) ? v.filter(id => id !== node.id) : [...v, node.id]); markDirty(); } }, collapsed.includes(node.id) ? '+' : '−'))));
                 })),
             !visible.length && !loading && react_1.default.createElement(Primitives_1.Empty, { title: mode === 'scene' ? 'Choose a scene to build its board' : mode === 'assets' ? 'Build your reference library' : 'Start your story map', action: react_1.default.createElement("button", { onClick: () => action(mode === 'assets' ? 'asset.create' : mode === 'scene' ? 'scene.create' : 'sequence.create') },
                     "Create a ",
                     mode === 'assets' ? 'reference item' : mode === 'scene' ? 'scene' : 'sequence') }, mode === 'assets' ? 'Add characters, places, props, and other references here. Their connections will appear as your library grows.' : 'Create items here or in the story outline. Story order and reference connections will appear as you build.'),
             react_1.default.createElement("div", { className: "canvas-zoom", onPointerDown: (e) => e.stopPropagation() },
-                react_1.default.createElement("button", { "aria-label": "Zoom out", onClick: () => setView(v => (0, geometry_1.zoomAt)(v, { x: 200, y: 200 }, .8)) }, "\u2212"),
+                react_1.default.createElement("button", { "aria-label": "Zoom out", onClick: () => { setView(v => (0, geometry_1.zoomAt)(v, { x: 200, y: 200 }, .8)); markDirty(); } }, "\u2212"),
                 react_1.default.createElement("span", null,
                     Math.round(view.scale * 100),
                     "%"),
-                react_1.default.createElement("button", { "aria-label": "Zoom in", onClick: () => setView(v => (0, geometry_1.zoomAt)(v, { x: 200, y: 200 }, 1.25)) }, "+"))),
+                react_1.default.createElement("button", { "aria-label": "Zoom in", onClick: () => { setView(v => (0, geometry_1.zoomAt)(v, { x: 200, y: 200 }, 1.25)); markDirty(); } }, "+"))),
         react_1.default.createElement("div", { className: "canvas-status" },
-            dirty && react_1.default.createElement("span", { role: "status" }, "Unsaved arrangement \u00B7 kept while you navigate"),
             react_1.default.createElement("span", null,
                 loading ? 'Loading…' : `${visible.length} cards · ${edges.length} connections`,
                 graph.truncated && ` · ${graph.total} matches; narrow your search to see more (up to 250 cards at a time)`),
@@ -628,21 +915,34 @@ function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refre
                     action('story.move', (0, utils_1.commandDefaults)(child)); } }, "Move in story") : selectedEdge.kind === 'location_default' ? react_1.default.createElement("button", { onClick: () => { const owner = state.entities.find(n => n.id === selectedEdge.source); if (owner)
                     action(owner.kind + '.update', (0, utils_1.commandDefaults)(owner)); } }, "Edit location\u2026") : react_1.default.createElement("button", { onClick: () => action(selectedEdge.kind === 'assignment' ? 'assignment.remove' : 'link.remove', { id: selectedEdge.id, revision: selectedEdge.revision }) }, "Remove connection\u2026"),
             react_1.default.createElement("button", { onClick: () => setSelectedEdge(null) }, "Close")),
-        deleteId && react_1.default.createElement(Primitives_1.Modal, { title: "Remove this card?", onClose: () => setDeleteId(null) },
-            react_1.default.createElement("div", { className: "modal-body" },
+        deleteId && react_1.default.createElement(Primitives_1.Modal, { title: "Remove this card?", onClose: closeDelete },
+            react_1.default.createElement("div", { className: "modal-body", "data-removal-id": deleteId },
                 react_1.default.createElement("p", null, "Hiding a card removes it from this arrangement. Archiving takes the item out of the active story; deleting removes it permanently."),
                 usage ? react_1.default.createElement("div", { className: "usage-summary" },
                     react_1.default.createElement("p", null, usage.can_delete ? 'This item is not used elsewhere.' : 'This item is used in these places:'),
                     Object.entries(usage).filter(([key, value]) => key !== 'can_delete' && Array.isArray(value) && value.length > 0).length > 0 && react_1.default.createElement("ul", null, Object.entries(usage).filter(([key, value]) => key !== 'can_delete' && Array.isArray(value) && value.length > 0).map(([key, value]) => react_1.default.createElement("li", { key: key },
                         (0, utils_1.human)(key),
                         " \u00B7 ",
-                        value.length)))) : react_1.default.createElement("p", null, "Checking where this item is used\u2026"),
+                        value.length)))) : usageLoading ? react_1.default.createElement("p", { role: "status" }, "Checking where this item is used\u2026") : usageError ? react_1.default.createElement("div", { className: "notice error", role: "alert" },
+                    react_1.default.createElement("strong", null, "We couldn\u2019t check where this item is used."),
+                    react_1.default.createElement("p", null, usageError),
+                    react_1.default.createElement("button", { onClick: () => void refreshUsage(deleteId) }, "Retry usage check")) : react_1.default.createElement("p", { role: "status" }, "Usage details are unavailable."),
                 react_1.default.createElement("div", { className: "form-stack" },
-                    react_1.default.createElement("button", { onClick: () => { setHidden([...hidden, deleteId]); setDirty(true); setDeleteId(null); } }, "Hide from this arrangement"),
-                    react_1.default.createElement("button", { onClick: () => { const n = state.entities.find(n => n.id === deleteId); if (n)
-                            action('entity.archive', (0, utils_1.commandDefaults)(n)); setDeleteId(null); } }, "Archive item\u2026"),
-                    react_1.default.createElement("button", { className: "danger", disabled: !usage?.can_delete, onClick: () => { const n = state.entities.find(n => n.id === deleteId); if (n)
-                            action('entity.delete', (0, utils_1.commandDefaults)(n)); setDeleteId(null); } }, "Delete item\u2026")))));
+                    react_1.default.createElement("button", { onClick: () => { setHidden([...hidden, deleteId]); markDirty(); closeDelete(); } }, "Hide from this arrangement"),
+                    react_1.default.createElement("button", { disabled: !usage || usageLoading, onClick: () => { const n = state.entities.find(n => n.id === deleteId); if (n)
+                            action('entity.archive', (0, utils_1.commandDefaults)(n)); closeDelete(); } }, "Archive item\u2026"),
+                    react_1.default.createElement("button", { className: "danger", disabled: !usage?.can_delete || usageLoading, onClick: () => { const n = state.entities.find(n => n.id === deleteId); if (n)
+                            action('entity.delete', (0, utils_1.commandDefaults)(n)); closeDelete(); } }, "Delete item\u2026")))),
+        pendingNavigation && react_1.default.createElement(Primitives_1.Modal, { title: "Unsaved canvas arrangement", onClose: () => setPendingNavigation(null) },
+            react_1.default.createElement("div", { className: "modal-body" },
+                react_1.default.createElement("p", null, "Your Canvas changes have not been saved. Save them to this arrangement, discard them, or stay on this view. The current geometry remains available while you decide."),
+                error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+                " ",
+                conflictPanel),
+            react_1.default.createElement("div", { className: "modal-footer" },
+                react_1.default.createElement("button", { onClick: () => setPendingNavigation(null) }, "Stay"),
+                react_1.default.createElement("button", { onClick: discardAndNavigate }, "Discard changes"),
+                react_1.default.createElement("button", { className: "primary", disabled: !layoutName.trim() || saving || layoutConflict, onClick: () => void saveAndNavigate() }, saving ? 'Saving…' : 'Save and continue'))));
 }
 
 },
@@ -735,33 +1035,189 @@ const react_1 = __importStar(require("../react"));
 const api_1 = require("../api");
 const utils_1 = require("../utils");
 const Primitives_1 = require("./Primitives");
+const remoteSources = new Set(['documents', 'document_nodes', 'versions', 'provenance_edges', 'annotations', 'provenance_endpoints', 'provenance_source', 'provenance_target', 'provenance_typed_endpoint']);
 function ActionDialog({ command, state, meta, defaults = {}, onClose, onDone, onReload }) {
     const initialize = (initial) => ({ ...Object.fromEntries(command.fields.map(f => [f.name, initial[f.name] ?? f.default ?? (f.type === 'boolean' ? false : f.type === 'json' ? '{}' : '')])), ...(initial.asset_id ? { asset_id: initial.asset_id } : {}) });
     const [values, setValues] = (0, react_1.useState)(() => initialize(defaults));
     const [busy, setBusy] = (0, react_1.useState)(false);
+    const busyRef = (0, react_1.useRef)(false);
+    const [cancelBusy, setCancelBusy] = (0, react_1.useState)(false);
     const [error, setError] = (0, react_1.useState)(null);
     const [confirmed, setConfirmed] = (0, react_1.useState)(false);
-    const set = (name, value) => {
-        setValues(previous => {
-            const next = { ...previous, [name]: value };
-            const record = (0, utils_1.allRecords)(state).find(r => r.id === value);
-            if (record && ['id', 'source_id'].includes(name)) {
-                next.revision = record.revision;
-                if (command.name.endsWith('.update')) {
-                    Object.assign(next, (0, utils_1.commandDefaults)(record));
-                }
+    const [choices, setChoices] = (0, react_1.useState)({});
+    const [queries, setQueries] = (0, react_1.useState)({});
+    const [choiceRecords, setChoiceRecords] = (0, react_1.useState)({});
+    const [choiceLoading, setChoiceLoading] = (0, react_1.useState)({});
+    const [resolving, setResolving] = (0, react_1.useState)({});
+    const valuesRef = (0, react_1.useRef)(values);
+    valuesRef.current = values;
+    const queriesRef = (0, react_1.useRef)(queries);
+    queriesRef.current = queries;
+    const alive = (0, react_1.useRef)(true);
+    const requests = (0, react_1.useRef)({});
+    const stateRef = (0, react_1.useRef)(state);
+    stateRef.current = state;
+    const contextFields = ['id', 'document_id', 'version_id', 'source_type', 'target_type', 'endpoint_type', 'kind', 'record_id', 'endpoint_id'];
+    const context = Object.fromEntries(command.fields.filter(f => ['id', 'document_id', 'version_id', 'source_type', 'target_type', 'endpoint_type', 'kind', 'record_id', 'endpoint_id'].includes(f.name)).map(f => [f.name, values[f.name]]));
+    const contextKey = JSON.stringify(context);
+    function contextFor(current) { return JSON.stringify(Object.fromEntries(command.fields.filter(f => contextFields.includes(f.name)).map(f => [f.name, current[f.name]]))); }
+    function selectionKey(current) { return JSON.stringify(Object.fromEntries(command.fields.filter(f => remoteSources.has(f.source) || f.name.endsWith('_id')).map(f => [f.name, current[f.name]]))); }
+    function scopedRequestKey(current) { return JSON.stringify({ project: stateRef.current.project.id, command: command.name, context: contextFor(current), selection: selectionKey(current) }); }
+    function scopedRequestIsCurrent(name, controller, key, current = valuesRef.current) { return alive.current && !controller.signal.aborted && requests.current[name] === controller && scopedRequestKey(current) === key; }
+    function invalidateScopedRequests(previous, next) {
+        const changed = command.fields.some(f => (remoteSources.has(f.source) || f.name.endsWith('_id') || contextFields.includes(f.name)) && previous[f.name] !== next[f.name]);
+        if (changed)
+            for (const name of ['reload', 'cancelRun']) {
+                requests.current[name]?.abort();
+                delete requests.current[name];
             }
-            if (record && name === 'target_id' && 'target_revision' in next)
-                next.target_revision = record.revision;
-            if (name === 'asset_id')
-                next.media_id = '';
-            return next;
-        });
+    }
+    function fieldContext(name, current = valuesRef.current) {
+        const source = command.fields.find(f => f.name === name)?.source;
+        const names = source === 'document_nodes' ? ['document_id', 'version_id'] : source === 'versions' ? ['document_id', 'id'] : source === 'provenance_source' ? ['source_type'] : source === 'provenance_target' ? ['target_type'] : source === 'provenance_typed_endpoint' ? ['kind', 'endpoint_type'] : source === 'provenance_endpoints' ? ['source_type', 'target_type', 'kind', 'endpoint_type'] : [];
+        return JSON.stringify(Object.fromEntries(names.filter(key => command.fields.some(f => f.name === key)).map(key => [key, current[key]])));
+    }
+    function requestKey(name) { return fieldContext(name) + '|' + (queriesRef.current[name] || ''); }
+    function dependentFields(name) {
+        if (name === 'document_id' || name === 'id' && command.fields.find(f => f.name === name)?.source === 'documents')
+            return ['version_id', 'node_id', 'parent_id'];
+        return { version_id: ['parent_id', 'node_id'], source_type: ['source_id'], target_type: ['target_id'], kind: ['record_id'], endpoint_type: ['endpoint_id'] }[name] || [];
+    }
+    function clearDependents(name, value) {
+        const cleared = valuesRef.current[name] !== value ? dependentFields(name) : [];
+        for (const field of cleared) {
+            requests.current['record:' + field]?.abort();
+            delete requests.current['record:' + field];
+        }
+        if (cleared.length) {
+            invalidateScopedRequests(valuesRef.current, { ...valuesRef.current, ...Object.fromEntries(cleared.map(field => [field, ''])) });
+            setResolving(previous => ({ ...previous, ...Object.fromEntries(cleared.map(field => [field, false])) }));
+            setChoiceRecords(previous => { const next = { ...previous }; for (const field of cleared)
+                delete next[field]; return next; });
+        }
+        return cleared;
+    }
+    (0, react_1.useEffect)(() => { alive.current = true; return () => { alive.current = false; for (const controller of Object.values(requests.current))
+        controller.abort(); }; }, []);
+    function choicePath(name, id) { return (0, api_1.projectPath)(stateRef.current.project.id, `/commands/${encodeURIComponent(command.name)}/fields/${encodeURIComponent(name)}/choices${id ? '/' + encodeURIComponent(id) : ''}`); }
+    function asError(e) { return e instanceof api_1.ApiError ? e : new api_1.ApiError('invalid', e instanceof Error ? e.message : String(e)); }
+    function recordValues(previous, name, record, preserveDraft = false) {
+        const next = { ...previous };
+        if (['id', 'document_id', 'node_id', 'edge_id', 'annotation_id'].includes(name) && record.revision !== undefined)
+            next.revision = record.revision;
+        if (!preserveDraft && command.name === 'annotation.update' && name === 'annotation_id') {
+            next.content = record.text;
+            next.state = record.state;
+        }
+        return next;
+    }
+    (0, react_1.useEffect)(() => {
+        const controller = new AbortController();
+        for (const field of command.fields.filter(f => remoteSources.has(f.source))) {
+            requests.current['page:' + field.name]?.abort();
+            delete requests.current['page:' + field.name];
+            const key = requestKey(field.name);
+            setChoiceLoading(previous => ({ ...previous, [field.name]: true }));
+            const params = new URLSearchParams({ values: contextKey, query: queries[field.name] || '', limit: '100', offset: '0' });
+            (0, api_1.api)(choicePath(field.name) + '?' + params, 'GET', undefined, controller.signal)
+                .then(page => { if (alive.current && !controller.signal.aborted && requestKey(field.name) === key)
+                setChoices(previous => ({ ...previous, [field.name]: page })); })
+                .catch(e => { if (alive.current && e.name !== 'AbortError' && !controller.signal.aborted)
+                setError(asError(e)); })
+                .finally(() => { if (!controller.signal.aborted)
+                setChoiceLoading(previous => ({ ...previous, [field.name]: false })); });
+        }
+        return () => controller.abort();
+    }, [command.name, state.project.id, contextKey, JSON.stringify(queries)]);
+    (0, react_1.useEffect)(() => { for (const field of command.fields.filter(f => remoteSources.has(f.source) && valuesRef.current[f.name]))
+        void selectRemote(field.name, valuesRef.current[field.name]); }, [command.name, state.project.id]);
+    async function selectRemote(name, value) {
+        requests.current['record:' + name]?.abort();
+        const before = valuesRef.current;
+        const cleared = clearDependents(name, value);
+        const nextValues = { ...before, ...Object.fromEntries(cleared.map(field => [field, ''])), [name]: value, ...(['id', 'document_id', 'node_id', 'edge_id', 'annotation_id'].includes(name) ? { revision: '' } : {}) };
+        invalidateScopedRequests(before, nextValues);
+        setValues(previous => ({ ...previous, ...Object.fromEntries(cleared.map(field => [field, ''])), [name]: value, ...(['id', 'document_id', 'node_id', 'edge_id', 'annotation_id'].includes(name) ? { revision: '' } : {}) }));
+        setChoiceRecords(previous => { const next = { ...previous }; delete next[name]; return next; });
+        if (!value) {
+            delete requests.current['record:' + name];
+            setResolving(previous => ({ ...previous, [name]: false }));
+            return;
+        }
+        const controller = new AbortController();
+        requests.current['record:' + name] = controller;
+        const key = fieldContext(name);
+        setResolving(previous => ({ ...previous, [name]: true }));
+        try {
+            const record = await (0, api_1.api)(choicePath(name, value) + '?' + new URLSearchParams({ values: contextKey }), 'GET', undefined, controller.signal);
+            if (!alive.current || controller.signal.aborted || requests.current['record:' + name] !== controller || fieldContext(name) !== key || valuesRef.current[name] !== value)
+                return;
+            setValues(previous => previous[name] === value ? recordValues(previous, name, record) : previous);
+            setChoiceRecords(previous => ({ ...previous, [name]: record }));
+        }
+        catch (e) {
+            if (alive.current && !controller.signal.aborted)
+                setError(asError(e));
+        }
+        finally {
+            if (alive.current && requests.current['record:' + name] === controller) {
+                delete requests.current['record:' + name];
+                setResolving(previous => ({ ...previous, [name]: false }));
+            }
+        }
+    }
+    async function moreChoices(name) {
+        const offset = choices[name]?.next_offset;
+        if (offset == null)
+            return;
+        requests.current['page:' + name]?.abort();
+        const controller = new AbortController();
+        requests.current['page:' + name] = controller;
+        const key = requestKey(name);
+        setChoiceLoading(previous => ({ ...previous, [name]: true }));
+        try {
+            const page = await (0, api_1.api)(choicePath(name) + '?' + new URLSearchParams({ values: contextKey, query: queries[name] || '', limit: '100', offset: String(offset) }), 'GET', undefined, controller.signal);
+            if (!alive.current || controller.signal.aborted || requestKey(name) !== key)
+                return;
+            setChoices(previous => ({ ...previous, [name]: { ...page, items: [...(previous[name]?.items || []), ...page.items] } }));
+        }
+        catch (e) {
+            if (alive.current && !controller.signal.aborted)
+                setError(asError(e));
+        }
+        finally {
+            if (alive.current && requests.current['page:' + name] === controller) {
+                delete requests.current['page:' + name];
+                setChoiceLoading(previous => ({ ...previous, [name]: false }));
+            }
+        }
+    }
+    const set = (name, value) => {
+        const before = valuesRef.current, cleared = clearDependents(name, value), next = { ...before, ...Object.fromEntries(cleared.map(field => [field, ''])), [name]: value };
+        const record = (0, utils_1.allRecords)(state).find(r => r.id === value);
+        if (record && ['id', 'source_id'].includes(name)) {
+            next.revision = record.revision;
+            if (command.name.endsWith('.update')) {
+                Object.assign(next, (0, utils_1.commandDefaults)(record));
+            }
+        }
+        if (record && name === 'target_id' && 'target_revision' in next)
+            next.target_revision = record.revision;
+        if (name === 'asset_id')
+            next.media_id = '';
+        invalidateScopedRequests(before, next);
+        setValues(next);
     };
     async function submit(e) {
         e.preventDefault();
+        if (busyRef.current || Object.values(resolving).some(Boolean) || !alive.current)
+            return;
+        busyRef.current = true;
         setBusy(true);
         setError(null);
+        const controller = new AbortController();
+        requests.current.submit?.abort();
+        requests.current.submit = controller;
         try {
             const payload = {};
             for (const f of command.fields) {
@@ -786,67 +1242,146 @@ function ActionDialog({ command, state, meta, defaults = {}, onClose, onDone, on
                     v = Array.isArray(v) ? v : String(v).split(',').map(s => s.trim()).filter(Boolean);
                 payload[f.name] = v;
             }
-            const result = await (0, api_1.runCommand)(state.project.id, command.name, payload);
+            const result = await (0, api_1.api)((0, api_1.projectPath)(stateRef.current.project.id, `/commands/${encodeURIComponent(command.name)}`), 'POST', payload, controller.signal);
+            if (!alive.current || controller.signal.aborted || requests.current.submit !== controller)
+                return;
             await onDone(result, command.name);
-            onClose();
+            if (alive.current && !controller.signal.aborted && requests.current.submit === controller)
+                onClose();
         }
         catch (e) {
-            setError(e instanceof api_1.ApiError ? e : new api_1.ApiError('invalid', e instanceof Error ? e.message : String(e)));
+            if (alive.current && !controller.signal.aborted && requests.current.submit === controller)
+                setError(e instanceof api_1.ApiError ? e : new api_1.ApiError('invalid', e instanceof Error ? e.message : String(e)));
         }
         finally {
-            setBusy(false);
+            busyRef.current = false;
+            if (alive.current && requests.current.submit === controller) {
+                delete requests.current.submit;
+                setBusy(false);
+            }
         }
     }
-    async function cancelRun() { try {
-        const fresh = await onReload();
-        const job = fresh.jobs.find(j => j.id === values.id);
-        if (job && ['queued', 'running'].includes(job.status))
-            await (0, api_1.runCommand)(state.project.id, 'job.cancel', { id: job.id, revision: job.revision });
+    async function cancelRun() {
+        if (!alive.current || cancelBusy)
+            return;
+        requests.current.cancelRun?.abort();
+        const controller = new AbortController();
+        requests.current.cancelRun = controller;
+        const key = scopedRequestKey(valuesRef.current);
+        setCancelBusy(true);
+        const current = () => scopedRequestIsCurrent('cancelRun', controller, key);
+        try {
+            const fresh = await onReload();
+            if (!current())
+                return;
+            const job = fresh.jobs.find(j => j.id === valuesRef.current.id);
+            if (job && ['queued', 'running'].includes(job.status)) {
+                await (0, api_1.api)((0, api_1.projectPath)(stateRef.current.project.id, '/commands/job.cancel'), 'POST', { id: job.id, revision: job.revision }, controller.signal);
+            }
+        }
+        catch (e) {
+            if (current())
+                setError(asError(e));
+        }
+        finally {
+            if (requests.current.cancelRun === controller) {
+                delete requests.current.cancelRun;
+                if (alive.current && !controller.signal.aborted)
+                    setCancelBusy(false);
+            }
+        }
     }
-    catch (e) {
-        setError(e instanceof api_1.ApiError ? e : new api_1.ApiError('invalid', String(e)));
-    } }
-    async function reload() { const fresh = await onReload(); const current = (0, utils_1.allRecords)(fresh).find(r => r.id === values.id); if (current) {
-        setValues(initialize((0, utils_1.commandDefaults)(current)));
-        setError(null);
-    } }
-    return react_1.default.createElement(Primitives_1.Modal, { title: command.label, onClose: () => { if (!busy)
+    async function reload() {
+        requests.current.reload?.abort();
+        const controller = new AbortController();
+        requests.current.reload = controller;
+        const selected = { ...valuesRef.current };
+        const key = scopedRequestKey(selected);
+        const serializedContext = contextFor(selected);
+        const current = () => scopedRequestIsCurrent('reload', controller, key);
+        try {
+            const fresh = await onReload();
+            if (!current())
+                return;
+            const field = command.fields.find(f => remoteSources.has(f.source) && ['id', 'document_id', 'node_id', 'edge_id', 'annotation_id'].includes(f.name) && selected[f.name]);
+            if (field) {
+                const recordId = selected[field.name];
+                const record = await (0, api_1.api)(choicePath(field.name, recordId) + '?' + new URLSearchParams({ values: serializedContext }), 'GET', undefined, controller.signal);
+                if (!current() || valuesRef.current[field.name] !== recordId)
+                    return;
+                setValues(previous => scopedRequestKey(previous) === key && previous[field.name] === recordId ? recordValues(previous, field.name, record, true) : previous);
+                setChoiceRecords(previous => scopedRequestKey(valuesRef.current) === key && valuesRef.current[field.name] === recordId ? ({ ...previous, [field.name]: record }) : previous);
+                if (current())
+                    setError(null);
+                return;
+            }
+            const currentRecord = (0, utils_1.allRecords)(fresh).find(record => record.id === selected.id);
+            if (currentRecord) {
+                setValues(previous => scopedRequestKey(previous) === key && previous.id === selected.id ? recordValues(previous, 'id', currentRecord, true) : previous);
+                if (current())
+                    setError(null);
+            }
+        }
+        catch (e) {
+            if (current())
+                setError(asError(e));
+        }
+        finally {
+            if (requests.current.reload === controller)
+                delete requests.current.reload;
+        }
+    }
+    return react_1.default.createElement(Primitives_1.Modal, { title: command.label, returnFocusSelector: "[data-action-search]", onClose: () => { if (!busy)
             onClose(); }, wide: command.fields.length > 10 },
         react_1.default.createElement("form", { onSubmit: submit },
             react_1.default.createElement("div", { className: "modal-body" },
                 react_1.default.createElement("p", { className: "muted" }, command.read_only ? 'View information saved in this project.' : 'Changes are saved to this project and appear throughout Storyboarder.'),
                 command.name === 'job.run' && react_1.default.createElement("div", { className: "notice warning" }, "Only run tools you trust. They run on this computer with the access allowed to your account."),
+                busy && react_1.default.createElement("div", { className: "notice", role: "status" }, "Saving this action. Editing is paused until the request finishes."),
                 error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error.message }, error.status === 409 && react_1.default.createElement(react_1.default.Fragment, null,
                     react_1.default.createElement("p", null, "Your edits are still here. Refresh the project to see the latest saved details, then reapply your changes."),
                     react_1.default.createElement("button", { type: "button", onClick: reload }, "Refresh project details"))),
-                react_1.default.createElement("div", { className: command.fields.length > 10 ? 'form-grid' : 'form-stack' }, command.fields.map(f => {
-                    const opts = (0, utils_1.selectOptions)(f, state, meta, values);
-                    const isSource = !!f.source || !!f.options.length;
-                    const label = (0, utils_1.fieldLabel)(f.name, f.label);
-                    if (f.name === 'revision' || f.name === 'target_revision')
-                        return react_1.default.createElement("input", { type: "hidden", key: f.name, value: values[f.name] ?? '' });
-                    if (f.type === 'boolean')
-                        return react_1.default.createElement("label", { className: "check-field", key: f.name },
-                            react_1.default.createElement("input", { type: "checkbox", checked: !!values[f.name], onChange: (e) => set(f.name, e.target.checked) }),
-                            react_1.default.createElement("span", null, label));
-                    return react_1.default.createElement("label", { className: `field ${f.type === 'textarea' || f.type === 'json' ? 'full' : ''}`, key: f.name },
-                        react_1.default.createElement("span", null,
-                            label,
-                            f.required && react_1.default.createElement("span", { "aria-hidden": "true" }, " *")),
-                        isSource ? react_1.default.createElement("select", { value: values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required },
-                            react_1.default.createElement("option", { value: "" }, f.required ? 'Choose…' : f.name === 'location_id' ? 'Use location from above' : 'Not set'),
-                            opts.map(o => react_1.default.createElement("option", { key: o.value, value: o.value }, o.label))) : f.type === 'textarea' || f.type === 'json' ? react_1.default.createElement("textarea", { rows: f.type === 'json' ? 5 : 3, value: typeof values[f.name] === 'object' ? JSON.stringify(values[f.name], null, 2) : values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required, spellCheck: f.type !== 'json' }) : react_1.default.createElement("input", { type: f.type === 'integer' || f.type === 'number' ? 'number' : 'text', step: f.type === 'number' ? 'any' : undefined, value: Array.isArray(values[f.name]) ? values[f.name].join(', ') : values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required }),
-                        " ",
-                        f.help && react_1.default.createElement("small", null, f.help),
-                        isSource && !opts.length && f.required && react_1.default.createElement("small", { className: "warning-text" }, (0, utils_1.emptySourceMessage)(f.source)));
-                })),
+                react_1.default.createElement("fieldset", { className: "action-fields", disabled: busy },
+                    react_1.default.createElement("div", { className: command.fields.length > 10 ? 'form-grid' : 'form-stack' }, command.fields.map(f => {
+                        const remote = remoteSources.has(f.source);
+                        const records = choices[f.name]?.items || [];
+                        const opts = remote ? records.map(r => ({ value: r.id, label: r.label })) : (0, utils_1.selectOptions)(f, state, meta, values);
+                        const chosen = choiceRecords[f.name];
+                        if (remote && chosen && chosen.id === values[f.name] && !opts.some(o => o.value === chosen.id))
+                            opts.push({ value: chosen.id, label: chosen.label || chosen.title || chosen.id });
+                        const isSource = !!f.source || !!f.options.length;
+                        const label = (0, utils_1.fieldLabel)(f.name, f.label);
+                        if (f.name === 'revision' || f.name === 'target_revision')
+                            return react_1.default.createElement("input", { type: "hidden", key: f.name, value: values[f.name] ?? '' });
+                        if (f.type === 'boolean')
+                            return react_1.default.createElement("label", { className: "check-field", key: f.name },
+                                react_1.default.createElement("input", { type: "checkbox", checked: !!values[f.name], onChange: (e) => set(f.name, e.target.checked) }),
+                                react_1.default.createElement("span", null, label));
+                        return react_1.default.createElement("div", { className: `field ${f.type === 'textarea' || f.type === 'json' ? 'full' : ''}`, key: f.name },
+                            remote && react_1.default.createElement("input", { "aria-label": `Search ${label}`, type: "search", placeholder: `Search ${label.toLowerCase()}…`, value: queries[f.name] || '', onChange: (e) => setQueries(previous => ({ ...previous, [f.name]: e.target.value })) }),
+                            react_1.default.createElement("label", { className: "field" },
+                                react_1.default.createElement("span", null,
+                                    label,
+                                    f.required && react_1.default.createElement("span", { "aria-hidden": "true" }, " *")),
+                                isSource ? react_1.default.createElement("select", { value: values[f.name] ?? '', onChange: (e) => remote ? void selectRemote(f.name, e.target.value) : set(f.name, e.target.value), required: f.required },
+                                    react_1.default.createElement("option", { value: "" }, f.required ? 'Choose…' : f.name === 'location_id' ? 'Use location from above' : 'Not set'),
+                                    opts.map(o => react_1.default.createElement("option", { key: o.value, value: o.value }, o.label))) : f.type === 'textarea' || f.type === 'json' ? react_1.default.createElement("textarea", { rows: f.type === 'json' ? 5 : 3, value: typeof values[f.name] === 'object' ? JSON.stringify(values[f.name], null, 2) : values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required, spellCheck: f.type !== 'json' }) : react_1.default.createElement("input", { type: f.type === 'integer' || f.type === 'number' ? 'number' : 'text', step: f.type === 'number' ? 'any' : undefined, value: Array.isArray(values[f.name]) ? values[f.name].join(', ') : values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required })),
+                            remote && choiceLoading[f.name] && react_1.default.createElement("small", { role: "status" }, "Loading choices\u2026"),
+                            remote && choices[f.name]?.next_offset != null && react_1.default.createElement("button", { type: "button", disabled: choiceLoading[f.name], onClick: () => void moreChoices(f.name) },
+                                "Load more ",
+                                label.toLowerCase(),
+                                " choices"),
+                            " ",
+                            f.help && react_1.default.createElement("small", null, f.help),
+                            isSource && !opts.length && !choiceLoading[f.name] && f.required && react_1.default.createElement("small", { className: "warning-text" }, (0, utils_1.emptySourceMessage)(f.source)));
+                    }))),
                 command.destructive && react_1.default.createElement("label", { className: "confirm-field" },
-                    react_1.default.createElement("input", { type: "checkbox", checked: confirmed, onChange: (e) => setConfirmed(e.target.checked), required: true }),
+                    react_1.default.createElement("input", { type: "checkbox", checked: confirmed, onChange: (e) => setConfirmed(e.target.checked), required: true, disabled: busy }),
                     "I understand this will change the project.")),
             react_1.default.createElement("div", { className: "modal-footer" },
-                busy && command.name === 'job.run' && react_1.default.createElement("button", { type: "button", className: "danger", onClick: cancelRun }, "Stop this run"),
+                busy && command.name === 'job.run' && react_1.default.createElement("button", { type: "button", className: "danger", disabled: cancelBusy, onClick: cancelRun }, "Stop this run"),
                 react_1.default.createElement("button", { type: "button", onClick: onClose, disabled: busy }, "Cancel"),
-                react_1.default.createElement("button", { className: command.destructive ? 'danger' : 'primary', type: "submit", disabled: busy || (command.destructive && !confirmed) }, busy ? 'Working…' : command.read_only ? 'Show result' : command.label))));
+                react_1.default.createElement("button", { className: command.destructive ? 'danger' : 'primary', type: "submit", disabled: busy || Object.values(resolving).some(Boolean) || (command.destructive && !confirmed) }, busy ? 'Working…' : command.read_only ? 'Show result' : command.label))));
 }
 
 },
@@ -891,6 +1426,7 @@ const react_1 = __importStar(require("../react"));
 const api_1 = require("../api");
 const utils_1 = require("../utils");
 const Primitives_1 = require("./Primitives");
+const ShotIntent_1 = require("./ShotIntent");
 function shotTitle(entity) {
     const number = String(entity.fields.number || '');
     return number && entity.title.startsWith(number)
@@ -977,9 +1513,27 @@ function ShotDetails({ entity, state }) {
 }
 function Inspector({ state, id, onClose, onSelect, action }) {
     const entity = state.entities.find(e => e.id === id);
-    const [tab, setTab] = (0, react_1.useState)('details'), [context, setContext] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)('');
+    const contextRefreshRevision = state.events[0]?.id;
+    const [tab, setTab] = (0, react_1.useState)('details'), [context, setContext] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''), [contextLoading, setContextLoading] = (0, react_1.useState)(false);
+    const contextRequest = (0, react_1.useRef)(0), contextOwner = (0, react_1.useRef)({ id, projectId: state.project.id });
+    contextOwner.current = { id, projectId: state.project.id };
+    async function loadContext(ownerId, projectId) { const request = ++contextRequest.current; setContextLoading(true); setError(''); try {
+        const value = await (0, api_1.runCommand)(projectId, 'context.resolve', { owner_id: ownerId });
+        if (request === contextRequest.current && contextOwner.current.id === ownerId && contextOwner.current.projectId === projectId)
+            setContext(value);
+    }
+    catch (e) {
+        if (request === contextRequest.current && contextOwner.current.id === ownerId && contextOwner.current.projectId === projectId)
+            setError(e.message || 'Could not load story direction.');
+    }
+    finally {
+        if (request === contextRequest.current && contextOwner.current.id === ownerId && contextOwner.current.projectId === projectId)
+            setContextLoading(false);
+    } }
     (0, react_1.useEffect)(() => { setContext(null); setError(''); if (entity && entity.kind !== 'asset')
-        (0, api_1.runCommand)(state.project.id, 'context.resolve', { owner_id: id }).then(setContext).catch(e => setError(e.message)); }, [state, id]);
+        void loadContext(id, state.project.id);
+    else
+        setContextLoading(false); return () => { contextRequest.current += 1; }; }, [state.project.id, id, entity?.kind, contextRefreshRevision]);
     const panel = (0, react_1.useRef)(null);
     const closeRef = (0, react_1.useRef)(onClose);
     closeRef.current = onClose;
@@ -1032,6 +1586,18 @@ function Inspector({ state, id, onClose, onSelect, action }) {
     }, []);
     if (!entity)
         return null;
+    const tabs = ['details', 'references', ...(entity.kind === 'shot' ? ['shot-intent'] : []), ...(entity.kind === 'asset' ? [] : ['context'])];
+    const activeTab = tabs.includes(tab) ? tab : 'details';
+    const tabPrefix = `inspector-${encodeURIComponent(id)}`;
+    function moveTab(event, index) { let next = null; if (event.key === 'ArrowRight')
+        next = (index + 1) % tabs.length;
+    else if (event.key === 'ArrowLeft')
+        next = (index + tabs.length - 1) % tabs.length;
+    else if (event.key === 'Home')
+        next = 0;
+    else if (event.key === 'End')
+        next = tabs.length - 1; if (next === null)
+        return; event.preventDefault(); const nextTab = tabs[next]; setTab(nextTab); document.getElementById(`${tabPrefix}-tab-${nextTab}`)?.focus(); }
     const members = state.asset_media.filter(m => m.asset_id === id), assignments = state.assignments.filter(a => a.shot_id === id || a.asset_id === id), links = state.links.filter(l => l.source_id === id || l.target_id === id), frames = state.frames.filter(f => f.shot_id === id);
     return react_1.default.createElement("aside", { ref: panel, className: "inspector", "aria-label": "Item details" },
         react_1.default.createElement("div", { className: "inspector-top" },
@@ -1057,9 +1623,10 @@ function Inspector({ state, id, onClose, onSelect, action }) {
                 "Edit ",
                 (0, utils_1.kindLabel)(entity).toLowerCase(),
                 " details")),
-        react_1.default.createElement("div", { className: "tabs", role: "tablist", "aria-label": "Item details sections" }, ['details', 'references', 'context'].filter(t => t !== 'context' || entity.kind !== 'asset').map(t => react_1.default.createElement("button", { key: t, role: "tab", "aria-selected": tab === t, onClick: () => setTab(t) }, (0, utils_1.human)(t)))),
-        react_1.default.createElement("div", { className: "inspector-body" },
-            tab === 'details' && react_1.default.createElement(react_1.default.Fragment, null,
+        react_1.default.createElement("div", { className: "tabs", role: "tablist", "aria-label": "Item details sections" }, tabs.map((t, index) => react_1.default.createElement("button", { key: t, id: `${tabPrefix}-tab-${t}`, type: "button", role: "tab", "aria-selected": activeTab === t, "aria-controls": `${tabPrefix}-panel-${t}`, tabIndex: activeTab === t ? 0 : -1, onClick: () => setTab(t), onKeyDown: (event) => moveTab(event, index) }, t === 'shot-intent' ? 'Shot intent' : (0, utils_1.human)(t)))),
+        tabs.filter(t => t !== activeTab).map(t => react_1.default.createElement("div", { key: t, hidden: true, role: "tabpanel", id: `${tabPrefix}-panel-${t}`, "aria-labelledby": `${tabPrefix}-tab-${t}`, tabIndex: 0 })),
+        react_1.default.createElement("div", { className: "inspector-body", role: "tabpanel", id: `${tabPrefix}-panel-${activeTab}`, "aria-labelledby": `${tabPrefix}-tab-${activeTab}`, tabIndex: 0 },
+            activeTab === 'details' && react_1.default.createElement(react_1.default.Fragment, null,
                 entity.kind === 'shot' ? react_1.default.createElement(ShotDetails, { entity: entity, state: state }) : react_1.default.createElement(react_1.default.Fragment, null,
                     react_1.default.createElement("p", { className: "prose" }, entity.description || 'No description yet.'),
                     Object.entries(entity.fields).filter(([k, v]) => v !== null && v !== '' && k !== 'type').map(([key, value]) => react_1.default.createElement("section", { className: "detail-field", key: key },
@@ -1092,7 +1659,7 @@ function Inspector({ state, id, onClose, onSelect, action }) {
                     react_1.default.createElement("button", { onClick: () => action(entity.archived ? 'entity.restore' : 'entity.archive', (0, utils_1.commandDefaults)(entity)) }, entity.archived ? 'Restore item' : 'Archive item…'),
                     react_1.default.createElement("button", { className: "danger", onClick: () => action('entity.delete', (0, utils_1.commandDefaults)(entity)) }, "Delete item\u2026"),
                     entity.kind === 'asset' && react_1.default.createElement("button", { onClick: () => action('asset.merge', { source_id: id, revision: entity.revision }) }, "Combine with another library item\u2026"))),
-            tab === 'references' && react_1.default.createElement(react_1.default.Fragment, null,
+            activeTab === 'references' && react_1.default.createElement(react_1.default.Fragment, null,
                 entity.kind === 'asset' && react_1.default.createElement(react_1.default.Fragment, null,
                     react_1.default.createElement("div", { className: "section-heading" },
                         react_1.default.createElement("h3", null, "Reference images"),
@@ -1133,10 +1700,15 @@ function Inspector({ state, id, onClose, onSelect, action }) {
                             f.version),
                         react_1.default.createElement(Primitives_1.Badge, { kind: f.state }, (0, utils_1.statusLabel)(f.state)))),
                     react_1.default.createElement("button", { onClick: () => action('frame.attach', { shot_id: id }) }, "Add storyboard image"))),
-            tab === 'context' && react_1.default.createElement(react_1.default.Fragment, null,
-                error && react_1.default.createElement("p", { role: "alert" }, error),
-                context ? react_1.default.createElement(Primitives_1.ContextView, { value: context }) : react_1.default.createElement("p", null, "Loading story direction\u2026"),
-                react_1.default.createElement("button", { onClick: () => action('context.put', { owner_id: id }) }, "Add direction note"))));
+            activeTab === 'context' && react_1.default.createElement(react_1.default.Fragment, null,
+                error && react_1.default.createElement("div", { role: "alert", className: "notice error" },
+                    react_1.default.createElement("strong", null, "Could not load story direction."),
+                    react_1.default.createElement("p", null, error),
+                    react_1.default.createElement("button", { onClick: () => void loadContext(id, state.project.id) }, "Retry loading direction")),
+                contextLoading && !context && !error && react_1.default.createElement("p", { role: "status" }, "Loading story direction\u2026"),
+                context && react_1.default.createElement(Primitives_1.ContextView, { value: context }),
+                react_1.default.createElement("button", { onClick: () => action('context.put', { owner_id: id }) }, "Add direction note")),
+            activeTab === 'shot-intent' && entity.kind === 'shot' && react_1.default.createElement(ShotIntent_1.ShotIntent, { key: id, projectId: state.project.id, shot: entity })));
 }
 
 },
@@ -1237,6 +1809,10 @@ function Icon({ name, size = 18 }) {
             react_1.default.createElement("circle", { cx: "10", cy: "10", r: "6" }),
             react_1.default.createElement("path", { d: "m15 15 6 6" })),
         check: react_1.default.createElement("path", { d: "m4 12 5 5L20 6" }),
+        warning: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("circle", { cx: "12", cy: "12", r: "9" }),
+            react_1.default.createElement("path", { d: "M12 7v6m0 4h.01" })),
+        stop: react_1.default.createElement("rect", { x: "5", y: "5", width: "14", height: "14", rx: "2" }),
         arrow: react_1.default.createElement("path", { d: "M3 12h18m-7-7 7 7-7 7" }),
         refresh: react_1.default.createElement(react_1.default.Fragment, null,
             react_1.default.createElement("path", { d: "M20 8a8 8 0 1 0 1 7M20 3v5h-5" })),
@@ -1261,32 +1837,44 @@ function ErrorNotice({ error, children }) { return react_1.default.createElement
     react_1.default.createElement("strong", null, "We couldn\u2019t complete that."),
     react_1.default.createElement("p", null, error),
     children); }
-function Modal({ title, children, onClose, wide = false }) {
+function Modal({ title, children, onClose, wide = false, returnFocusSelector }) {
     const dialog = (0, react_1.useRef)(null);
     const closeRef = (0, react_1.useRef)(onClose);
     closeRef.current = onClose;
+    // Capture the opener during render: React may already have applied an input's
+    // autoFocus prop by the time this component's passive effect runs.
+    const opener = (0, react_1.useRef)(document.activeElement instanceof HTMLElement ? document.activeElement : null);
     (0, react_1.useEffect)(() => {
-        const previous = document.activeElement;
         const el = dialog.current;
-        const focusable = () => Array.from(el?.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]') || []).filter(x => x.offsetParent !== null);
-        (focusable()[0] || el)?.focus();
+        const visible = (node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden' && !node.closest('[inert]');
+        const focusable = () => Array.from(el?.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]') || []).filter(visible);
+        const active = document.activeElement instanceof HTMLElement && el?.contains(document.activeElement) ? document.activeElement : null;
+        const requested = el?.querySelector('[autofocus]');
+        // Preserve React's native autoFocus result if it focused an element even when
+        // the renderer did not leave an [autofocus] attribute in the DOM.
+        (requested && visible(requested) ? requested : active && active !== el ? active : focusable()[0] || el)?.focus({ preventScroll: true });
         const handler = (event) => { if (event.key === 'Escape') {
             event.preventDefault();
             closeRef.current();
         } if (event.key === 'Tab') {
             const items = focusable();
             const first = items[0], last = items[items.length - 1];
-            if (event.shiftKey && document.activeElement === first) {
+            if (!items.length) {
+                event.preventDefault();
+                el?.focus();
+            }
+            else if (event.shiftKey && (document.activeElement === first || !el?.contains(document.activeElement))) {
                 event.preventDefault();
                 last?.focus();
             }
-            else if (!event.shiftKey && document.activeElement === last) {
+            else if (!event.shiftKey && (document.activeElement === last || !el?.contains(document.activeElement))) {
                 event.preventDefault();
                 first?.focus();
             }
         } };
         el?.addEventListener('keydown', handler);
-        return () => { el?.removeEventListener('keydown', handler); previous?.focus(); };
+        return () => { el?.removeEventListener('keydown', handler); const saved = opener.current; const target = saved?.isConnected ? saved : returnFocusSelector ? document.querySelector(returnFocusSelector) : null; if (target?.isConnected && !target.matches(':disabled') && !target.closest('[inert]') && visible(target))
+            target.focus({ preventScroll: true }); };
     }, []);
     return react_1.default.createElement("div", { className: "modal-backdrop", onMouseDown: (e) => { if (e.target === e.currentTarget)
             onClose(); } },
@@ -1350,6 +1938,821 @@ function ExportLinks({ project, result }) { return react_1.default.createElement
         react_1.default.createElement("summary", null, "Individual files"),
         react_1.default.createElement("div", { className: "file-links" }, result.files?.filter(p => !p.endsWith('.zip')).map(path => react_1.default.createElement("a", { key: path, href: (0, api_1.exportUrl)(project, path, true) }, path.split('/').pop())))),
     result.validation && react_1.default.createElement(Validation, { issues: result.validation })); }
+
+},
+"components/ShotIntent":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ShotIntent = ShotIntent;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const draftCache = new Map();
+const pendingDrafts = new Set();
+const draftListeners = new Map();
+const dirtyDraftOwners = new Set();
+const acceptedRecordEpochs = new Map();
+function acceptedRecordEpoch(key) { return acceptedRecordEpochs.get(key) || 0; }
+function noteAcceptedRecordWrite(key) { acceptedRecordEpochs.set(key, acceptedRecordEpoch(key) + 1); }
+function guardUnsavedUnload(event) { if (!dirtyDraftOwners.size && !pendingDrafts.size)
+    return; event.preventDefault(); event.returnValue = ''; }
+function updateUnloadGuard() { if (typeof window === 'undefined')
+    return; if (dirtyDraftOwners.size || pendingDrafts.size)
+    window.addEventListener('beforeunload', guardUnsavedUnload);
+else
+    window.removeEventListener('beforeunload', guardUnsavedUnload); }
+function setDraftDirty(key, dirty) { if (dirty)
+    dirtyDraftOwners.add(key);
+else
+    dirtyDraftOwners.delete(key); updateUnloadGuard(); }
+function notifyDraft(key, event, origin) { for (const listener of draftListeners.get(key) || [])
+    listener(event, origin); }
+function storeDraft(key, entry, origin) { draftCache.set(key, entry); setDraftDirty(key, JSON.stringify(entry.baseRecord?.contract || emptyBody()) !== JSON.stringify(entry.body)); notifyDraft(key, { entry, pending: pendingDrafts.has(key) }, origin); }
+function setDraftPending(key, pending, origin) { if (pending)
+    pendingDrafts.add(key);
+else
+    pendingDrafts.delete(key); updateUnloadGuard(); notifyDraft(key, { pending }, origin); }
+const emptyBody = () => ({ schema: 'storyboarder.observation-contract/v1', source_pins: [], script_intents: [], requirements: [], references: [], continuity: [], notes: '' });
+const copy = (value) => JSON.parse(JSON.stringify(value));
+function stableId() { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes); bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128; const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(''); return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`; }
+function sourceScope(row) { return row.inherited ? 'scene-context' : 'direct-element'; }
+function sourceName(row, details) { const kind = details?.nodeType || row.node_type; const title = details?.nodeTitle || row.title; return `${row.inherited ? 'Scene context' : 'Direct shot link'} · ${kind === 'scene' ? 'Scene node' : kind} · ${title || 'Untitled source'}`; }
+function readablePath(path) { return path.replace(/^\//, '').split('/').map(part => part.replace(/_id$/, ' ID').replace(/_/g, ' ')).join(' · '); }
+function displayValue(value) { if (value && typeof value === 'object')
+    return JSON.stringify(value); if (value === undefined)
+    return 'Not present'; return String(value); }
+function ShotIntent({ projectId, shot }) {
+    const ownerKey = `${projectId}:${shot.id}`;
+    const instance = (0, react_1.useRef)({});
+    const [sources, setSources] = (0, react_1.useState)([]), [sourceDetails, setSourceDetails] = (0, react_1.useState)({});
+    const [items, setItems] = (0, react_1.useState)([]), [selectedContract, setSelectedContract] = (0, react_1.useState)('');
+    const [saved, setSaved] = (0, react_1.useState)(null), [latest, setLatest] = (0, react_1.useState)(null), [draft, setDraft] = (0, react_1.useState)(emptyBody);
+    const [validation, setValidation] = (0, react_1.useState)(null), [remoteDiff, setRemoteDiff] = (0, react_1.useState)(null), [historyDiff, setHistoryDiff] = (0, react_1.useState)(null);
+    const [review, setReview] = (0, react_1.useState)(null), [reviewGeneration, setReviewGeneration] = (0, react_1.useState)(-1), [retargetPreview, setRetargetPreview] = (0, react_1.useState)(null);
+    const [loading, setLoading] = (0, react_1.useState)(true), [refreshing, setRefreshing] = (0, react_1.useState)(false), [busy, setBusy] = (0, react_1.useState)(false), [ownerPending, setOwnerPending] = (0, react_1.useState)(pendingDrafts.has(ownerKey)), [error, setError] = (0, react_1.useState)(''), [sourceError, setSourceError] = (0, react_1.useState)(''), [notice, setNotice] = (0, react_1.useState)(''), [ready, setReady] = (0, react_1.useState)(false), [conflicted, setConflicted] = (0, react_1.useState)(false), [rebaseNeedsReview, setRebaseNeedsReview] = (0, react_1.useState)(false);
+    const editGeneration = (0, react_1.useRef)(0), loadSequence = (0, react_1.useRef)(0), initialShotRevision = (0, react_1.useRef)(shot.revision), [latestShotRevision, setLatestShotRevision] = (0, react_1.useState)(shot.revision);
+    const dirty = !!saved ? JSON.stringify(saved.contract) !== JSON.stringify(draft) : JSON.stringify(emptyBody()) !== JSON.stringify(draft);
+    async function hydrateSources(rows, active) {
+        if (active())
+            setSources(rows);
+        const documents = Array.from(new Set(rows.map(row => row.document_id)));
+        const documentDetails = {};
+        await Promise.all(documents.map(async (documentId) => {
+            const [documentResult, versionsResult] = await Promise.allSettled([
+                (0, api_1.runCommand)(projectId, 'document.show', { id: documentId }),
+                (0, api_1.runCommand)(projectId, 'document.versions', { document_id: documentId, limit: 100, offset: 0 }),
+            ]);
+            documentDetails[documentId] = { document: documentResult.status === 'fulfilled' ? documentResult.value : null, versions: versionsResult.status === 'fulfilled' ? versionsResult.value?.items || [] : [], failed: documentResult.status === 'rejected' || versionsResult.status === 'rejected' };
+        }));
+        const next = {};
+        await Promise.all(rows.map(async (row) => {
+            const nodeResult = await Promise.allSettled([(0, api_1.runCommand)(projectId, 'document.node', { id: row.node_id })]);
+            const node = nodeResult[0].status === 'fulfilled' ? nodeResult[0].value : null;
+            const parent = documentDetails[row.document_id];
+            const version = parent?.versions.find((entry) => entry.id === row.version_id);
+            next[row.edge_id] = { documentTitle: parent?.document?.title, versionNumber: version?.number, versionLabel: version?.label || row.version_label, nodeTitle: node?.title || row.title, nodeType: node?.node_type || row.node_type, currentVersionId: parent?.document?.current_version_id || row.current_version_id, contentSha256: node?.content_sha256 || row.content_sha256,
+                error: parent?.failed || nodeResult[0].status === 'rejected' ? 'Some exact source details could not be loaded.' : '' };
+        }));
+        if (active())
+            setSourceDetails(old => ({ ...old, ...next }));
+        if (documents.length && active())
+            setSourceError('');
+    }
+    async function initialLoad() {
+        const sequence = ++loadSequence.current, acceptedEpoch = acceptedRecordEpoch(ownerKey);
+        const stillCurrent = () => loadSequence.current === sequence && acceptedRecordEpoch(ownerKey) === acceptedEpoch;
+        const stopStaleLoad = () => { if (loadSequence.current === sequence) {
+            setReady(true);
+            setLoading(false);
+        } };
+        const cachedAtStart = draftCache.get(ownerKey);
+        editGeneration.current = cachedAtStart?.generation || 0;
+        initialShotRevision.current = cachedAtStart?.shotRevision ?? shot.revision;
+        setLatestShotRevision(shot.revision);
+        setOwnerPending(pendingDrafts.has(ownerKey));
+        setLoading(true);
+        setReady(false);
+        setError('');
+        setSourceError('');
+        setNotice('');
+        setSaved(null);
+        setLatest(null);
+        setValidation(null);
+        setDraft(copy(cachedAtStart?.body || emptyBody()));
+        setItems([]);
+        setSelectedContract('');
+        setReview(null);
+        setRemoteDiff(null);
+        setHistoryDiff(null);
+        setConflicted(false);
+        setRebaseNeedsReview(false);
+        const [sourceResult, listResult] = await Promise.allSettled([
+            (0, api_1.runCommand)(projectId, 'shot.sources', { id: shot.id }),
+            (0, api_1.runCommand)(projectId, 'observation.list', { shot_id: shot.id, limit: 100, offset: 0 }),
+        ]);
+        if (!stillCurrent()) {
+            stopStaleLoad();
+            return;
+        }
+        if (sourceResult.status === 'fulfilled')
+            void hydrateSources(sourceResult.value.items || [], () => loadSequence.current === sequence);
+        else
+            setSourceError(messageOf(sourceResult.reason));
+        if (listResult.status === 'rejected') {
+            setError(messageOf(listResult.reason));
+            setLoading(false);
+            return;
+        }
+        const rows = listResult.value.items || [];
+        setItems(rows);
+        setReady(true);
+        const cached = draftCache.get(ownerKey);
+        const first = rows.find(item => item.id === cached?.baseRecord?.id) || rows[0];
+        if (!first) {
+            const cached = draftCache.get(ownerKey);
+            setSaved(null);
+            setLatest(null);
+            setSelectedContract('');
+            setDraft(copy(cached?.body || emptyBody()));
+            setConflicted(false);
+            setLoading(false);
+            if (cached)
+                storeDraft(ownerKey, { ...cached, body: copy(cached.body), baseRecord: null, latestRecord: null }, instance.current);
+            return;
+        }
+        setSelectedContract(first.id);
+        try {
+            const record = await (0, api_1.runCommand)(projectId, 'observation.show', { contract_id: first.id });
+            if (!stillCurrent())
+                return;
+            const checked = await (0, api_1.runCommand)(projectId, 'observation.validate', { contract_id: first.id, version_id: record.selected_version_id });
+            if (!stillCurrent())
+                return;
+            const cached = draftCache.get(ownerKey);
+            if (cached) {
+                const base = cached.baseRecord;
+                const pendingOwnCreate = !cached.baseRecord && pendingDrafts.has(ownerKey);
+                const hasExternal = (!cached.baseRecord && !pendingOwnCreate) || !!cached.baseRecord && (cached.baseRecord.revision !== record.revision || cached.baseRecord.current_version_id !== record.current_version_id);
+                setSaved(base);
+                setLatest(record);
+                setDraft(copy(cached.body));
+                setValidation(checked);
+                setConflicted(hasExternal || cached.conflicted);
+                let difference = null;
+                if (cached.baseRecord && hasExternal) {
+                    try {
+                        difference = await (0, api_1.runCommand)(projectId, 'observation.diff', { contract_id: record.id, before_version_id: cached.baseRecord.current_version_id, after_version_id: record.current_version_id });
+                    }
+                    catch (reason) {
+                        if (stillCurrent())
+                            setError(messageOf(reason));
+                    }
+                }
+                if (!stillCurrent())
+                    return;
+                setRemoteDiff(difference);
+                storeDraft(ownerKey, { ...cached, baseRecord: base, latestRecord: record, conflicted: hasExternal || cached.conflicted }, instance.current);
+            }
+            else {
+                setSaved(record);
+                setLatest(record);
+                setDraft(copy(record.contract));
+                setValidation(checked);
+                storeDraft(ownerKey, { body: copy(record.contract), baseRecord: record, latestRecord: record, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted: false }, instance.current);
+            }
+        }
+        catch (reason) {
+            if (stillCurrent())
+                setError(messageOf(reason));
+        }
+        finally {
+            if (loadSequence.current === sequence)
+                setLoading(false);
+        }
+    }
+    (0, react_1.useEffect)(() => {
+        let listeners = draftListeners.get(ownerKey);
+        if (!listeners) {
+            listeners = new Set();
+            draftListeners.set(ownerKey, listeners);
+        }
+        const listener = (event, origin) => { if (origin === instance.current)
+            return; setOwnerPending(event.pending); if (event.entry) {
+            editGeneration.current = event.entry.generation;
+            initialShotRevision.current = event.entry.shotRevision;
+            setDraft(copy(event.entry.body));
+            setSaved(event.entry.baseRecord);
+            setLatest(event.entry.latestRecord);
+            setConflicted(event.entry.conflicted);
+            const record = event.entry.latestRecord || event.entry.baseRecord;
+            if (record) {
+                const listItem = { id: record.id, shot_id: record.shot_id, current_version_id: record.current_version_id, revision: record.revision, shot_title: shot.title, version_number: record.version.number };
+                setItems(old => old.some(item => item.id === record.id) ? old.map(item => item.id === record.id ? listItem : item) : [...old, listItem]);
+                setSelectedContract(record.id);
+                setValidation(record.validation);
+            }
+        } };
+        listeners.add(listener);
+        setOwnerPending(pendingDrafts.has(ownerKey));
+        void initialLoad();
+        return () => { listeners?.delete(listener); if (!listeners?.size)
+            draftListeners.delete(ownerKey); loadSequence.current += 1; };
+    }, [projectId, shot.id]);
+    function changeDraft(next) { editGeneration.current += 1; setDraft(next); storeDraft(ownerKey, { body: copy(next), baseRecord: saved, latestRecord: latest, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted }, instance.current); setReview(null); setReviewGeneration(-1); setHistoryDiff(null); setNotice(''); }
+    function patchDraft(update) { changeDraft(update(draft)); }
+    function patchIntent(id, update) { patchDraft(body => ({ ...body, script_intents: body.script_intents.map(item => item.id === id ? update(item) : item) })); }
+    function patchRequirement(id, update) { patchDraft(body => ({ ...body, requirements: body.requirements.map(item => item.id === id ? update(item) : item) })); }
+    function addIntent() { if (!draft.source_pins.length) {
+        setNotice('Select an exact linked screenplay source before adding its purpose.');
+        return;
+    } const pin = draft.source_pins[0]; patchDraft(body => ({ ...body, script_intents: [...body.script_intents, { id: stableId(), source_edge_id: pin.edge_id, source_scope: pin.source_scope, purpose: '', communication: '', basis: 'unknown' }] })); }
+    function addRequirement() { patchDraft(body => ({ ...body, requirements: [...body.requirements, { id: stableId(), priority: 'must', basis: 'unknown', source_edge_ids: draft.source_pins.slice(0, 1).map(pin => pin.edge_id), statement: '', topic: null }] })); }
+    function togglePin(row, selected) {
+        const edge = row.edge_id;
+        if (!selected) {
+            const used = draft.script_intents.some(item => item.source_edge_id === edge) || draft.requirements.some(item => item.source_edge_ids.includes(edge));
+            if (used) {
+                setNotice('Remove or retarget the purpose and requirements that use this source before unpinning it.');
+                return;
+            }
+        }
+        patchDraft(body => ({ ...body, source_pins: selected ? [...body.source_pins, { edge_id: edge, source_scope: sourceScope(row) }] : body.source_pins.filter(pin => pin.edge_id !== edge) }));
+    }
+    function previewRetarget(oldEdgeId, newEdgeId) { const target = sourceByEdge.get(newEdgeId); if (!target || target.stale || oldEdgeId === newEdgeId)
+        return; setRetargetPreview({ oldEdgeId, newEdgeId }); }
+    function confirmRetarget() { if (!retargetPreview)
+        return; const { oldEdgeId, newEdgeId } = retargetPreview; const target = sourceByEdge.get(newEdgeId); if (!target || target.stale)
+        return; const scope = sourceScope(target); patchDraft(body => ({ ...body, source_pins: body.source_pins.some(pin => pin.edge_id === newEdgeId) ? body.source_pins.filter(pin => pin.edge_id !== oldEdgeId) : body.source_pins.map(pin => pin.edge_id === oldEdgeId ? { edge_id: newEdgeId, source_scope: scope } : pin), script_intents: body.script_intents.map(item => item.source_edge_id === oldEdgeId ? { ...item, source_edge_id: newEdgeId, source_scope: scope } : item), requirements: body.requirements.map(item => ({ ...item, source_edge_ids: Array.from(new Set(item.source_edge_ids.map(edge => edge === oldEdgeId ? newEdgeId : edge))) })) })); setRetargetPreview(null); }
+    async function refreshStatus(fromConflict = false) {
+        const sequence = ++loadSequence.current;
+        setRefreshing(true);
+        setError('');
+        setNotice(fromConflict ? 'The write conflicted. Refreshing the saved record while keeping your draft…' : 'Refreshing saved status and exact linked sources…');
+        try {
+            const [sourceRows, list, projectState] = await Promise.all([
+                (0, api_1.runCommand)(projectId, 'shot.sources', { id: shot.id }),
+                (0, api_1.runCommand)(projectId, 'observation.list', { shot_id: shot.id, limit: 100, offset: 0 }),
+                (0, api_1.api)((0, api_1.projectPath)(projectId, '/state')),
+            ]);
+            const rows = sourceRows.items || [];
+            if (loadSequence.current !== sequence)
+                return;
+            setSources(rows);
+            void hydrateSources(rows, () => loadSequence.current === sequence);
+            setItems(list.items || []);
+            const refreshedShot = projectState.entities.find(entity => entity.id === shot.id);
+            const observedShotRevision = refreshedShot?.revision ?? shot.revision;
+            setLatestShotRevision(observedShotRevision);
+            const candidate = (list.items || []).find(item => item.id === selectedContract) || (list.items || [])[0];
+            if (!candidate) {
+                if (loadSequence.current !== sequence)
+                    return;
+                const cached = draftCache.get(ownerKey);
+                const hasConflict = !!saved || observedShotRevision !== initialShotRevision.current;
+                setLatest(null);
+                setValidation(null);
+                setRemoteDiff(null);
+                setConflicted(hasConflict);
+                storeDraft(ownerKey, { body: copy(cached?.body || draft), baseRecord: cached ? cached.baseRecord : saved, latestRecord: null, shotRevision: cached?.shotRevision ?? initialShotRevision.current, generation: cached?.generation ?? editGeneration.current, conflicted: hasConflict }, instance.current);
+                setNotice(saved ? 'The saved contract is no longer listed. Your draft and exact pins remain here.' : 'Linked sources refreshed. Your selected exact pins were left unchanged.');
+                return;
+            }
+            const record = await (0, api_1.runCommand)(projectId, 'observation.show', { contract_id: candidate.id });
+            const checked = await (0, api_1.runCommand)(projectId, 'observation.validate', { contract_id: candidate.id, version_id: record.selected_version_id });
+            if (loadSequence.current !== sequence)
+                return;
+            setLatest(record);
+            setValidation(checked);
+            setSelectedContract(candidate.id);
+            const hasExternalChange = !saved || saved.revision !== record.revision || saved.current_version_id !== record.current_version_id;
+            setConflicted(hasExternalChange);
+            if (hasExternalChange) {
+                if (saved) {
+                    const difference = await (0, api_1.runCommand)(projectId, 'observation.diff', { contract_id: candidate.id, before_version_id: saved.current_version_id, after_version_id: record.current_version_id });
+                    if (loadSequence.current !== sequence)
+                        return;
+                    setRemoteDiff(difference);
+                }
+                setNotice(saved ? 'A newer saved revision is available. Your editor draft and exact source pins were kept unchanged. Compare it or explicitly load it.' : 'A contract now exists for this shot. Your create draft and exact pins are retained; load the saved contract explicitly to edit it.');
+            }
+            else {
+                setRemoteDiff(null);
+                setNotice(fromConflict ? 'The current saved revision is loaded for comparison. Your draft is unchanged.' : 'Status refreshed. Your draft and exact source pins were unchanged.');
+            }
+            const cached = draftCache.get(ownerKey);
+            storeDraft(ownerKey, { body: copy(cached?.body || draft), baseRecord: cached ? cached.baseRecord : saved, latestRecord: record, shotRevision: cached?.shotRevision ?? initialShotRevision.current, generation: cached?.generation ?? editGeneration.current, conflicted: hasExternalChange }, instance.current);
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+        }
+        finally {
+            setRefreshing(false);
+        }
+    }
+    function loadLatestIntoDraft() {
+        if (!latest)
+            return;
+        setSaved(latest);
+        setDraft(copy(latest.contract));
+        setValidation(latest.validation);
+        setConflicted(false);
+        setRemoteDiff(null);
+        setReview(null);
+        editGeneration.current += 1;
+        storeDraft(ownerKey, { body: copy(latest.contract), baseRecord: latest, latestRecord: latest, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted: false }, instance.current);
+        setNotice(`Draft replaced with saved contract revision ${latest.revision}.`);
+        setError('');
+    }
+    function useLatestShotRevision() { initialShotRevision.current = latestShotRevision; setConflicted(false); storeDraft(ownerKey, { body: copy(draft), baseRecord: saved, latestRecord: latest, shotRevision: latestShotRevision, generation: editGeneration.current, conflicted: false }, instance.current); setNotice(`Create will use the refreshed shot revision ${latestShotRevision}. Your draft and exact pins are unchanged.`); setError(''); }
+    async function loadContract(id) {
+        if (id === selectedContract || !id)
+            return;
+        if (dirty && !window.confirm('Discard this local shot intent draft and open the selected contract?'))
+            return;
+        setLoading(true);
+        setError('');
+        setNotice('');
+        setReview(null);
+        setRemoteDiff(null);
+        setConflicted(false);
+        try {
+            const record = await (0, api_1.runCommand)(projectId, 'observation.show', { contract_id: id });
+            const checked = await (0, api_1.runCommand)(projectId, 'observation.validate', { contract_id: id, version_id: record.selected_version_id });
+            setSaved(record);
+            setLatest(record);
+            setDraft(copy(record.contract));
+            setValidation(checked);
+            setSelectedContract(id);
+            editGeneration.current += 1;
+            storeDraft(ownerKey, { body: copy(record.contract), baseRecord: record, latestRecord: record, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted: false }, instance.current);
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+        }
+        finally {
+            setLoading(false);
+        }
+    }
+    async function submit(operation) {
+        if (busy || pendingDrafts.has(ownerKey))
+            return;
+        const generation = editGeneration.current, body = copy(draft), shotRevision = initialShotRevision.current;
+        setBusy(true);
+        setOwnerPending(true);
+        setDraftPending(ownerKey, true, instance.current);
+        setError('');
+        setNotice('');
+        try {
+            let record;
+            if (operation === 'create')
+                record = await (0, api_1.runCommand)(projectId, 'observation.create', { shot_id: shot.id, expected_shot_revision: initialShotRevision.current, contract: body });
+            else if (operation === 'rebase') {
+                if (!review || reviewGeneration !== generation)
+                    throw new Error('Review this exact draft again before rebasing.');
+                record = await (0, api_1.runCommand)(projectId, 'observation.rebase', { contract_id: saved.id, revision: review.revision, contract: body, expected_basis_sha256: review.expected_basis_sha256 });
+            }
+            else
+                record = await (0, api_1.runCommand)(projectId, 'observation.revise', { contract_id: saved.id, revision: saved.revision, contract: body });
+            noteAcceptedRecordWrite(ownerKey);
+            setItems(old => old.some(item => item.id === record.id) ? old.map(item => item.id === record.id ? { ...item, revision: record.revision, current_version_id: record.current_version_id } : item) : [...old, { id: record.id, shot_id: record.shot_id, current_version_id: record.current_version_id, revision: record.revision, shot_title: shot.title, version_number: record.version.number }]);
+            setSelectedContract(record.id);
+            setSaved(record);
+            setLatest(record);
+            setValidation(record.validation);
+            setConflicted(false);
+            setRemoteDiff(null);
+            setReview(null);
+            setReviewGeneration(-1);
+            const cached = draftCache.get(ownerKey);
+            const newer = cached && cached.generation !== generation;
+            const nextBody = newer ? copy(cached.body) : copy(record.contract);
+            const nextGeneration = newer ? cached.generation : generation;
+            editGeneration.current = nextGeneration;
+            setDraft(nextBody);
+            storeDraft(ownerKey, { body: nextBody, baseRecord: record, latestRecord: record, shotRevision, generation: nextGeneration, conflicted: false }, instance.current);
+            if (!newer) {
+                setNotice(`Shot intent saved as contract revision ${record.revision}.`);
+            }
+            else
+                setNotice('The submitted version was saved. Newer edits remain in the editor.');
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+            if (reason?.status === 409 || reason?.code === 'contract_rebase_required') {
+                setReview(null);
+                setReviewGeneration(-1);
+                setConflicted(true);
+                const cached = draftCache.get(ownerKey);
+                storeDraft(ownerKey, { body: copy(cached?.body || draft), baseRecord: saved, latestRecord: latest, shotRevision: initialShotRevision.current, generation: cached?.generation ?? generation, conflicted: true }, instance.current);
+                if (operation === 'rebase' || reason?.code === 'contract_rebase_required')
+                    setRebaseNeedsReview(true);
+                await refreshStatus(true);
+            }
+        }
+        finally {
+            setBusy(false);
+            setOwnerPending(false);
+            setDraftPending(ownerKey, false, instance.current);
+        }
+    }
+    async function reviewRebase() {
+        if (!saved || busy)
+            return;
+        const generation = editGeneration.current;
+        setError('');
+        setNotice('Reviewing the exact proposed contract against the current saved basis…');
+        setReview(null);
+        try {
+            const result = await (0, api_1.runCommand)(projectId, 'observation.rebase-preview', { contract_id: saved.id, contract: copy(draft) });
+            if (editGeneration.current !== generation) {
+                setNotice('The proposed contract changed during review. Review the current draft again.');
+                return;
+            }
+            setReview(result);
+            setReviewGeneration(generation);
+            setRebaseNeedsReview(false);
+            setNotice('Review complete. Confirm the rebase only if these exact changes and source pins are intended.');
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+        }
+    }
+    async function compareVersion(versionId) {
+        if (!saved)
+            return;
+        try {
+            const result = await (0, api_1.runCommand)(projectId, 'observation.diff', { contract_id: saved.id, before_version_id: versionId, after_version_id: saved.current_version_id });
+            setHistoryDiff(result);
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+        }
+    }
+    const sourceByEdge = new Map(sources.map(row => [row.edge_id, row]));
+    const validationStatus = validation?.status || latest?.validation?.status || saved?.validation?.status || 'not checked';
+    const validationRevision = validation?.revision ?? latest?.revision ?? saved?.revision;
+    const draftNeedsValidationDisclaimer = dirty || conflicted;
+    const validationLabel = draftNeedsValidationDisclaimer ? `Saved revision ${validationRevision} validation: ${validationStatus}` : `Current saved revision ${validationRevision}: ${validationStatus}`;
+    const validationScope = draftNeedsValidationDisclaimer ? `This status covers saved revision ${validationRevision} only; the current local draft has not been checked.` : 'This status covers the current saved contract revision.';
+    const missingSourcePins = draft.source_pins.filter(pin => !sourceByEdge.has(pin.edge_id) || !!validation?.source_pins?.find(item => item.edge_id === pin.edge_id && item.stale));
+    const canSubmit = ready && !busy && !ownerPending && !loading && !refreshing && !!draft.script_intents.length && draft.source_pins.length > 0;
+    return react_1.default.createElement("section", { className: "shot-intent-panel", "aria-label": "Shot intent contract" },
+        react_1.default.createElement("div", { className: "shot-intent-heading" },
+            react_1.default.createElement("div", null,
+                react_1.default.createElement("h3", null, "Shot intent"),
+                react_1.default.createElement("p", { className: "muted" }, "Record what the screenplay asks this shot to communicate. Pins name exact source links; validation does not judge rendered images."),
+                react_1.default.createElement("p", { className: "shot-intent-draft-scope" }, "Unsaved edits stay in this open app session and follow this shot across tabs and shots. Create, Save draft, or confirm rebase to store them. Reloading or closing the app will prompt while edits remain unsaved.")),
+            react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: loading || refreshing || busy || ownerPending }, "Refresh status")),
+        ownerPending && react_1.default.createElement("p", { role: "status" }, "A save for this shot is still in progress. Its draft is preserved and editing is paused until it finishes."),
+        react_1.default.createElement("label", { className: "field" },
+            react_1.default.createElement("span", null, "Observation contract"),
+            react_1.default.createElement("select", { "aria-label": "Observation contract", value: selectedContract, onChange: (event) => void loadContract(event.target.value), disabled: loading || busy || ownerPending || items.length < 2 },
+                !items.length && react_1.default.createElement("option", { value: "" }, "New contract for this shot"),
+                items.map(item => react_1.default.createElement("option", { key: item.id, value: item.id },
+                    "Revision ",
+                    item.revision,
+                    " \u00B7 ",
+                    item.id))),
+            react_1.default.createElement("small", null,
+                "Selected shot: ",
+                shot.title,
+                " \u00B7 latest shot revision ",
+                latestShotRevision,
+                !saved ? ` · create will use revision ${initialShotRevision.current}` : ` · contract ${saved.id} · header revision ${saved.revision}`)),
+        loading && react_1.default.createElement("p", { role: "status" }, "Loading exact sources and saved contract\u2026"),
+        error && react_1.default.createElement("div", { role: "alert", className: "notice error" },
+            react_1.default.createElement("strong", null, "Shot intent could not be updated."),
+            react_1.default.createElement("p", null, error),
+            react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: refreshing || busy || ownerPending }, "Retry refresh")),
+        sourceError && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "Linked source details are unavailable."),
+            react_1.default.createElement("p", null, sourceError),
+            react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: refreshing || busy }, "Retry source refresh")),
+        notice && react_1.default.createElement("p", { role: "status", className: "shot-intent-status" }, notice),
+        rebaseNeedsReview && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "The reviewed basis changed."),
+            react_1.default.createElement("p", null, "Your draft, exact pins, and previous header CAS are retained. The prior review token is invalid. Review the current proposal again before any rebase."),
+            react_1.default.createElement("button", { type: "button", onClick: () => void reviewRebase(), disabled: busy || loading }, "Review this draft again")),
+        conflicted && !latest && !saved && latestShotRevision !== initialShotRevision.current && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "The selected shot revision changed."),
+            react_1.default.createElement("p", null,
+                "Create still uses shot revision ",
+                initialShotRevision.current,
+                "; the latest saved shot revision is ",
+                latestShotRevision,
+                ". Your local draft and exact pins are retained."),
+            react_1.default.createElement("button", { type: "button", onClick: useLatestShotRevision, disabled: busy },
+                "Use shot revision ",
+                latestShotRevision,
+                " for create")),
+        saved && react_1.default.createElement("div", { className: `notice ${validationStatus === 'consistent' ? '' : 'warning'}` },
+            react_1.default.createElement("strong", null, validationLabel),
+            react_1.default.createElement("p", null, validationScope),
+            react_1.default.createElement("p", null, validation?.findings?.length ? `${validation.findings.length} finding${validation.findings.length === 1 ? '' : 's'} · authored basis ${validation.basis_current ? 'current' : 'changed'}` : 'Deterministic source, identity, and authored-basis checks.'),
+            react_1.default.createElement("div", { className: "shot-intent-meta" },
+                react_1.default.createElement("span", null,
+                    "Contract ID ",
+                    react_1.default.createElement("code", null, saved.id)),
+                react_1.default.createElement("span", null,
+                    "Header revision ",
+                    react_1.default.createElement("code", null, saved.revision)),
+                react_1.default.createElement("span", null,
+                    "Current version ",
+                    react_1.default.createElement("code", null, saved.current_version_id)))),
+        conflicted && latest && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "A newer saved revision is available."),
+            react_1.default.createElement("p", null,
+                "The editor still uses header revision ",
+                saved?.revision || 'not saved',
+                "; latest is revision ",
+                latest.revision,
+                ". Your local draft and exact pins are retained."),
+            react_1.default.createElement("div", { className: "button-row" },
+                react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: refreshing || busy || ownerPending }, "Refresh comparison"),
+                react_1.default.createElement("button", { type: "button", onClick: loadLatestIntoDraft, disabled: busy || ownerPending },
+                    "Discard draft and load revision ",
+                    latest.revision))),
+        remoteDiff && react_1.default.createElement(DiffView, { title: "Saved revision changes", changes: remoteDiff.changes.map(change => ({ path: change.path, before: change.before, after: change.after })) }),
+        ready && !loading && react_1.default.createElement("fieldset", { className: "shot-intent-fields", disabled: busy || ownerPending },
+            react_1.default.createElement("section", { className: "shot-intent-section" },
+                react_1.default.createElement("div", { className: "shot-intent-section-heading" },
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("h4", null, "Exact screenplay links"),
+                        react_1.default.createElement("p", null, "Select active links already connected to this shot or its scene. Refresh reports changes without replacing these pins."))),
+                !sources.length ? react_1.default.createElement("p", { className: "muted" }, "No screenplay source links are connected to this shot yet. Add a link in the source-document workflow, then refresh.") : sources.map(row => {
+                    const checked = draft.source_pins.some(pin => pin.edge_id === row.edge_id);
+                    const detail = sourceDetails[row.edge_id];
+                    const validationPin = validation?.source_pins?.find(pin => pin.edge_id === row.edge_id);
+                    const stale = row.stale || !!validationPin?.stale;
+                    const stalePins = draft.source_pins.filter(pin => { const previous = sourceByEdge.get(pin.edge_id); const pinned = saved?.source_pins?.find(item => item.edge_id === pin.edge_id); return pin.edge_id !== row.edge_id && (!previous || previous.stale || !!validation?.source_pins?.find(item => item.edge_id === pin.edge_id)?.stale || !!pinned && pinned.source_version_id !== previous.version_id); });
+                    return react_1.default.createElement("div", { className: "shot-source-row", key: row.edge_id },
+                        react_1.default.createElement("label", { className: "shot-source-option" },
+                            react_1.default.createElement("input", { type: "checkbox", checked: checked, onChange: (event) => togglePin(row, event.target.checked) }),
+                            react_1.default.createElement("span", null,
+                                react_1.default.createElement("strong", null, sourceName(row, detail)),
+                                react_1.default.createElement("small", null,
+                                    detail?.documentTitle || 'Screenplay',
+                                    " \u00B7 ",
+                                    detail?.versionLabel || row.version_label,
+                                    detail?.versionNumber ? ` (version ${detail.versionNumber})` : '',
+                                    stale ? ' · source version is stale' : ''),
+                                react_1.default.createElement("small", null,
+                                    "Edge ",
+                                    react_1.default.createElement("code", null, row.edge_id)),
+                                react_1.default.createElement("small", null,
+                                    "Version ",
+                                    react_1.default.createElement("code", null, row.version_id),
+                                    " \u00B7 node ",
+                                    react_1.default.createElement("code", null, row.node_id)),
+                                react_1.default.createElement("small", null,
+                                    "Source SHA-256 ",
+                                    react_1.default.createElement("code", null, detail?.contentSha256 || row.content_sha256 || 'Unavailable')),
+                                detail?.error && react_1.default.createElement("small", { className: "warning-text" }, detail.error))),
+                        stalePins.length > 0 && !checked && !stale && react_1.default.createElement("div", { className: "shot-retarget-shortcuts" }, stalePins.map(pin => { const oldRow = sourceByEdge.get(pin.edge_id); const oldName = oldRow ? sourceName(oldRow, sourceDetails[pin.edge_id]) : `Saved source ${pin.edge_id}`; return react_1.default.createElement("button", { type: "button", key: pin.edge_id, onClick: () => previewRetarget(pin.edge_id, row.edge_id) },
+                            "Preview retarget from ",
+                            oldName,
+                            " to ",
+                            sourceName(row, detail)); })));
+                }),
+                !!draft.source_pins.length && missingSourcePins.map(pin => react_1.default.createElement("div", { className: "shot-source-stale", key: pin.edge_id },
+                    react_1.default.createElement("strong", null, "Saved exact pin is unavailable or stale"),
+                    react_1.default.createElement("small", null,
+                        "Edge ",
+                        react_1.default.createElement("code", null, pin.edge_id),
+                        " \u00B7 scope ",
+                        pin.source_scope === 'scene-context' ? 'Scene context' : 'Direct shot link'),
+                    react_1.default.createElement("small", null, "This pin remains in the draft until you explicitly choose a new source during rebase."))),
+                !!draft.source_pins.length && react_1.default.createElement("section", { className: "shot-pin-comparison", "aria-label": "Saved and current exact pin details" },
+                    react_1.default.createElement("h5", null, "Saved and current exact pins"),
+                    draft.source_pins.map(pin => { const current = sourceByEdge.get(pin.edge_id); const detail = sourceDetails[pin.edge_id]; const previous = saved?.source_pins?.find(item => item.edge_id === pin.edge_id); return react_1.default.createElement("div", { className: "shot-pin-comparison-row", key: pin.edge_id },
+                        react_1.default.createElement("strong", null, current ? sourceName(current, detail) : `Saved exact source ${pin.edge_id}`),
+                        react_1.default.createElement("dl", null,
+                            react_1.default.createElement("div", null,
+                                react_1.default.createElement("dt", null, "Scope"),
+                                react_1.default.createElement("dd", null, pin.source_scope === 'scene-context' ? 'Scene context' : 'Direct shot link')),
+                            react_1.default.createElement("div", null,
+                                react_1.default.createElement("dt", null, "Saved pin"),
+                                react_1.default.createElement("dd", null, previous ? react_1.default.createElement(react_1.default.Fragment, null,
+                                    "Version ",
+                                    react_1.default.createElement("code", null, previous.source_version_id),
+                                    " \u00B7 node ",
+                                    react_1.default.createElement("code", null, previous.node_id),
+                                    " \u00B7 source SHA-256 ",
+                                    react_1.default.createElement("code", null, previous.source_sha256 || 'Unavailable'),
+                                    previous.scope_sha256 && react_1.default.createElement(react_1.default.Fragment, null,
+                                        " \u00B7 scope SHA-256 ",
+                                        react_1.default.createElement("code", null, previous.scope_sha256))) : 'Not saved yet')),
+                            react_1.default.createElement("div", null,
+                                react_1.default.createElement("dt", null, "Current linked source"),
+                                react_1.default.createElement("dd", null, current ? react_1.default.createElement(react_1.default.Fragment, null,
+                                    "Version ",
+                                    react_1.default.createElement("code", null, current.version_id),
+                                    " \u00B7 node ",
+                                    react_1.default.createElement("code", null, current.node_id),
+                                    " \u00B7 source SHA-256 ",
+                                    react_1.default.createElement("code", null, detail?.contentSha256 || current.content_sha256 || 'Unavailable'),
+                                    (current.stale || previous && previous.source_version_id !== current.version_id) && ' · differs from the saved pin') : 'Unavailable; saved pin retained in this draft')))); })),
+                retargetPreview && react_1.default.createElement(RetargetReview, { preview: retargetPreview, body: draft, saved: saved, rows: sourceByEdge, details: sourceDetails, onCancel: () => setRetargetPreview(null), onConfirm: confirmRetarget, disabled: busy || ownerPending })),
+            react_1.default.createElement("section", { className: "shot-intent-section" },
+                react_1.default.createElement("div", { className: "shot-intent-section-heading" },
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("h4", null, "Purpose and communication"),
+                        react_1.default.createElement("p", null, "Keep each purpose attached to one exact source edge.")),
+                    react_1.default.createElement("button", { type: "button", onClick: addIntent, disabled: !draft.source_pins.length }, "Add purpose")),
+                draft.script_intents.map(intent => react_1.default.createElement("article", { className: "shot-intent-card", key: intent.id, "data-intent-id": intent.id },
+                    react_1.default.createElement("div", { className: "shot-intent-card-heading" },
+                        react_1.default.createElement("strong", null,
+                            "Purpose ",
+                            react_1.default.createElement("small", null,
+                                "Stable ID ",
+                                react_1.default.createElement("code", null, intent.id))),
+                        react_1.default.createElement("button", { type: "button", className: "text-button", "aria-label": `Remove purpose ${intent.purpose || intent.id}`, onClick: () => patchDraft(body => ({ ...body, script_intents: body.script_intents.filter(item => item.id !== intent.id) })) }, "Remove")),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Exact source link"),
+                        react_1.default.createElement("select", { "aria-label": `Source for purpose ${intent.id}`, value: intent.source_edge_id, onChange: (event) => { const row = sourceByEdge.get(event.target.value); if (row)
+                                patchIntent(intent.id, value => ({ ...value, source_edge_id: row.edge_id, source_scope: sourceScope(row) })); } }, draft.source_pins.map(pin => { const row = sourceByEdge.get(pin.edge_id); return react_1.default.createElement("option", { key: pin.edge_id, value: pin.edge_id }, row ? sourceName(row, sourceDetails[row.edge_id]) : `${pin.source_scope} · saved pin ${pin.edge_id}`); }))),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Purpose"),
+                        react_1.default.createElement("input", { "aria-label": `Purpose ${intent.id}`, value: intent.purpose, maxLength: 120, onChange: (event) => patchIntent(intent.id, value => ({ ...value, purpose: event.target.value })), placeholder: "e.g. establish the handoff" })),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Communication"),
+                        react_1.default.createElement("textarea", { "aria-label": `Communication ${intent.id}`, value: intent.communication, maxLength: 4000, rows: 3, onChange: (event) => patchIntent(intent.id, value => ({ ...value, communication: event.target.value })), placeholder: "What should the audience understand from this source?" })),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Basis"),
+                        react_1.default.createElement("select", { "aria-label": `Purpose basis ${intent.id}`, value: intent.basis, onChange: (event) => patchIntent(intent.id, value => ({ ...value, basis: event.target.value })) },
+                            react_1.default.createElement("option", { value: "direct" }, "Direct"),
+                            react_1.default.createElement("option", { value: "interpreted" }, "Interpreted"),
+                            react_1.default.createElement("option", { value: "unknown" }, "Unknown"))))),
+                !draft.script_intents.length && react_1.default.createElement("p", { className: "muted" }, "No purpose statements yet.")),
+            react_1.default.createElement("section", { className: "shot-intent-section" },
+                react_1.default.createElement("div", { className: "shot-intent-section-heading" },
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("h4", null, "Source-specific requirements"),
+                        react_1.default.createElement("p", null, "Requirements keep their stable IDs and point to one or more selected exact links.")),
+                    react_1.default.createElement("button", { type: "button", onClick: addRequirement }, "Add requirement")),
+                draft.requirements.map(item => react_1.default.createElement("article", { className: "shot-intent-card", key: item.id, "data-requirement-id": item.id },
+                    react_1.default.createElement("div", { className: "shot-intent-card-heading" },
+                        react_1.default.createElement("strong", null,
+                            "Requirement ",
+                            react_1.default.createElement("small", null,
+                                "Stable ID ",
+                                react_1.default.createElement("code", null, item.id))),
+                        react_1.default.createElement("button", { type: "button", className: "text-button", "aria-label": `Remove requirement ${item.id}`, onClick: () => patchDraft(body => ({ ...body, requirements: body.requirements.filter(row => row.id !== item.id) })) }, "Remove")),
+                    react_1.default.createElement("div", { className: "shot-intent-grid" },
+                        react_1.default.createElement("label", { className: "field" },
+                            react_1.default.createElement("span", null, "Priority"),
+                            react_1.default.createElement("select", { "aria-label": `Priority ${item.id}`, value: item.priority, onChange: (event) => { const priority = event.target.value; patchRequirement(item.id, value => priority === 'unknown' ? { ...value, priority, topic: value.statement || value.topic || '', statement: null } : { ...value, priority, statement: value.topic || value.statement || '', topic: null }); } },
+                                react_1.default.createElement("option", { value: "must" }, "Must"),
+                                react_1.default.createElement("option", { value: "prefer" }, "Prefer"),
+                                react_1.default.createElement("option", { value: "unknown" }, "Unknown"))),
+                        react_1.default.createElement("label", { className: "field" },
+                            react_1.default.createElement("span", null, "Basis"),
+                            react_1.default.createElement("select", { "aria-label": `Requirement basis ${item.id}`, value: item.basis, onChange: (event) => patchRequirement(item.id, value => ({ ...value, basis: event.target.value })) },
+                                react_1.default.createElement("option", { value: "direct" }, "Direct"),
+                                react_1.default.createElement("option", { value: "interpreted" }, "Interpreted"),
+                                react_1.default.createElement("option", { value: "unknown" }, "Unknown")))),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, item.priority === 'unknown' ? 'Topic' : 'Requirement statement'),
+                        react_1.default.createElement("textarea", { "aria-label": `${item.priority === 'unknown' ? 'Topic' : 'Requirement statement'} ${item.id}`, rows: 3, maxLength: 4000, value: item.priority === 'unknown' ? item.topic || '' : item.statement || '', onChange: (event) => patchRequirement(item.id, value => item.priority === 'unknown' ? { ...value, topic: event.target.value, statement: null } : { ...value, statement: event.target.value, topic: null }) })),
+                    react_1.default.createElement("fieldset", { className: "shot-edge-select" },
+                        react_1.default.createElement("legend", null, "Exact source links"),
+                        draft.source_pins.map(pin => { const row = sourceByEdge.get(pin.edge_id); return react_1.default.createElement("label", { key: pin.edge_id },
+                            react_1.default.createElement("input", { type: "checkbox", checked: item.source_edge_ids.includes(pin.edge_id), onChange: (event) => patchRequirement(item.id, value => ({ ...value, source_edge_ids: event.target.checked ? [...value.source_edge_ids, pin.edge_id] : value.source_edge_ids.filter(edge => edge !== pin.edge_id) })) }),
+                            react_1.default.createElement("span", null, row ? sourceName(row, sourceDetails[row.edge_id]) : `Saved exact pin · ${pin.edge_id}`)); }),
+                        !draft.source_pins.length && react_1.default.createElement("small", null, "Select an exact screenplay link above.")))),
+                !draft.requirements.length && react_1.default.createElement("p", { className: "muted" }, "No source-specific requirements yet.")),
+            saved && react_1.default.createElement("section", { className: "shot-intent-section" },
+                react_1.default.createElement("h4", null, "Saved contract history"),
+                react_1.default.createElement("p", null, "Each revision is immutable. Comparing history does not change the editor."),
+                react_1.default.createElement("div", { className: "shot-history" }, saved.history.map(version => react_1.default.createElement("div", { className: "shot-history-row", key: version.id },
+                    react_1.default.createElement("span", null,
+                        react_1.default.createElement("strong", null,
+                            "Revision ",
+                            version.number),
+                        react_1.default.createElement("small", null,
+                            version.operation,
+                            " \u00B7 ",
+                            new Date(version.created_at).toLocaleString()),
+                        react_1.default.createElement("small", null,
+                            "Version ",
+                            react_1.default.createElement("code", null, version.id))),
+                    react_1.default.createElement("button", { type: "button", onClick: () => void compareVersion(version.id), disabled: version.id === saved.current_version_id }, "Compare")))))),
+        historyDiff && react_1.default.createElement(DiffView, { title: "Contract version comparison", changes: historyDiff.changes.map(change => ({ path: change.path, before: change.before, after: change.after })) }),
+        review && react_1.default.createElement("section", { className: "shot-intent-review", "aria-label": "Rebase review" },
+            react_1.default.createElement("h4", null, "Reviewed basis changes"),
+            react_1.default.createElement("p", null,
+                "Saved basis ",
+                react_1.default.createElement("code", null, review.saved_basis_sha256),
+                " \u00B7 current basis ",
+                react_1.default.createElement("code", null, review.current_basis_sha256)),
+            react_1.default.createElement(DiffView, { title: review.basis_changed ? 'The saved authored basis changed' : 'The current basis matches the saved basis', changes: review.changes.map(change => ({ path: change.path, before: change.saved_value, after: change.current_value })) }),
+            review.changes_truncated && react_1.default.createElement("p", { role: "status" }, "Additional basis differences were omitted by the service."),
+            react_1.default.createElement("p", null,
+                "Review token ",
+                react_1.default.createElement("code", null, review.expected_basis_sha256),
+                " \u00B7 contract revision ",
+                review.revision),
+            react_1.default.createElement("button", { type: "button", className: "primary", onClick: () => void submit('rebase'), disabled: !canSubmit || reviewGeneration !== editGeneration.current }, "Confirm reviewed rebase")),
+        ready && !loading && react_1.default.createElement("div", { className: "button-row shot-intent-actions" }, !saved ? react_1.default.createElement("button", { type: "button", className: "primary", onClick: () => void submit('create'), disabled: !canSubmit || conflicted }, "Create observation contract") : react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("button", { type: "button", className: "primary", onClick: () => void submit('revise'), disabled: !canSubmit || !dirty || conflicted }, "Save draft"),
+            react_1.default.createElement("button", { type: "button", onClick: () => void reviewRebase(), disabled: busy || ownerPending || loading }, "Review rebase"))),
+        saved && react_1.default.createElement("div", { className: "shot-intent-cas" },
+            react_1.default.createElement("small", null,
+                "Shot revision used for contract creation: ",
+                react_1.default.createElement("code", null, initialShotRevision.current)),
+            react_1.default.createElement("small", null,
+                "Contract header CAS revision for edit: ",
+                react_1.default.createElement("code", null, saved.revision)),
+            react_1.default.createElement("small", null,
+                "Exact source pins in draft: ",
+                draft.source_pins.length,
+                " \u00B7 linked sources now available: ",
+                sources.length)));
+}
+function DiffView({ title, changes }) {
+    return react_1.default.createElement("section", { className: "shot-intent-diff" },
+        react_1.default.createElement("h4", null, title),
+        !changes.length ? react_1.default.createElement("p", null, "No field changes.") : changes.map((change, index) => react_1.default.createElement("div", { className: "shot-intent-diff-row", key: `${change.path}-${index}` },
+            react_1.default.createElement("strong", null, readablePath(change.path)),
+            react_1.default.createElement("dl", null,
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("dt", null, "Saved"),
+                    react_1.default.createElement("dd", null, displayValue(change.before))),
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("dt", null, "Current or proposed"),
+                    react_1.default.createElement("dd", null, displayValue(change.after)))))));
+}
+function RetargetReview({ preview, body, saved, rows, details, onCancel, onConfirm, disabled }) {
+    const oldPin = body.source_pins.find(pin => pin.edge_id === preview.oldEdgeId), oldRow = rows.get(preview.oldEdgeId), nextRow = rows.get(preview.newEdgeId);
+    if (!oldPin || !nextRow)
+        return null;
+    const oldSaved = saved?.source_pins.find(item => item.edge_id === preview.oldEdgeId), oldDetail = details[preview.oldEdgeId], nextDetail = details[nextRow.edge_id];
+    return react_1.default.createElement("section", { className: "shot-retarget-preview", "aria-label": "Retarget preview", role: "group" },
+        react_1.default.createElement("h5", null, "Retarget preview"),
+        react_1.default.createElement("p", null, "This explicit draft edit changes the source edge used by linked purposes and requirements. Nothing changes until you choose Retarget draft pin."),
+        react_1.default.createElement("div", null,
+            react_1.default.createElement("strong", null, "Saved/local source"),
+            react_1.default.createElement("small", null,
+                oldRow ? sourceName(oldRow, oldDetail) : `Saved source ${preview.oldEdgeId}`,
+                " \u00B7 ",
+                oldPin.source_scope === 'scene-context' ? 'Scene context' : 'Direct shot link'),
+            react_1.default.createElement("small", null,
+                "Version ",
+                react_1.default.createElement("code", null, oldSaved?.source_version_id || oldRow?.version_id || 'Unavailable'),
+                " \u00B7 node ",
+                react_1.default.createElement("code", null, oldSaved?.node_id || oldRow?.node_id || 'Unavailable'),
+                " \u00B7 source SHA-256 ",
+                react_1.default.createElement("code", null, oldSaved?.source_sha256 || oldDetail?.contentSha256 || 'Unavailable'))),
+        react_1.default.createElement("div", null,
+            react_1.default.createElement("strong", null, "Proposed current source"),
+            react_1.default.createElement("small", null,
+                sourceName(nextRow, nextDetail),
+                " \u00B7 ",
+                sourceScope(nextRow) === 'scene-context' ? 'Scene context' : 'Direct shot link'),
+            react_1.default.createElement("small", null,
+                "Version ",
+                react_1.default.createElement("code", null, nextRow.version_id),
+                " \u00B7 node ",
+                react_1.default.createElement("code", null, nextRow.node_id),
+                " \u00B7 source SHA-256 ",
+                react_1.default.createElement("code", null, nextDetail?.contentSha256 || nextRow.content_sha256 || 'Unavailable'))),
+        react_1.default.createElement("div", { className: "button-row" },
+            react_1.default.createElement("button", { type: "button", onClick: onCancel }, "Cancel"),
+            react_1.default.createElement("button", { type: "button", className: "primary", onClick: onConfirm, disabled: disabled }, "Retarget draft pin")));
+}
+function messageOf(reason) { const value = reason; return value?.message || 'The request could not be completed. Your draft remains in the editor.'; }
 
 },
 "main":function(require,module,exports){
@@ -1531,7 +2934,7 @@ function OutlinePage(p) {
         const frame = entity.kind === 'shot' ? framingParts(entity) : null;
         const number = String(entity.fields.number || String(entity.position + 1).padStart(2, '0'));
         const title = outlineTitle(entity);
-        return react_1.default.createElement("div", { key: entity.id, className: `story-node node-${entity.kind}` },
+        return react_1.default.createElement("div", { key: entity.id, className: `story-node ${entity.kind}` },
             react_1.default.createElement("div", { className: `story-row ${p.selected === entity.id ? 'is-selected' : ''}` },
                 entity.kind === 'shot'
                     ? react_1.default.createElement("span", { className: "shot-order" }, number)

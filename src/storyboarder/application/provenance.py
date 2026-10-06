@@ -42,6 +42,9 @@ class Provenance:
             elif kind == 'frame':
                 shot = self.repo.get(conn, 'entities', row['shot_id'])
                 row['title'] = f"{shot['title']} · frame {row['version']}"
+                # Frames have their own archived lifecycle state, and inherit
+                # archive status from their parent shot for new-link checks.
+                row['archived'] = bool(row['state'] == 'archived' or shot['archived'])
             elif kind == 'media':
                 row['title'] = row['original_name']
         elif kind == 'node':
@@ -49,11 +52,14 @@ class Provenance:
             version = Documents._one(conn, 'document_versions', node['version_id'])
             document = Documents._one(conn, 'documents', version['document_id'])
             row = {k: v for k, v in node.items() if k not in ('payload', 'text')}
-            row.update(document_id=document['id'], document_kind=document['kind'], version_label=version['label'], is_current=document['current_version_id'] == node['version_id'])
+            row.update(document_id=document['id'], document_kind=document['kind'], version_label=version['label'], is_current=document['current_version_id'] == node['version_id'], archived=bool(document['archived']))
         elif kind == 'version':
             row = Documents._one(conn, 'document_versions', record_id)
             document = Documents._one(conn, 'documents', row['document_id'])
             row['title'] = f"{document['title']} · {row['label']}"
+            # Versions and their nodes are immutable and inherit archive state
+            # from the owning document.
+            row['archived'] = bool(document['archived'])
             row.pop('warnings', None)
         else:
             row = Documents._one(conn, 'source_artifacts', record_id)

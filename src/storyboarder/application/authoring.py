@@ -47,7 +47,7 @@ class AuthoringOperations:
     def update_entity(self, record_id, revision, changes):
         if not isinstance(changes, dict):
             raise StoryboardError("Enter the item details in the expected format.")
-        if unknown := set(changes) - {"title", "description", "fields", "tags", "aliases"}:
+        if set(changes) - {"title", "description", "fields", "tags", "aliases"}:
             raise StoryboardError("One or more item details are no longer supported. Refresh the project and try again.")
         with self.repo.transaction() as conn:
             row = self.entity(conn, record_id)
@@ -94,6 +94,21 @@ class AuthoringOperations:
             "jobs": ("SELECT id FROM jobs WHERE shot_id=?", (record_id,)),
             "generated_outputs": ("SELECT output_key FROM job_outputs WHERE entity_id=?", (record_id,)),
             "context_blocks": ("SELECT id FROM context_blocks WHERE owner_id=?", (record_id,)),
+            # Provenance and annotations are intentionally retained as history,
+            # including retired links and resolved notes. The database guards
+            # deletion on these references, so report them before attempting it.
+            "provenance_links": ("SELECT id FROM provenance_edges WHERE (source_type='entity' AND source_id=?) OR (target_type='entity' AND target_id=?)", (record_id, record_id)),
+            "annotations": ("SELECT id FROM annotations WHERE endpoint_type='entity' AND endpoint_id=?", (record_id,)),
+            "observation_contracts": ("SELECT id FROM observation_contracts WHERE shot_id=?", (record_id,)),
+            "observation_references": ("""SELECT DISTINCT version.contract_id
+              FROM observation_reference_pins pin
+              JOIN observation_contract_versions version ON version.id=pin.version_id
+              WHERE pin.reference_id=? ORDER BY version.contract_id""", (record_id,)),
+            "observation_continuity": ("""SELECT DISTINCT version.contract_id
+              FROM observation_contract_versions version,
+                   json_each(version.contract_json,'$.continuity') continuity,
+                   json_each(continuity.value,'$.related_shot_ids') related
+              WHERE related.value=? ORDER BY version.contract_id""", (record_id,)),
         }
         result = {name: [r[0] for r in conn.execute(sql, args)] for name, (sql, args) in queries.items()}
         result["can_delete"] = not any(result.values())

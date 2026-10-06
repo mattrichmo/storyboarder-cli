@@ -105,6 +105,12 @@ apply in order and record checksums. Before upgrading an older database, the rep
 creates a database-only `before-vN` backup. This is not a substitute for a media-inclusive
 project backup. Never edit a released migration or manually alter `user_version`.
 
+If an upgrade stops after earlier numbered migrations commit, the same-project `before-vN`
+backup can have an older schema than the database being resumed. Storyboarder preserves that
+original recovery point. A backup for another project or a schema newer than the database
+blocks the upgrade without replacing the backup or changing the database; preserve the project
+folder and inspect the backup before retrying.
+
 After a crash: preserve the folder; run doctor; confirm originals; review staging/orphan
 warnings; clear/rebuild cache if needed. An interrupted running job can be cancelled and
 explicitly retried after its process/lock is gone. Approval checks output hashes again,

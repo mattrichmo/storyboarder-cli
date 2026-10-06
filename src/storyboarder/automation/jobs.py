@@ -131,33 +131,82 @@ class Jobs:
 
     @staticmethod
     def _stop(process):
-        if process.poll() is not None:
-            return
-        try:
-            if os.name == "posix":
-                os.killpg(process.pid, signal.SIGTERM)
-            else:
-                process.send_signal(signal.CTRL_BREAK_EVENT)
-            process.wait(timeout=2)
-        except (OSError, subprocess.TimeoutExpired):
+        if os.name == "posix":
+            # The script runs in a new session, so its pid is also the process
+            # group id. Signal the group even when the direct child has already
+            # exited: descendants may still be running in that group.
+            group_id = process.pid
             try:
-                if os.name == "posix":
-                    os.killpg(process.pid, signal.SIGKILL)
-                else:
-                    subprocess.run(
-                        ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        check=False,
-                        timeout=5,
-                    )
+                os.killpg(group_id, signal.SIGTERM)
+            except OSError:
+                pass
+
+            deadline = time.monotonic() + 2
+            while True:
+                try:
+                    os.killpg(group_id, 0)
+                except ProcessLookupError:
+                    break
+                except OSError:
+                    break
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    try:
+                        os.killpg(group_id, signal.SIGKILL)
+                    except OSError:
+                        pass
+                    break
+                try:
+                    process.wait(timeout=min(0.05, remaining))
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+                time.sleep(min(0.05, max(0, deadline - time.monotonic())))
+
+            try:
                 process.wait(timeout=2)
-            except (OSError, subprocess.TimeoutExpired):
+            except subprocess.TimeoutExpired:
                 try:
                     process.kill()
                     process.wait(timeout=2)
                 except (OSError, subprocess.TimeoutExpired):
                     pass
+            except OSError:
+                pass
+            return
+
+        try:
+            if process.poll() is None:
+                process.send_signal(signal.CTRL_BREAK_EVENT)
+        except OSError:
+            pass
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            pass
+        except OSError:
+            pass
+        try:
+            # taskkill's tree mode is the available Windows process-tree
+            # cleanup mechanism. Keep it bounded so cancellation cannot hang.
+            subprocess.run(
+                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+                timeout=5,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        try:
+            process.wait(timeout=2)
+        except subprocess.TimeoutExpired:
+            try:
+                process.kill()
+                process.wait(timeout=2)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+        except OSError:
+            pass
 
     def _validate_outputs(self, output, manifest, max_file_bytes=MAX_FILE_BYTES, max_output_bytes=MAX_OUTPUT_BYTES):
         try:
@@ -200,7 +249,7 @@ class Jobs:
             self.repo.event(conn, "job.running", job_id)
         work = Path(tempfile.mkdtemp(prefix="storyboarder-run-"))
         storage = safe_path(self.service.root, f".storyboarder/jobs/{job_id}/attempt-{row['attempt']}")
-        process, started = None, now()
+        process, started, stopped = None, now(), False
         stdout, stderr = bytearray(), bytearray()
         try:
             storage.mkdir(parents=True, exist_ok=False)
@@ -275,12 +324,13 @@ class Jobs:
         except (StoryboardError, OSError, ValueError) as exc:
             if process:
                 self._stop(process)
+                stopped = True
             result = {"script": script["name"], "attempt": row["attempt"], "started_at": started, "finished_at": now(), "error": str(exc), "return_code": process.returncode if process else None, "outputs": []}
             if storage.exists():
                 json_file(storage / "result.json", result)
             return self._finish(job_id, "failed", result)
         finally:
-            if process:
+            if process and not stopped:
                 self._stop(process)
             if storage.exists():
                 for name, data in (("stdout.log", stdout), ("stderr.log", stderr)):

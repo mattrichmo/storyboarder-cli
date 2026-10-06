@@ -156,8 +156,14 @@ async def check_navigation(url, projects, args, report):
             report["checks"].append("Switching projects isolates drafts and restores the original arrangement.")
 
             async def save():
+                # A restored conflict stays locked until the user compares/reapplies it.
+                button = page.get_by_role("button", name="Save arrangement", exact=True)
+                if await button.is_disabled():
+                    await page.get_by_role("button", name="Refresh latest saved revision", exact=True).click()
+                    await page.locator(".layout-conflict-review").wait_for()
+                    button = page.get_by_role("button", name="Reapply merged arrangement", exact=True)
                 async with page.expect_response(lambda response: response.url.endswith("/commands/canvas.save")) as pending:
-                    await page.get_by_role("button", name="Save arrangement", exact=True).click()
+                    await button.click()
                 response = await pending.value
                 assert response.ok, await response.text()
                 await page.get_by_text("Unsaved arrangement · kept while you navigate", exact=True).wait_for(state="hidden")
@@ -182,6 +188,49 @@ async def check_navigation(url, projects, args, report):
             assert saved["id"] == a["layout"] and saved["revision"] == 3
             assert saved["positions"][a["sequence"]] == {"x": 20, "y": 0}
             report["checks"].append("Save after return updates the same layout at revisions 2 and 3.")
+
+            # A genuine same-field conflict must retain its baseline and explicit choice on return.
+            current_session = (await api.get("/api/v1/session")).json()
+            external_positions = dict(saved["positions"])
+            external_positions[a["sequence"]] = {"x": 90, "y": 0}
+            external = await api.post(
+                f'/api/v1/projects/{a["id"]}/commands/canvas.save',
+                headers={"X-Storyboarder-Token": current_session["token"]},
+                json={"name": saved["name"], "mode": saved["mode"], "positions": external_positions,
+                      "settings": saved["settings"], "layout_id": saved["id"], "revision": saved["revision"]},
+            )
+            assert external.status_code == 200, external.text
+            await node.focus()
+            await node.press("ArrowRight")
+            await page.get_by_role("button", name="Save arrangement", exact=True).click()
+            await page.get_by_role("button", name="Refresh latest saved revision", exact=True).click()
+            choice = page.locator(".layout-conflict-review").get_by_role("button", name="Keep local", exact=True)
+            await choice.click()
+            await page.get_by_role("button", name="Story outline", exact=True).click()
+            await canvas()
+            assert await position(node) == {"x": 30, "y": 0}
+            assert await choice.get_attribute("aria-pressed") == "true"
+            assert await page.get_by_role("button", name="Save arrangement", exact=True).is_disabled()
+            async with page.expect_response(lambda response: response.url.endswith("/commands/canvas.save")) as pending:
+                await page.get_by_role("button", name="Reapply merged arrangement", exact=True).click()
+            recovered = await (await pending.value).json()
+            assert recovered["revision"] == 5
+            assert recovered["positions"][a["sequence"]] == {"x": 30, "y": 0}
+            await page.get_by_text("Unsaved changes", exact=True).wait_for(state="hidden")
+            report["checks"].append("Real same-field conflict and Keep local choice survive unmount and reapply under CAS.")
+
+            await node.focus()
+            await node.press("ArrowRight")
+            await page.get_by_role("button", name="Scene board", exact=True).click()
+            gate = page.get_by_role("dialog", name="Unsaved canvas arrangement")
+            await gate.get_by_role("button", name="Stay", exact=True).click()
+            assert await position(node) == {"x": 40, "y": 0}
+            await page.get_by_role("button", name="Scene board", exact=True).click()
+            await gate.get_by_role("button", name="Discard changes", exact=True).click()
+            await page.get_by_role("button", name="Story flow", exact=True).click()
+            await node.wait_for()
+            assert await position(node) == {"x": 30, "y": 0}
+            report["checks"].append("Mode replacement offers Stay and Discard; discarded geometry returns to the saved layout.")
 
             await open_project("Navigation B")
             assert await position(other) == {"x": 50, "y": 0}

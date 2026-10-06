@@ -8,7 +8,7 @@ from storyboarder.domain.models import uid, now, title, dumps
 
 
 class LayoutOperations:
-    def save_layout(self, name, mode, positions, settings=None, revision=None):
+    def save_layout(self, name, mode, positions, settings=None, revision=None, layout_id=None):
         if mode not in ("story", "assets", "scene"):
             raise StoryboardError("Choose Story flow, Reference map, or Scene board.")
         if not isinstance(positions, dict) or len(positions) > 20000:
@@ -33,14 +33,22 @@ class LayoutOperations:
             if not isinstance(view, dict) or set(view) != {"x", "y", "scale"} or any(not isinstance(v, (int, float)) or not math.isfinite(v) for v in view.values()) or not 0.15 <= view["scale"] <= 3:
                 raise StoryboardError("The canvas view could not be saved. Adjust the view and try again.")
         with self.repo.transaction() as conn:
-            existing = conn.execute("SELECT id FROM layouts WHERE name=? AND mode=?", (title(name), mode)).fetchone()
-            values = {"positions": clean, "settings": settings}
-            if existing:
-                result = self.repo.update(conn, "layouts", existing[0], revision, values)
+            normalized_name = title(name)
+            identity = conn.execute("SELECT id FROM layouts WHERE name=? AND mode=?", (normalized_name, mode)).fetchone()
+            values = {"name": normalized_name, "mode": mode, "positions": clean, "settings": settings}
+            if layout_id:
+                existing = conn.execute("SELECT id FROM layouts WHERE id=?", (layout_id,)).fetchone()
+                if not existing:
+                    raise Conflict("This saved arrangement was removed. Refresh the canvas before saving again.", {"id": layout_id})
+                if identity and identity["id"] != layout_id:
+                    raise StoryboardError("An arrangement with this name already exists in this view. Choose another name before saving.")
+                result = self.repo.update(conn, "layouts", layout_id, revision, values)
+            elif identity:
+                result = self.repo.update(conn, "layouts", identity["id"], revision, {"positions": clean, "settings": settings})
             elif revision is not None:
                 raise Conflict("This saved arrangement was removed. Refresh the canvas before saving again.")
             else:
-                result = self.repo.insert(conn, "layouts", {"id": uid(), "name": title(name), "mode": mode, **values, "updated_at": now()})
+                result = self.repo.insert(conn, "layouts", {"id": uid(), **values, "updated_at": now()})
             self.repo.event(conn, "canvas.saved", result["id"], {"name": name, "mode": mode})
             return result
 

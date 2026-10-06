@@ -74,6 +74,7 @@
       "page": "library",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -169,6 +170,7 @@
       "page": "library",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -254,6 +256,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -274,6 +277,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -384,6 +388,7 @@
       "page": "outline",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -514,6 +519,7 @@
       "page": "editor",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -599,6 +605,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -619,6 +626,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -739,6 +747,7 @@
       "page": "outline",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -869,6 +878,7 @@
       "page": "editor",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -954,6 +964,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -974,6 +985,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -1124,6 +1136,7 @@
       "page": "outline",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1284,6 +1297,7 @@
       "page": "editor",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1369,6 +1383,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -1389,6 +1404,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -1519,6 +1535,7 @@
       "page": "guide",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1559,6 +1576,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1579,6 +1597,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -1609,6 +1628,7 @@
       "page": "",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1639,6 +1659,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1669,6 +1690,7 @@
       "page": "",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1719,6 +1741,7 @@
       "page": "outline",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1739,6 +1762,7 @@
       "page": "settings",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -1748,6 +1772,7 @@
       "page": "settings",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1757,6 +1782,7 @@
       "page": "settings",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1787,6 +1813,7 @@
       "page": "",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1817,6 +1844,7 @@
       "page": "",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1847,6 +1875,7 @@
       "page": "",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1877,6 +1906,7 @@
       "page": "",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1907,6 +1937,7 @@
       "page": "",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1937,6 +1968,7 @@
       "page": "library",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1967,6 +1999,7 @@
       "page": "library",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -1997,6 +2030,7 @@
       "page": "library",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2047,6 +2081,7 @@
       "page": "library",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2093,6 +2128,7 @@
       "page": "connections",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2149,6 +2185,7 @@
       "page": "editor",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2205,6 +2242,7 @@
       "page": "editor",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2235,6 +2273,7 @@
       "page": "intake",
       "destructive": false,
       "browser": false,
+      "api_safe": false,
       "read_only": false
     },
     {
@@ -2275,6 +2314,7 @@
       "page": "intake",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2295,6 +2335,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -2370,6 +2411,7 @@
       "page": "intake",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2400,6 +2442,7 @@
       "page": "intake",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2464,6 +2507,7 @@
       "page": "guide",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2484,6 +2528,7 @@
       "page": "guide",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -2524,6 +2569,7 @@
       "page": "frames",
       "destructive": false,
       "browser": false,
+      "api_safe": false,
       "read_only": false
     },
     {
@@ -2564,6 +2610,7 @@
       "page": "frames",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2609,6 +2656,7 @@
       "page": "frames",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2714,6 +2762,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -2734,6 +2783,7 @@
       "page": "connections",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -2793,11 +2843,22 @@
           "source": "",
           "help": "",
           "default": null
+        },
+        {
+          "name": "layout_id",
+          "label": "Saved arrangement",
+          "type": "select",
+          "required": false,
+          "options": [],
+          "source": "layouts",
+          "help": "",
+          "default": null
         }
       ],
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2818,6 +2879,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -2838,6 +2900,7 @@
       "page": "composition",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -2868,6 +2931,7 @@
       "page": "composition",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2913,6 +2977,7 @@
       "page": "composition",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2922,6 +2987,7 @@
       "page": "settings",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -2931,6 +2997,7 @@
       "page": "settings",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3009,6 +3076,7 @@
       "page": "automation",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3039,6 +3107,7 @@
       "page": "automation",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3069,6 +3138,7 @@
       "page": "automation",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3099,6 +3169,7 @@
       "page": "automation",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3129,6 +3200,7 @@
       "page": "automation",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3149,6 +3221,7 @@
       "page": "automation",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3158,6 +3231,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3182,6 +3256,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3191,6 +3266,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3211,6 +3287,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3231,6 +3308,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3251,6 +3329,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3275,6 +3354,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3301,6 +3381,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3374,6 +3455,7 @@
       "page": "documents",
       "destructive": false,
       "browser": false,
+      "api_safe": false,
       "read_only": false
     },
     {
@@ -3434,6 +3516,7 @@
       "page": "documents",
       "destructive": false,
       "browser": false,
+      "api_safe": false,
       "read_only": false
     },
     {
@@ -3464,6 +3547,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3524,6 +3608,7 @@
       "page": "documents",
       "destructive": false,
       "browser": false,
+      "api_safe": false,
       "read_only": false
     },
     {
@@ -3554,6 +3639,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3617,6 +3703,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3629,7 +3716,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "entities",
+          "source": "documents",
           "help": "",
           "default": null
         }
@@ -3637,6 +3724,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3649,7 +3737,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3677,6 +3765,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3689,7 +3778,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3699,7 +3788,7 @@
           "type": "text",
           "required": false,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         },
@@ -3737,6 +3826,7 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3749,7 +3839,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         },
@@ -3759,7 +3849,7 @@
           "type": "text",
           "required": false,
           "options": [],
-          "source": "",
+          "source": "document_nodes",
           "help": "",
           "default": null
         },
@@ -3787,6 +3877,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3799,7 +3890,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "entities",
+          "source": "document_nodes",
           "help": "",
           "default": null
         }
@@ -3807,6 +3898,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3819,7 +3911,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "entities",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3829,7 +3921,7 @@
           "type": "text",
           "required": false,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         }
@@ -3837,6 +3929,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3849,7 +3942,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "document_nodes",
           "help": "",
           "default": null
         },
@@ -3887,6 +3980,7 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3899,7 +3993,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         },
@@ -3909,7 +4003,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         }
@@ -3917,6 +4011,7 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -3929,7 +4024,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3939,7 +4034,7 @@
           "type": "text",
           "required": false,
           "options": [],
-          "source": "",
+          "source": "versions",
           "help": "",
           "default": null
         },
@@ -3957,6 +4052,7 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3969,7 +4065,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -3987,6 +4083,7 @@
       "page": "documents",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -3999,7 +4096,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "documents",
           "help": "",
           "default": null
         },
@@ -4017,6 +4114,7 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -4039,7 +4137,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "document_nodes",
           "help": "",
           "default": null
         },
@@ -4057,6 +4155,7 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -4077,6 +4176,7 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -4107,7 +4207,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_source",
           "help": "",
           "default": null
         },
@@ -4135,7 +4235,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_target",
           "help": "",
           "default": null
         },
@@ -4169,6 +4269,7 @@
       "page": "provenance",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -4199,7 +4300,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_typed_endpoint",
           "help": "",
           "default": null
         },
@@ -4241,6 +4342,7 @@
       "page": "provenance",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -4253,7 +4355,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_edges",
           "help": "",
           "default": null
         },
@@ -4271,6 +4373,7 @@
       "page": "provenance",
       "destructive": true,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -4311,6 +4414,7 @@
       "page": "provenance",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -4331,6 +4435,7 @@
       "page": "coverage",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -4361,7 +4466,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_typed_endpoint",
           "help": "",
           "default": null
         },
@@ -4379,6 +4484,7 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": false
     },
     {
@@ -4409,7 +4515,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "provenance_typed_endpoint",
           "help": "",
           "default": null
         },
@@ -4437,6 +4543,7 @@
       "page": "",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
       "read_only": true
     },
     {
@@ -4449,7 +4556,7 @@
           "type": "text",
           "required": true,
           "options": [],
-          "source": "",
+          "source": "annotations",
           "help": "",
           "default": null
         },
@@ -4490,6 +4597,459 @@
       "page": "documents",
       "destructive": false,
       "browser": true,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "observation.create",
+      "label": "Create a shot observation contract",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Storyboard shot",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_shot_revision",
+          "label": "Last-read storyboard shot revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "contract",
+          "label": "Versioned observation contract",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "observation.show",
+      "label": "Show a shot observation contract",
+      "fields": [
+        {
+          "name": "contract_id",
+          "label": "Observation contract",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Contract version",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.list",
+      "label": "List shot observation contracts",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Storyboard shot",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "shots",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "include_archived",
+          "label": "Include archived shots",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        },
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.revise",
+      "label": "Revise a shot observation contract",
+      "fields": [
+        {
+          "name": "contract_id",
+          "label": "Observation contract",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        },
+        {
+          "name": "contract",
+          "label": "Versioned observation contract",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "observation.validate",
+      "label": "Check declared observation links and basis",
+      "fields": [
+        {
+          "name": "contract_id",
+          "label": "Observation contract",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Contract version",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.rebase-preview",
+      "label": "Review basis changes before rebasing a contract",
+      "fields": [
+        {
+          "name": "contract_id",
+          "label": "Observation contract",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "contract",
+          "label": "Versioned observation contract",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.rebase",
+      "label": "Rebase a contract with explicit source pins",
+      "fields": [
+        {
+          "name": "contract_id",
+          "label": "Observation contract",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Version check",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "Keeps a newer edit from being overwritten.",
+          "default": null
+        },
+        {
+          "name": "contract",
+          "label": "Versioned observation contract",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Reviewed basis token",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "observation.diff",
+      "label": "Compare two observation contract versions",
+      "fields": [
+        {
+          "name": "contract_id",
+          "label": "Observation contract",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "story",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "before_version_id",
+          "label": "Earlier version",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "after_version_id",
+          "label": "Later version",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.coverage",
+      "label": "Report exact observation coverage",
+      "fields": [
+        {
+          "name": "request",
+          "label": "Request-scoped exact anchors",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "JSON object: {\"anchors\": [{\"document_id\", \"version_id\", \"node_id\", \"source_sha256\", \"priority\", \"basis\"}]}.",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Page size",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 500
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.create-group",
+      "label": "Create planned shots, source links, and contracts",
+      "fields": [
+        {
+          "name": "request",
+          "label": "Atomic grouped plan",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "JSON object: {\"items\": [GroupItem, ...]}; include caller-generated shot_id, contract_id, edge_id, and expected_scene_revision.",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "observation.plan-export",
+      "label": "Export exact observation history plan",
+      "fields": [],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.plan-import-preview",
+      "label": "Preview observation plan reconciliation",
+      "fields": [
+        {
+          "name": "plan",
+          "label": "Portable observation plan",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "choices",
+          "label": "Explicit conflict choices by contract ID",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.plan-import-apply",
+      "label": "Apply a reviewed observation plan import",
+      "fields": [
+        {
+          "name": "plan",
+          "label": "Portable observation plan",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "preview",
+          "label": "Exact preview receipt",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "coverage",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
       "read_only": false
     }
   ]
