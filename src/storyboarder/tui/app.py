@@ -244,8 +244,17 @@ class Desk:
             if command.page == 'coverage' and not command.browser and name not in standard_observation_forms:
                 buttons.append(Button(command.label[:28], handler=lambda n=name: self.launch_action(n)))
         if self.observation_draft:
-            buttons += [Button('Retry saved draft', handler=lambda: self.spawn(self.retry_observation_draft())),
-                        Button('Discard saved draft', handler=self.discard_observation_draft)]
+            draft = self.observation_draft
+            if draft.get('kind') == 'create_existing' and draft.get('conflict_contract_id'):
+                buttons.append(Button('Review draft on existing contract',
+                                      handler=lambda: self.spawn(self.recover_observation_create_conflict())))
+            elif draft.get('kind') == 'create_existing' and draft.get('latest_shot_revision') is not None:
+                revision = draft['latest_shot_revision']
+                buttons.append(Button(f'Use shot revision {revision} and retry',
+                                      handler=lambda: self.spawn(self.use_latest_shot_revision_for_draft())))
+            else:
+                buttons.append(Button('Retry saved draft', handler=lambda: self.spawn(self.retry_observation_draft())))
+            buttons.append(Button('Discard saved draft', handler=self.discard_observation_draft))
         columns = 3 if self._terminal_columns() >= 150 else 2 if self._terminal_columns() >= 100 else 1
         button_rows = [VSplit(buttons[index:index + columns], padding=1, height=1)
                        for index in range(0, len(buttons), columns)]
@@ -269,9 +278,17 @@ class Desk:
             item = self.observation_draft['payload']['request']['items'][0]
             return f"Saved draft · {item['title']} · exact source pins retained · scene revision {item['expected_scene_revision']}"
         if kind == 'create_existing':
-            return (f"Saved contract draft · shot {self.observation_draft['shot_id']} · "
-                    f"shot revision {self.observation_draft['expected_shot_revision']} · "
-                    f"{len(self.observation_draft['contract']['source_pins'])} exact pins retained")
+            draft = self.observation_draft
+            if draft.get('conflict_contract_id'):
+                return (f"Saved contract draft · shot {draft['shot_id']} · existing contract "
+                        f"{draft['conflict_contract_id']} · {len(draft['contract']['source_pins'])} exact pins retained")
+            if draft.get('latest_shot_revision') is not None:
+                return (f"Saved contract draft · shot {draft['shot_id']} · expected shot revision "
+                        f"{draft['expected_shot_revision']} · latest is {draft['latest_shot_revision']} · "
+                        f"{len(draft['contract']['source_pins'])} exact pins retained")
+            return (f"Saved contract draft · shot {draft['shot_id']} · "
+                    f"shot revision {draft['expected_shot_revision']} · "
+                    f"{len(draft['contract']['source_pins'])} exact pins retained")
         if kind == 'rebase':
             pins = self.observation_draft['contract']['source_pins']
             return (f"Saved rebase review · contract {self.observation_draft['contract_id']} · "
@@ -638,32 +655,217 @@ class Desk:
         draft = self.observation_draft
         if not draft:
             return
+        selected_contract_id = None
+        success_message = ''
         try:
             if draft['kind'] == 'group':
                 result = await self.run_worker(execute, self.service, 'observation.create-group', draft['payload'])
-                self.set_message(f"Created shot {result['items'][0]['shot_id']} and its exact observation contract.")
+                created = result['items'][0]
+                selected_contract_id = created['contract_id']
+                success_message = (f"Created shot {created['shot_id']} and its exact observation contract. "
+                                   f"Selected contract {selected_contract_id}.")
             elif draft['kind'] == 'create_existing':
                 result = await self.run_worker(execute, self.service, 'observation.create', {
                     'shot_id': draft['shot_id'],
                     'expected_shot_revision': draft['expected_shot_revision'],
                     'contract': draft['contract'],
                 })
-                self.set_message(f"Created observation contract {result['id']} at revision {result['revision']}.")
+                selected_contract_id = result['id']
+                success_message = (f"Created observation contract {result['id']} at revision {result['revision']} "
+                                   f"for shot {result['shot_id']}. Selected contract {result['id']}.")
             elif draft['kind'] == 'rebase':
                 result = await self.run_worker(execute, self.service, 'observation.rebase', {
                     'contract_id': draft['contract_id'], 'revision': draft['revision'],
                     'contract': draft['contract'],
                     'expected_basis_sha256': draft['expected_basis_sha256'],
                 })
-                self.set_message(f"Saved contract rebase {result['revision']} with the reviewed basis and exact pins.")
+                selected_contract_id = result.get('id') or draft['contract_id']
+                success_message = f"Saved contract rebase {result['revision']} with the reviewed basis and exact pins."
             else:
                 result = await self.run_worker(execute, self.service, 'observation.revise', {
                     'contract_id': draft['contract_id'], 'revision': draft['revision'], 'contract': draft['contract']})
-                self.set_message(f"Saved contract revision {result['revision']} with the existing IDs and source pins.")
+                selected_contract_id = result.get('id') or draft['contract_id']
+                success_message = f"Saved contract revision {result['revision']} with the existing IDs and source pins."
             self.observation_draft = None
             await self.refresh()
+            if selected_contract_id:
+                await self._select_observation_contract(selected_contract_id)
+            if success_message:
+                self.set_message(success_message)
         except (StoryboardError, OSError) as exc:
+            if draft.get('kind') == 'create_existing' and getattr(exc, 'code', None) == 'contract_already_exists':
+                await self._retain_existing_contract_conflict(draft, exc)
+                return
+            if draft.get('kind') == 'create_existing' and getattr(exc, 'code', None) == 'revision_conflict':
+                await self._retain_shot_revision_conflict(draft, exc)
+                return
+            if draft.get('kind') == 'revise' and draft.get('create_conflict_recovery') and getattr(exc, 'code', None) == 'revision_conflict':
+                await self._retain_contract_revision_conflict(draft, exc)
+                return
             self.set_message('Draft retained with exact IDs, revisions, and pins. ' + str(exc))
+            self.build_page()
+
+    async def _select_observation_contract(self, contract_id):
+        """Select a contract by its stable header ID, hydrating it if the list is truncated."""
+        if not contract_id:
+            return False
+        row = next((item for item in self.observation_rows if item.id == contract_id), None)
+        if row is None:
+            record = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+            shot = await self.run_worker(self.service.get, 'entities', record['shot_id'])
+            content_sha256 = record['version'].get('content_sha256', '')
+            row = Row(contract_id,
+                      f"{shot['title']} · contract r{record['revision']} · v{record['version']['number']}",
+                      f"{content_sha256} · {'archived' if shot.get('archived') else 'active'}",
+                      {'id': contract_id, 'shot_id': record['shot_id'], 'shot_title': shot['title'],
+                       'revision': record['revision'], 'version_number': record['version']['number'],
+                       'current_version_id': record.get('current_version_id') or record['version']['id'],
+                       'content_sha256': content_sha256,
+                       'shot_archived': bool(shot.get('archived'))})
+            self.observation_rows = [item for item in self.observation_rows if item.id != contract_id]
+            self.observation_rows.append(row)
+        if self.search.text:
+            self.search.text = ''
+        self.rebuild_rows()
+        index = next((index for index, item in enumerate(self.records.rows) if item.id == contract_id), None)
+        if index is None:
+            return False
+        self.records.index = index
+        self.select(self.records.selected)
+        return True
+
+    async def _retain_existing_contract_conflict(self, draft, error):
+        details = getattr(error, 'details', {}) or {}
+        contract_id = details.get('contract_id')
+        shot_id = details.get('shot_id') or draft.get('shot_id')
+        if not contract_id or shot_id != draft.get('shot_id'):
+            self.set_message('The create conflicted. Your exact shot, draft, and pins are retained; refresh the contract list to inspect the saved shot.')
+            self.build_page()
+            return
+        try:
+            record = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+            if record.get('shot_id') != shot_id:
+                self.set_message('The conflict returned a contract for a different shot. Your exact draft and pins remain saved for recovery.')
+                self.build_page()
+                return
+            draft['conflict_contract_id'] = contract_id
+            draft['conflict_revision'] = record['revision']
+            await self.refresh()
+            await self._select_observation_contract(contract_id)
+            self.build_page()
+            self.set_message(
+                f"A contract already exists for shot {shot_id}. Your draft and exact pins are retained. "
+                f"Contract {contract_id} is selected; review it before using your draft as its next revision."
+            )
+        except (StoryboardError, OSError) as refresh_error:
+            self.set_message('The create conflicted. Your exact draft and pins are retained, but the existing contract could not be loaded: '
+                             + str(refresh_error))
+            self.build_page()
+
+    async def _retain_shot_revision_conflict(self, draft, error):
+        try:
+            shot = await self.run_worker(self.service.get, 'entities', draft['shot_id'])
+            if shot.get('kind') != 'shot' or shot.get('archived'):
+                raise StoryboardError('The selected shot is no longer active.')
+            draft['latest_shot_revision'] = shot['revision']
+            self.state = await self.run_worker(self.service.state)
+            self.build_page()
+            self.set_message(
+                f"Shot {draft['shot_id']} changed after revision {draft['expected_shot_revision']} was captured. "
+                f"Your draft and exact pins remain; review and explicitly use shot revision {shot['revision']} to retry."
+            )
+        except (StoryboardError, OSError) as refresh_error:
+            self.set_message('The shot revision conflicted. Your exact draft and pins are retained, but the current shot could not be loaded: '
+                             + str(refresh_error or error))
+            self.build_page()
+
+    async def _retain_contract_revision_conflict(self, draft, error):
+        contract_id = draft.get('contract_id')
+        try:
+            record = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+            if record.get('shot_id') != draft.get('shot_id'):
+                raise StoryboardError('The selected contract no longer belongs to the draft shot.')
+            draft['kind'] = 'create_existing'
+            draft['conflict_contract_id'] = contract_id
+            draft['conflict_revision'] = record['revision']
+            draft.pop('contract_id', None)
+            draft.pop('revision', None)
+            draft.pop('create_conflict_recovery', None)
+            await self.refresh()
+            await self._select_observation_contract(contract_id)
+            self.build_page()
+            self.set_message(
+                f"Contract {contract_id} changed while the retained draft was being saved. "
+                f"Your exact draft and pins remain; review current revision {record['revision']} before continuing."
+            )
+        except (StoryboardError, OSError) as refresh_error:
+            self.set_message('The existing contract changed during recovery. Your exact draft and pins are retained: '
+                             + str(refresh_error or error))
+            self.build_page()
+
+    async def use_latest_shot_revision_for_draft(self):
+        draft = self.observation_draft
+        if not draft or draft.get('kind') != 'create_existing':
+            return
+        try:
+            shot = await self.run_worker(self.service.get, 'entities', draft['shot_id'])
+            if shot.get('kind') != 'shot' or shot.get('archived'):
+                raise StoryboardError('Restore the selected shot before creating its contract.')
+            draft['expected_shot_revision'] = shot['revision']
+            draft.pop('latest_shot_revision', None)
+            self.set_message(f"Retrying the retained draft with shot revision {shot['revision']}.")
+            await self._apply_observation_draft()
+        except (StoryboardError, OSError) as exc:
+            self.set_message('The current shot revision could not be used. Your exact draft and pins are retained: ' + str(exc))
+            self.build_page()
+
+    async def recover_observation_create_conflict(self):
+        draft = self.observation_draft
+        if not draft or draft.get('kind') != 'create_existing' or not draft.get('conflict_contract_id'):
+            return
+        contract_id = draft['conflict_contract_id']
+        try:
+            saved = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+            if saved.get('shot_id') != draft.get('shot_id'):
+                raise StoryboardError('The selected contract no longer belongs to the draft shot.')
+            reviewed_revision = saved['revision']
+            comparison = (
+                f"Existing contract {contract_id}\nShot ID {saved['shot_id']} · header revision {reviewed_revision}\n"
+                f"Saved version {saved['current_version_id']} · source pins "
+                f"{', '.join(pin['edge_id'] for pin in saved['contract']['source_pins']) or '(none)'}\n\n"
+                "Current saved contract body:\n" + json.dumps(saved['contract'], ensure_ascii=False, sort_keys=True, indent=2) +
+                "\n\nRetained local draft (unchanged):\n" +
+                json.dumps(draft['contract'], ensure_ascii=False, sort_keys=True, indent=2) +
+                "\n\nChoosing to continue will save the retained body as the next immutable contract revision. "
+                "No fields or source pins are merged automatically."
+            )
+            await self.message_dialog('Review the existing contract and retained draft', comparison)
+            choice = await self.choose('Use the retained draft as the next contract revision?', [
+                ('no', 'Keep the draft and saved contract unchanged'),
+                ('yes', f"Save the draft as revision {reviewed_revision + 1}")], 'no')
+            if choice != 'yes':
+                return
+            latest = await self.run_worker(ObservationContracts(self.service).show, contract_id)
+            if latest.get('shot_id') != draft.get('shot_id'):
+                raise StoryboardError('The selected contract no longer belongs to the draft shot.')
+            if latest['revision'] != reviewed_revision or latest['current_version_id'] != saved['current_version_id']:
+                draft['conflict_revision'] = latest['revision']
+                await self.refresh()
+                await self._select_observation_contract(contract_id)
+                self.set_message(
+                    f"Contract {contract_id} changed while you reviewed it. Your exact draft and pins remain; "
+                    f"review the latest revision {latest['revision']} before continuing."
+                )
+                return
+            draft['kind'] = 'revise'
+            draft['contract_id'] = contract_id
+            draft['revision'] = reviewed_revision
+            draft['create_conflict_recovery'] = True
+            draft.pop('conflict_contract_id', None)
+            draft.pop('conflict_revision', None)
+            await self._apply_observation_draft()
+        except (StoryboardError, OSError) as exc:
+            self.set_message('The existing contract could not be used. Your exact draft and pins are retained: ' + str(exc))
             self.build_page()
 
     async def _pick_exact_source(self):

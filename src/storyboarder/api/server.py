@@ -97,7 +97,14 @@ def create_app(project=None, workspace=None, port=7430):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Cross-Origin-Resource-Policy"] = "same-origin"
-        response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+        export_route = request.scope.get("route")
+        if getattr(export_route, "name", None) == "export_file":
+            # Project exports can contain arbitrary document formats. Keep the
+            # generated board preview inline, but isolate every file response
+            # from the launch token and local API, regardless of its suffix.
+            response.headers["Content-Security-Policy"] = "default-src 'none'; script-src 'none'; style-src 'self'; img-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; sandbox allow-same-origin"
+        else:
+            response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self'; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         elif request.url.path in ("/", "/index.html", "/build.json"):

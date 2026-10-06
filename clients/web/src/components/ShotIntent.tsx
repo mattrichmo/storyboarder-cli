@@ -16,7 +16,7 @@ type ContractListItem={id:string;shot_id:string;current_version_id:string;revisi
 type SourceDetails={documentTitle?:string;versionNumber?:number;versionLabel?:string;nodeTitle?:string;nodeType?:string;currentVersionId?:string;contentSha256?:string;error?:string};
 type RebaseReview={revision:number;expected_basis_sha256:string;saved_basis_sha256:string;current_basis_sha256:string;basis_changed:boolean;changes:Array<{path:string;saved_value:unknown;current_value:unknown}>;changes_truncated:boolean};
 type ContractDiff={before_version_id:string;after_version_id:string;changes:Array<{path:string;before:unknown;after:unknown}>};
-type DraftCache={body:ContractBody;baseRecord:ContractRecord|null;latestRecord:ContractRecord|null;shotRevision:number;generation:number;conflicted:boolean;validation?:Validation|null};
+type DraftCache={body:ContractBody;baseRecord:ContractRecord|null;latestRecord:ContractRecord|null;shotRevision:number;generation:number;conflicted:boolean;validation?:Validation|null;recoveryBaseRecord?:ContractRecord|null};
 type DraftEvent={entry?:DraftCache;pending:boolean};
 type RetargetPreview={oldEdgeId:string;newEdgeId:string};
 
@@ -31,7 +31,7 @@ function guardUnsavedUnload(event:BeforeUnloadEvent){if(!dirtyDraftOwners.size&&
 function updateUnloadGuard(){if(typeof window==='undefined')return;if(dirtyDraftOwners.size||pendingDrafts.size)window.addEventListener('beforeunload',guardUnsavedUnload);else window.removeEventListener('beforeunload',guardUnsavedUnload);}
 function setDraftDirty(key:string,dirty:boolean){if(dirty)dirtyDraftOwners.add(key);else dirtyDraftOwners.delete(key);updateUnloadGuard();}
 function notifyDraft(key:string,event:DraftEvent,origin:object){for(const listener of draftListeners.get(key)||[])listener(event,origin);}
-function storeDraft(key:string,entry:DraftCache,origin:object){const previous=draftCache.get(key);const accepted={...entry,validation:Object.prototype.hasOwnProperty.call(entry,'validation')?entry.validation??null:previous?.validation??null};draftCache.set(key,accepted);setDraftDirty(key,JSON.stringify(accepted.baseRecord?.contract||emptyBody())!==JSON.stringify(accepted.body));notifyDraft(key,{entry:accepted,pending:pendingDrafts.has(key)},origin);}
+function storeDraft(key:string,entry:DraftCache,origin:object){const previous=draftCache.get(key);const accepted={...entry,validation:Object.prototype.hasOwnProperty.call(entry,'validation')?entry.validation??null:previous?.validation??null,recoveryBaseRecord:Object.prototype.hasOwnProperty.call(entry,'recoveryBaseRecord')?entry.recoveryBaseRecord??null:previous?.recoveryBaseRecord??null};draftCache.set(key,accepted);setDraftDirty(key,JSON.stringify(accepted.baseRecord?.contract||emptyBody())!==JSON.stringify(accepted.body));notifyDraft(key,{entry:accepted,pending:pendingDrafts.has(key)},origin);}
 function setDraftPending(key:string,pending:boolean,origin:object){if(pending)pendingDrafts.add(key);else pendingDrafts.delete(key);updateUnloadGuard();notifyDraft(key,{pending},origin);}
 
 const emptyBody=():ContractBody=>({schema:'storyboarder.observation-contract/v1',source_pins:[],script_intents:[],requirements:[],references:[],continuity:[],notes:''});
@@ -57,13 +57,39 @@ function sourceScope(row:SourceRow):SourceScope{return row.inherited?'scene-cont
 function sourceName(row:SourceRow,details?:SourceDetails){const kind=details?.nodeType||row.node_type;const title=details?.nodeTitle||row.title;return `${row.inherited?'Scene context':'Direct shot link'} · ${kind==='scene'?'Scene node':kind} · ${title||'Untitled source'}`;}
 function readablePath(path:string){return path.replace(/^\//,'').split('/').map(part=>part.replace(/_id$/,' ID').replace(/_/g,' ')).join(' · ');}
 function displayValue(value:unknown){if(value&&typeof value==='object')return JSON.stringify(value);if(value===undefined)return 'Not present';return String(value);}
+type ContractFieldChange={path:string;before:unknown;after:unknown};
+function contractBodyChanges(before:unknown,after:unknown):ContractFieldChange[]{
+ const changes:ContractFieldChange[]=[];
+ const stableArrayKey=(value:unknown):string|null=>{if(!value||typeof value!=='object'||Array.isArray(value))return null;const row=value as Record<string,unknown>;const key=typeof row.id==='string'?row.id:typeof row.edge_id==='string'?row.edge_id:null;return key?`${typeof row.id==='string'?'id':'edge_id'}=${key}`:null;};
+ const visit=(left:unknown,right:unknown,path:string)=>{
+  if(Object.is(left,right))return;
+  if(Array.isArray(left)&&Array.isArray(right)){
+   const leftKeys=left.map(stableArrayKey),rightKeys=right.map(stableArrayKey);
+   if(leftKeys.every(Boolean)&&rightKeys.every(Boolean)){
+    const leftByKey=new Map(left.map((value,index)=>[leftKeys[index]!,value]));const rightByKey=new Map(right.map((value,index)=>[rightKeys[index]!,value]));
+    for(const key of Array.from(new Set([...leftByKey.keys(),...rightByKey.keys()])).sort())visit(leftByKey.get(key),rightByKey.get(key),`${path}/${key}`);
+   }else{
+    for(let index=0;index<Math.max(left.length,right.length);index++)visit(left[index],right[index],`${path}/${index}`);
+   }
+   return;
+  }
+  if(left&&right&&typeof left==='object'&&typeof right==='object'&&!Array.isArray(left)&&!Array.isArray(right)){
+   const leftRow=left as Record<string,unknown>,rightRow=right as Record<string,unknown>;
+   for(const key of Array.from(new Set([...Object.keys(leftRow),...Object.keys(rightRow)])).sort())visit(leftRow[key],rightRow[key],`${path}/${key}`);
+   return;
+  }
+  changes.push({path:path||'/contract',before:left,after:right});
+ };
+ visit(before,after,'/contract');
+ return changes;
+}
 
 export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
  const ownerKey=`${projectId}:${shot.id}`;const instance=useRef<object>({});
  const [sources,setSources]=useState<SourceRow[]>([]),[sourceDetails,setSourceDetails]=useState<Record<string,SourceDetails>>({});
  const [items,setItems]=useState<ContractListItem[]>([]),[selectedContract,setSelectedContract]=useState('');
  const [saved,setSaved]=useState<ContractRecord|null>(null),[latest,setLatest]=useState<ContractRecord|null>(null),[draft,setDraft]=useState<ContractBody>(emptyBody);
- const [validation,setValidation]=useState<Validation|null>(null),[remoteDiff,setRemoteDiff]=useState<ContractDiff|null>(null),[historyDiff,setHistoryDiff]=useState<ContractDiff|null>(null);
+ const [validation,setValidation]=useState<Validation|null>(null),[remoteDiff,setRemoteDiff]=useState<ContractDiff|null>(null),[historyDiff,setHistoryDiff]=useState<ContractDiff|null>(null),[recoveryBaseRecord,setRecoveryBaseRecord]=useState<ContractRecord|null>(null);
  const [review,setReview]=useState<RebaseReview|null>(null),[reviewGeneration,setReviewGeneration]=useState(-1),[retargetPreview,setRetargetPreview]=useState<RetargetPreview|null>(null);
  const [loading,setLoading]=useState(true),[refreshing,setRefreshing]=useState(false),[busy,setBusy]=useState(false),[ownerPending,setOwnerPending]=useState(pendingDrafts.has(ownerKey)),[error,setError]=useState(''),[sourceError,setSourceError]=useState(''),[notice,setNotice]=useState(''),[ready,setReady]=useState(false),[conflicted,setConflicted]=useState(false),[rebaseNeedsReview,setRebaseNeedsReview]=useState(false);
  const editGeneration=useRef(0),loadSequence=useRef(0),initialShotRevision=useRef(shot.revision),[latestShotRevision,setLatestShotRevision]=useState(shot.revision);
@@ -93,7 +119,7 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
  }
 
  async function initialLoad(){
-  const sequence=++loadSequence.current,acceptedEpoch=acceptedRecordEpoch(ownerKey);const stillCurrent=()=>loadSequence.current===sequence&&acceptedRecordEpoch(ownerKey)===acceptedEpoch;const stopStaleLoad=()=>{if(loadSequence.current===sequence){setReady(true);setLoading(false);}};const cachedAtStart=draftCache.get(ownerKey);editGeneration.current=cachedAtStart?.generation||0;initialShotRevision.current=cachedAtStart?.shotRevision??shot.revision;setLatestShotRevision(shot.revision);setOwnerPending(pendingDrafts.has(ownerKey));
+  const sequence=++loadSequence.current,acceptedEpoch=acceptedRecordEpoch(ownerKey);const stillCurrent=()=>loadSequence.current===sequence&&acceptedRecordEpoch(ownerKey)===acceptedEpoch;const stopStaleLoad=()=>{if(loadSequence.current===sequence){setReady(true);setLoading(false);}};const cachedAtStart=draftCache.get(ownerKey);editGeneration.current=cachedAtStart?.generation||0;initialShotRevision.current=cachedAtStart?.shotRevision??shot.revision;setLatestShotRevision(shot.revision);setOwnerPending(pendingDrafts.has(ownerKey));setRecoveryBaseRecord(cachedAtStart?.recoveryBaseRecord||null);
   setLoading(true);setReady(false);setError('');setSourceError('');setNotice('');setSaved(null);setLatest(null);setValidation(null);setDraft(copy(cachedAtStart?.body||emptyBody()));setItems([]);setSelectedContract('');setReview(null);setRemoteDiff(null);setHistoryDiff(null);setConflicted(false);setRebaseNeedsReview(false);
   const [sourceResult,listResult]=await Promise.allSettled([
    runCommand<{items:SourceRow[]}>(projectId,'shot.sources',{id:shot.id}),
@@ -105,7 +131,7 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
   if(listResult.status==='rejected'){setError(messageOf(listResult.reason));setLoading(false);return;}
   const rows=listResult.value.items||[];setItems(rows);setReady(true);
   const cached=draftCache.get(ownerKey);const first=rows.find(item=>item.id===cached?.baseRecord?.id)||rows[0];
-  if(!first){const cached=draftCache.get(ownerKey);setSaved(null);setLatest(null);setSelectedContract('');setDraft(copy(cached?.body||emptyBody()));setValidation(null);setConflicted(false);setLoading(false);if(cached)storeDraft(ownerKey,{...cached,body:copy(cached.body),baseRecord:null,latestRecord:null,validation:null},instance.current);return;}
+  if(!first){const cached=draftCache.get(ownerKey);setSaved(null);setLatest(null);setSelectedContract('');setDraft(copy(cached?.body||emptyBody()));setValidation(null);setConflicted(false);setRecoveryBaseRecord(null);setLoading(false);if(cached)storeDraft(ownerKey,{...cached,body:copy(cached.body),baseRecord:null,latestRecord:null,validation:null,recoveryBaseRecord:null},instance.current);return;}
   setSelectedContract(first.id);
   try{
    const shown=await runCommand<ContractRecord>(projectId,'observation.show',{contract_id:first.id});
@@ -131,7 +157,7 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
 
  useEffect(()=>{
   let listeners=draftListeners.get(ownerKey);if(!listeners){listeners=new Set();draftListeners.set(ownerKey,listeners);}
- const listener=(event:DraftEvent,origin:object)=>{if(origin===instance.current)return;setOwnerPending(event.pending);if(event.entry){editGeneration.current=event.entry.generation;initialShotRevision.current=event.entry.shotRevision;setDraft(copy(event.entry.body));setSaved(event.entry.baseRecord);setLatest(event.entry.latestRecord);setConflicted(event.entry.conflicted);setValidation(event.entry.validation||null);const record=event.entry.latestRecord||event.entry.baseRecord;if(record){const item=listItem(record,shot.title);setItems(old=>old.some(row=>row.id===record.id)?old.map(row=>row.id===record.id?item:row):[item,...old]);setSelectedContract(record.id);}}};
+  const listener=(event:DraftEvent,origin:object)=>{if(origin===instance.current)return;setOwnerPending(event.pending);if(event.entry){editGeneration.current=event.entry.generation;initialShotRevision.current=event.entry.shotRevision;setDraft(copy(event.entry.body));setSaved(event.entry.baseRecord);setLatest(event.entry.latestRecord);setConflicted(event.entry.conflicted);setValidation(event.entry.validation||null);setRecoveryBaseRecord(event.entry.recoveryBaseRecord||null);const record=event.entry.latestRecord||event.entry.baseRecord;if(record){const item=listItem(record,shot.title);setItems(old=>old.some(row=>row.id===record.id)?old.map(row=>row.id===record.id?item:row):[item,...old]);setSelectedContract(record.id);}}};
   listeners.add(listener);setOwnerPending(pendingDrafts.has(ownerKey));void initialLoad();
   return()=>{listeners?.delete(listener);if(!listeners?.size)draftListeners.delete(ownerKey);loadSequence.current+=1;};
  },[projectId,shot.id]);
@@ -162,7 +188,7 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
    const rows=sourceRows.items||[];if(loadSequence.current!==sequence)return;setSources(rows);void hydrateSources(rows,()=>loadSequence.current===sequence);setItems(list.items||[]);
    const refreshedShot=projectState.entities.find(entity=>entity.id===shot.id);const observedShotRevision=refreshedShot?.revision??shot.revision;setLatestShotRevision(observedShotRevision);
    const candidate=(list.items||[]).find(item=>item.id===selectedContract)||(list.items||[])[0];
-   if(!candidate){if(loadSequence.current!==sequence)return;const cached=draftCache.get(ownerKey);const hasConflict=!!saved||observedShotRevision!==initialShotRevision.current;setLatest(null);setValidation(null);setRemoteDiff(null);setConflicted(hasConflict);storeDraft(ownerKey,{body:copy(cached?.body||draft),baseRecord:cached?cached.baseRecord:saved,latestRecord:null,shotRevision:cached?.shotRevision??initialShotRevision.current,generation:cached?.generation??editGeneration.current,conflicted:hasConflict,validation:null},instance.current);setNotice(saved?'The saved contract is no longer listed. Your draft and exact pins remain here.':'Linked sources refreshed. Your selected exact pins were left unchanged.');return;}
+   if(!candidate){if(loadSequence.current!==sequence)return;const cached=draftCache.get(ownerKey);const hasConflict=!!saved||observedShotRevision!==initialShotRevision.current;setLatest(null);setValidation(null);setRemoteDiff(null);setConflicted(hasConflict);setRecoveryBaseRecord(null);storeDraft(ownerKey,{body:copy(cached?.body||draft),baseRecord:cached?cached.baseRecord:saved,latestRecord:null,shotRevision:cached?.shotRevision??initialShotRevision.current,generation:cached?.generation??editGeneration.current,conflicted:hasConflict,validation:null,recoveryBaseRecord:null},instance.current);setNotice(saved?'The saved contract is no longer listed. Your draft and exact pins remain here.':'Linked sources refreshed. Your selected exact pins were left unchanged.');return;}
    const shown=await runCommand<ContractRecord>(projectId,'observation.show',{contract_id:candidate.id});
    const read=await showAndValidateRecord(projectId,shown,()=>loadSequence.current===sequence);
    if(read.stopped||loadSequence.current!==sequence)return;
@@ -173,7 +199,7 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
    if(read.unstable){setRemoteDiff(null);setNotice('The latest saved header could not be matched to a validation result after one retry. Your draft and exact source pins are retained; validation is not checked. Refresh status to try again.');}
    else if(hasExternalChange){
     if(saved){const difference=await runCommand<ContractDiff>(projectId,'observation.diff',{contract_id:candidate.id,before_version_id:saved.current_version_id,after_version_id:record.current_version_id});if(loadSequence.current!==sequence)return;setRemoteDiff(difference);}
-    setNotice(saved?'A newer saved revision is available. Your editor draft and exact source pins were kept unchanged. Compare it or explicitly load it.':'A contract now exists for this shot. Your create draft and exact pins are retained; load the saved contract explicitly to edit it.');
+    setNotice(saved?'A newer saved revision is available. Your editor draft and exact source pins were kept unchanged. Compare it or explicitly load it.':'A contract now exists for this shot. Your create draft and exact pins are retained; compare the saved record before choosing how to continue.');
    }else{setRemoteDiff(null);setNotice(fromConflict?'The current saved revision is loaded for comparison. Your draft is unchanged.':'Status refreshed. Your draft and exact source pins were unchanged.');}
    const cached=draftCache.get(ownerKey);storeDraft(ownerKey,{body:copy(cached?.body||draft),baseRecord:cached?cached.baseRecord:saved,latestRecord:record,shotRevision:cached?.shotRevision??initialShotRevision.current,generation:cached?.generation??editGeneration.current,conflicted:hasExternalChange,validation:checked},instance.current);
   }catch(reason){setError(messageOf(reason));}
@@ -182,16 +208,23 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
 
  function loadLatestIntoDraft(){
   if(!latest)return;
-  setSaved(latest);setDraft(copy(latest.contract));setValidation(validation);setConflicted(false);setRemoteDiff(null);setReview(null);editGeneration.current+=1;storeDraft(ownerKey,{body:copy(latest.contract),baseRecord:latest,latestRecord:latest,shotRevision:initialShotRevision.current,generation:editGeneration.current,conflicted:false,validation},instance.current);setNotice(`Draft replaced with saved contract revision ${latest.revision}.`);setError('');
+  setSaved(latest);setDraft(copy(latest.contract));setValidation(validation);setConflicted(false);setRemoteDiff(null);setReview(null);setRecoveryBaseRecord(null);editGeneration.current+=1;storeDraft(ownerKey,{body:copy(latest.contract),baseRecord:latest,latestRecord:latest,shotRevision:initialShotRevision.current,generation:editGeneration.current,conflicted:false,validation,recoveryBaseRecord:null},instance.current);setNotice(`Draft replaced with saved contract revision ${latest.revision}.`);setError('');
  }
 
- function useLatestShotRevision(){initialShotRevision.current=latestShotRevision;setConflicted(false);storeDraft(ownerKey,{body:copy(draft),baseRecord:saved,latestRecord:latest,shotRevision:latestShotRevision,generation:editGeneration.current,conflicted:false,validation},instance.current);setNotice(`Create will use the refreshed shot revision ${latestShotRevision}. Your draft and exact pins are unchanged.`);setError('');}
+ function keepDraftOnExistingContract(){
+  if(!latest||saved||latest.shot_id!==shot.id||!validation||validation.revision!==latest.revision||validation.version_id!==latest.selected_version_id||busy||ownerPending)return;
+  const record=latest;setSelectedContract(record.id);setSaved(record);setLatest(record);setValidation(validation);setConflicted(false);setRemoteDiff(null);setReview(null);setRecoveryBaseRecord(record);
+  storeDraft(ownerKey,{body:copy(draft),baseRecord:record,latestRecord:record,shotRevision:initialShotRevision.current,generation:editGeneration.current,conflicted:false,validation,recoveryBaseRecord:record},instance.current);
+  setNotice(JSON.stringify(record.contract)===JSON.stringify(draft)?`Your draft already matches contract ${record.id}, revision ${record.revision}. It is saved; no second contract or revision is needed.`:`Your draft and exact pins are preserved on contract ${record.id}, revision ${record.revision}. Compare the saved values below. Save draft will create a new revision on this contract, not a second contract.`);setError('');
+ }
+
+ function useLatestShotRevision(){initialShotRevision.current=latestShotRevision;setConflicted(false);setRecoveryBaseRecord(null);storeDraft(ownerKey,{body:copy(draft),baseRecord:saved,latestRecord:latest,shotRevision:latestShotRevision,generation:editGeneration.current,conflicted:false,validation,recoveryBaseRecord:null},instance.current);setNotice(`Create will use the refreshed shot revision ${latestShotRevision}. Your draft and exact pins are unchanged.`);setError('');}
 
  async function loadContract(id:string){
   if(id===selectedContract||!id)return;
   if(dirty&&!window.confirm('Discard this local shot intent draft and open the selected contract?'))return;
-  setLoading(true);setError('');setNotice('');setReview(null);setRemoteDiff(null);setConflicted(false);
-  try{const shown=await runCommand<ContractRecord>(projectId,'observation.show',{contract_id:id});const read=await showAndValidateRecord(projectId,shown);const record=read.record;const acceptedItem=listItem(record,shot.title);setItems(old=>old.some(item=>item.id===record.id)?old.map(item=>item.id===record.id?acceptedItem:item):[acceptedItem,...old]);setSaved(record);setLatest(record);setDraft(copy(record.contract));setValidation(read.validation);setConflicted(read.unstable);setSelectedContract(id);editGeneration.current+=1;storeDraft(ownerKey,{body:copy(record.contract),baseRecord:record,latestRecord:record,shotRevision:initialShotRevision.current,generation:editGeneration.current,conflicted:read.unstable,validation:read.validation},instance.current);if(read.unstable)setNotice('The latest saved header could not be matched to a validation result after one retry. No validation status is shown. Refresh status before saving.');}
+  setLoading(true);setError('');setNotice('');setReview(null);setRemoteDiff(null);setConflicted(false);setRecoveryBaseRecord(null);
+  try{const shown=await runCommand<ContractRecord>(projectId,'observation.show',{contract_id:id});const read=await showAndValidateRecord(projectId,shown);const record=read.record;const acceptedItem=listItem(record,shot.title);setItems(old=>old.some(item=>item.id===record.id)?old.map(item=>item.id===record.id?acceptedItem:item):[acceptedItem,...old]);setSaved(record);setLatest(record);setDraft(copy(record.contract));setValidation(read.validation);setConflicted(read.unstable);setSelectedContract(id);editGeneration.current+=1;storeDraft(ownerKey,{body:copy(record.contract),baseRecord:record,latestRecord:record,shotRevision:initialShotRevision.current,generation:editGeneration.current,conflicted:read.unstable,validation:read.validation,recoveryBaseRecord:null},instance.current);if(read.unstable)setNotice('The latest saved header could not be matched to a validation result after one retry. No validation status is shown. Refresh status before saving.');}
   catch(reason){setError(messageOf(reason));}
   finally{setLoading(false);}
  }
@@ -208,9 +241,9 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
    }else record=await runCommand<ContractRecord>(projectId,'observation.revise',{contract_id:saved!.id,revision:saved!.revision,contract:body});
    noteAcceptedRecordWrite(ownerKey);
    const acceptedItem=listItem(record,shot.title);setItems(old=>old.some(item=>item.id===record.id)?old.map(item=>item.id===record.id?acceptedItem:item):[acceptedItem,...old]);
-   const accepted=recordValidation(record);setSelectedContract(record.id);setSaved(record);setLatest(record);setValidation(accepted);setConflicted(false);setRemoteDiff(null);setReview(null);setReviewGeneration(-1);
+   const accepted=recordValidation(record);setSelectedContract(record.id);setSaved(record);setLatest(record);setValidation(accepted);setConflicted(false);setRemoteDiff(null);setReview(null);setReviewGeneration(-1);setRecoveryBaseRecord(null);
    const cached=draftCache.get(ownerKey);const newer=cached&&cached.generation!==generation;const nextBody=newer?copy(cached.body):copy(record.contract);const nextGeneration=newer?cached.generation:generation;
-   editGeneration.current=nextGeneration;setDraft(nextBody);storeDraft(ownerKey,{body:nextBody,baseRecord:record,latestRecord:record,shotRevision,generation:nextGeneration,conflicted:false,validation:accepted},instance.current);
+   editGeneration.current=nextGeneration;setDraft(nextBody);storeDraft(ownerKey,{body:nextBody,baseRecord:record,latestRecord:record,shotRevision,generation:nextGeneration,conflicted:false,validation:accepted,recoveryBaseRecord:null},instance.current);
    if(!newer){setNotice(`Shot intent saved as contract revision ${record.revision}.`);}
    else setNotice('The submitted version was saved. Newer edits remain in the editor.');
   }catch(reason){
@@ -243,6 +276,8 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
  const draftNeedsValidationDisclaimer=dirty||conflicted;
  const validationLabel=draftNeedsValidationDisclaimer?`Saved revision ${validationRevision} validation: ${validationStatus}`:`Current saved revision ${validationRevision}: ${validationStatus}`;
  const validationScope=draftNeedsValidationDisclaimer?`This status covers saved revision ${validationRevision} only; the current local draft has not been checked.`:'This status covers the current saved contract revision.';
+ const latestCanBeRecoveryBase=!!latest&&latest.shot_id===shot.id&&!!validation&&validation.revision===latest.revision&&validation.version_id===latest.selected_version_id;
+ const recoveryBaseline=recoveryBaseRecord&&saved?.id===recoveryBaseRecord.id?recoveryBaseRecord:null;
  const missingSourcePins=draft.source_pins.filter(pin=>!sourceByEdge.has(pin.edge_id)||!!validation?.source_pins?.find(item=>item.edge_id===pin.edge_id&&item.stale));
  const canSubmit=ready&&!busy&&!ownerPending&&!loading&&!refreshing&&!!draft.script_intents.length&&draft.source_pins.length>0;
 
@@ -256,9 +291,11 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
   {notice&&<p role="status" className="shot-intent-status">{notice}</p>}
   {rebaseNeedsReview&&<div role="alert" className="notice warning"><strong>The reviewed basis changed.</strong><p>Your draft, exact pins, and previous header CAS are retained. The prior review token is invalid. Review the current proposal again before any rebase.</p><button type="button" onClick={()=>void reviewRebase()} disabled={busy||loading}>Review this draft again</button></div>}
   {conflicted&&!latest&&!saved&&latestShotRevision!==initialShotRevision.current&&<div role="alert" className="notice warning"><strong>The selected shot revision changed.</strong><p>Create still uses shot revision {initialShotRevision.current}; the latest saved shot revision is {latestShotRevision}. Your local draft and exact pins are retained.</p><button type="button" onClick={useLatestShotRevision} disabled={busy}>Use shot revision {latestShotRevision} for create</button></div>}
+  {conflicted&&latest&&!saved&&<div role="alert" className="notice warning"><strong>A contract already exists for this shot.</strong><p>The first-create request conflicted with saved contract {latest.id} at revision {latest.revision}. Your entered content and exact pins are retained. Review the comparison, then explicitly choose this existing contract as the draft base or load its saved content.</p><DiffView title="Saved contract vs retained create draft" changes={contractBodyChanges(latest.contract,draft)} ariaLabel="Retained draft comparison"/><div className="button-row"><button type="button" onClick={()=>void refreshStatus()} disabled={refreshing||busy||ownerPending}>Refresh comparison</button><button type="button" onClick={loadLatestIntoDraft} disabled={busy||ownerPending}>Discard draft and load revision {latest.revision}</button><button type="button" className="primary" onClick={keepDraftOnExistingContract} disabled={!latestCanBeRecoveryBase||busy||ownerPending}>Use existing contract and keep my draft</button></div></div>}
   {saved&&<div className={`notice ${validationStatus==='consistent'?'':'warning'}`}><strong>{validationLabel}</strong><p>{validationScope}</p><p>{validation?.findings?.length?`${validation.findings.length} finding${validation.findings.length===1?'':'s'} · authored basis ${validation.basis_current?'current':'changed'}`:'Deterministic source, identity, and authored-basis checks.'}</p><div className="shot-intent-meta"><span>Contract ID <code>{saved.id}</code></span><span>Checked header revision <code>{validation?.revision??'Not checked'}</code></span><span>Checked version <code>{validation?.version_id||'Not checked'}</code></span><span>Editor CAS revision <code>{saved.revision}</code></span><span>Draft base version <code>{saved.current_version_id}</code></span></div></div>}
   {conflicted&&latest&&saved&&(latest.revision!==saved.revision||latest.current_version_id!==saved.current_version_id)&&<div role="alert" className="notice warning"><strong>A newer saved revision is available.</strong><p>The editor still uses header revision {saved.revision}; latest is revision {latest.revision}. Your local draft and exact pins are retained.</p><div className="button-row"><button type="button" onClick={()=>void refreshStatus()} disabled={refreshing||busy||ownerPending}>Refresh comparison</button><button type="button" onClick={loadLatestIntoDraft} disabled={busy||ownerPending}>Discard draft and load revision {latest.revision}</button></div></div>}
   {conflicted&&latest&&saved&&latest.revision===saved.revision&&latest.current_version_id===saved.current_version_id&&!validation&&<div role="alert" className="notice warning"><strong>The saved header could not be matched to validation.</strong><p>No validation status is shown. Your local draft, exact pins, and editor CAS revision {saved.revision} remain unchanged.</p><button type="button" onClick={()=>void refreshStatus()} disabled={refreshing||busy||ownerPending}>Retry status refresh</button></div>}
+  {recoveryBaseline&&<DiffView title="Saved contract vs retained create draft" changes={contractBodyChanges(recoveryBaseline.contract,draft)} ariaLabel="Retained draft comparison"/>}
   {remoteDiff&&<DiffView title="Saved revision changes" changes={remoteDiff.changes.map(change=>({path:change.path,before:change.before,after:change.after}))}/>}
   {ready&&!loading&&<fieldset className="shot-intent-fields" disabled={busy||ownerPending}>
    <section className="shot-intent-section"><div className="shot-intent-section-heading"><div><h4>Exact screenplay links</h4><p>Select active links already connected to this shot or its scene. Refresh reports changes without replacing these pins.</p></div></div>
@@ -299,8 +336,8 @@ export function ShotIntent({projectId,shot}:{projectId:string;shot:Entity}){
  </section>;
 }
 
-function DiffView({title,changes}:{title:string;changes:Array<{path:string;before:unknown;after:unknown}>}){
- return <section className="shot-intent-diff"><h4>{title}</h4>{!changes.length?<p>No field changes.</p>:changes.map((change,index)=><div className="shot-intent-diff-row" key={`${change.path}-${index}`}><strong>{readablePath(change.path)}</strong><dl><div><dt>Saved</dt><dd>{displayValue(change.before)}</dd></div><div><dt>Current or proposed</dt><dd>{displayValue(change.after)}</dd></div></dl></div>)}</section>;
+function DiffView({title,changes,ariaLabel}:{title:string;changes:Array<{path:string;before:unknown;after:unknown}>;ariaLabel?:string}){
+ return <section className="shot-intent-diff" role={ariaLabel?'region':undefined} aria-label={ariaLabel}><h4>{title}</h4>{!changes.length?<p>No field changes.</p>:changes.map((change,index)=><div className="shot-intent-diff-row" key={`${change.path}-${index}`}><strong>{readablePath(change.path)}</strong><dl><div><dt>Saved</dt><dd>{displayValue(change.before)}</dd></div><div><dt>Current or proposed</dt><dd>{displayValue(change.after)}</dd></div></dl></div>)}</section>;
 }
 
 function RetargetReview({preview,body,saved,rows,details,onCancel,onConfirm,disabled}:{preview:RetargetPreview;body:ContractBody;saved:ContractRecord|null;rows:Map<string,SourceRow>;details:Record<string,SourceDetails>;onCancel:()=>void;onConfirm:()=>void;disabled:boolean}){
