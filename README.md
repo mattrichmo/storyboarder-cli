@@ -141,6 +141,10 @@ the script refuses to overwrite an existing project. Its generated panels are de
 | Terminal | `storyboarder tui --project ./stories/projects/my-film` | Full-screen authoring and project review for people. |
 | CLI | `storyboarder --project ./stories/projects/my-film shot list --json` | Repeatable commands for scripts and agents, with structured output. |
 
+![Storyboarder TUI scene and shot editor showing a scene with multiple shots and the selected shot's preview and direction](docs/images/tui-terminal-desk.png)
+
+<p align="center"><em>The scene and shot editor with the included Winter Station demo. Its preview is an illustrative demo slate, not finished shot artwork.</em></p>
+
 A standalone project works too: create it with
 `storyboarder project create ./stories/standalone --title "My Film"`, then open it
 with `storyboarder ui --project ./stories/standalone`. Workspace registration is optional.
