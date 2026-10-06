@@ -179,7 +179,10 @@ def _portable_losses(value: Any) -> list[dict[str, str]]:
                 key_lower = str(key).casefold()
                 compact = re.sub(r"[^a-z0-9]", "", key_lower)
                 sensitive = key_lower in SENSITIVE_KEYS or any(
-                    marker in compact for marker in ("apikey", "accesstoken", "refreshtoken", "clientsecret", "password", "credential", "privatekey", "signingkey", "certificate")
+                    marker in compact for marker in (
+                        "apikey", "apitoken", "accesstoken", "refreshtoken", "clientsecret", "password",
+                        "credential", "privatekey", "signingkey", "certificate",
+                    )
                 )
                 runtime = key_lower in RUNTIME_KEYS or any(
                     marker in compact for marker in ("launch", "runtime", "argv", "executable", "workingdirectory", "workingdir", "workspace", "path", "directory", "root", "cwd", "environment", "processid", "pid")

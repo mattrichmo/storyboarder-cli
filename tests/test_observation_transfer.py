@@ -5,6 +5,8 @@ import copy
 import hashlib
 import json
 import shutil
+import subprocess
+import sys
 import uuid
 
 import pytest
@@ -474,6 +476,52 @@ def test_manifest_tampering_and_unknown_runtime_fields_are_rejected(service, tmp
     assert nonportable.value.code == "observation_plan_not_portable"
     reasons = {loss["reason"] for loss in nonportable.value.details["adapter_losses"]}
     assert "absolute_path" in reasons and "runtime_launch_field" in reasons and "credential_field" in reasons
+
+
+@pytest.mark.parametrize("key", ["api_token", "api-token", "ApiToken"])
+def test_observation_export_rejects_api_token_in_source_metadata(tmp_path, key):
+    sentinel = "STO08_SENTINEL_DO_NOT_EXPORT_7d3c1"
+    unsafe = Service(Project.create(tmp_path / key.replace("/", "_"), "Unsafe source metadata"))
+    story = _base(unsafe, screenplay=_screenplay(metadata={"production": {key: sentinel}}))
+    ObservationContracts(unsafe).create(
+        story["shots"][0]["id"], story["shots"][0]["revision"],
+        _contract(story["edges"]["scene_a"], "scene-context", 15),
+    )
+    source_before = Documents(unsafe).source_bytes(story["document"]["current_version_id"])
+
+    with pytest.raises(ObservationTransferError) as nonportable:
+        export_observation_plan(unsafe)
+
+    assert nonportable.value.code == "observation_plan_not_portable"
+    losses = nonportable.value.details["adapter_losses"]
+    assert any(loss["path"].endswith(f"/source_snapshot/payload/meta/production/{key}")
+               and loss["reason"] == "credential_field" for loss in losses)
+    assert sentinel not in repr(nonportable.value.details)
+    assert Documents(unsafe).source_bytes(story["document"]["current_version_id"]) == source_before
+
+
+def test_observation_plan_cli_export_refuses_api_token_metadata(tmp_path):
+    sentinel = "STO08_SENTINEL_DO_NOT_EXPORT_7d3c1"
+    unsafe = Service(Project.create(tmp_path / "credential-metadata", "Credential metadata"))
+    story = _base(unsafe, screenplay=_screenplay(metadata={"production": {"api_token": sentinel}}))
+    ObservationContracts(unsafe).create(
+        story["shots"][0]["id"], story["shots"][0]["revision"],
+        _contract(story["edges"]["scene_a"], "scene-context", 16),
+    )
+
+    result = subprocess.run(
+        [sys.executable, "-m", "storyboarder", "--project", str(unsafe.project.root),
+         "observation", "plan-export", "--json"],
+        capture_output=True, text=True, timeout=10,
+    )
+
+    assert result.returncode != 0
+    assert not result.stdout
+    assert sentinel not in result.stderr
+    error = json.loads(result.stderr)["error"]
+    assert error["code"] == "observation_plan_not_portable"
+    assert any(loss["path"].endswith("/source_snapshot/payload/meta/production/api_token")
+               and loss["reason"] == "credential_field" for loss in error["details"]["adapter_losses"])
 
 
 def test_nested_source_pointer_in_screenplay_payload_is_not_exempted(service, tmp_path):
