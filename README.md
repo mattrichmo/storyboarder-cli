@@ -22,6 +22,10 @@
   <a href="#documentation">Documentation</a>
 </p>
 
+![Storyboarder planning system illustration showing references connected to one scene, three distinct shots, and structured CLI output](docs/images/storyboarder-cover.png)
+
+<p align="center"><em>Cover illustration, not a product screenshot: connected references and scene direction lead to distinct shot plans and structured handoff data.</em></p>
+
 ![Story flow canvas showing the Winter Station sequence, scenes, and connected shot cards](docs/images/canvas-desktop.png)
 
 <p align="center"><em>The story flow canvas, using the included fictional Winter Station demo.</em></p>
