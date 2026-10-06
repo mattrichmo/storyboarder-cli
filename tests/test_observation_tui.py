@@ -57,6 +57,26 @@ async def render_tick():
     await asyncio.sleep(0.08)
 
 
+def exact_contract_body(edge_id, *, body_id=99700, notes='Retained draft'):
+    return {
+        'schema': 'storyboarder.observation-contract/v1',
+        'source_pins': [{'edge_id': edge_id, 'source_scope': 'direct-element'}],
+        'script_intents': [{'id': uid(body_id), 'source_edge_id': edge_id,
+                            'source_scope': 'direct-element', 'purpose': 'Preserve the action',
+                            'communication': 'Keep the handoff readable.', 'basis': 'direct'}],
+        'requirements': [{'id': uid(body_id + 1), 'priority': 'must', 'basis': 'direct',
+                          'source_edge_ids': [edge_id], 'statement': 'The handoff remains visible.', 'topic': None}],
+        'references': [], 'continuity': [], 'notes': notes,
+    }
+
+
+def install_direct_worker(desk):
+    async def run_worker(function, *args, **kwargs):
+        return function(*args, **kwargs)
+    desk.run_worker = run_worker
+    desk.set_message = lambda message: setattr(desk, 'message', str(message))
+
+
 def button_control(desk, label):
     for control in desk.app.layout.find_all_controls():
         if not isinstance(control, FormattedTextControl):
@@ -346,6 +366,177 @@ async def test_existing_shot_contract_stale_revision_keeps_exact_draft(story, im
         assert captured[0]['expected_shot_revision'] == shot['revision']
         assert captured[0]['contract'] == desk.observation_draft['contract']
         assert ObservationContracts(service).list(shot_id=shot['id'])['total'] == 0
+
+
+@pytest.mark.asyncio
+async def test_successful_create_selects_exact_contract_id_when_shot_titles_match(story, imported_screenplay):
+    service = story['service']
+    _, nodes = imported_screenplay
+    shot_a = service.create_entity('shot', 'Same title', story['scene']['id'])
+    shot_b = service.create_entity('shot', 'Same title', story['scene']['id'])
+    edge_a = Provenance(service).link('node', nodes[uid(99603)]['id'], 'entity', shot_a['id'], 'visualizes')
+    edge_b = Provenance(service).link('node', nodes[uid(99603)]['id'], 'entity', shot_b['id'], 'visualizes')
+    saved_a = ObservationContracts(service).create(
+        shot_a['id'], shot_a['revision'], exact_contract_body(edge_a['id'], body_id=99710))
+
+    with create_pipe_input() as pipe:
+        desk = Desk(project=service.project, input=pipe, output=DummyOutput())
+        install_direct_worker(desk)
+        desk.page = 'coverage'
+        desk.build_page()
+        await desk.refresh()
+        assert desk.selected.record['id'] == saved_a['id']
+        desk.observation_draft = {
+            'kind': 'create_existing', 'shot_id': shot_b['id'],
+            'expected_shot_revision': shot_b['revision'],
+            'contract': exact_contract_body(edge_b['id'], body_id=99720),
+        }
+
+        await desk._apply_observation_draft()
+
+    created = ObservationContracts(service).list(shot_id=shot_b['id'])['items'][0]
+    persisted = ObservationContracts(service).show(created['id'])
+    assert shot_a['title'] == shot_b['title']
+    assert created['id'] != saved_a['id']
+    assert persisted['shot_id'] == shot_b['id']
+    assert desk.observation_draft is None
+    assert desk.selected.record['id'] == created['id']
+    assert desk.selected.record['shot_id'] == shot_b['id']
+    assert f"Selected contract {created['id']}" in desk.message
+
+
+@pytest.mark.asyncio
+async def test_create_conflict_retains_exact_draft_and_requires_review_at_latest_header(story, imported_screenplay, monkeypatch):
+    service = story['service']
+    _, nodes = imported_screenplay
+    shot_a = service.create_entity('shot', 'Same title', story['scene']['id'])
+    shot_b = service.create_entity('shot', 'Same title', story['scene']['id'])
+    edge_a = Provenance(service).link('node', nodes[uid(99603)]['id'], 'entity', shot_a['id'], 'visualizes')
+    edge_b = Provenance(service).link('node', nodes[uid(99603)]['id'], 'entity', shot_b['id'], 'visualizes')
+    saved_a = ObservationContracts(service).create(
+        shot_a['id'], shot_a['revision'], exact_contract_body(edge_a['id'], body_id=99730))
+    saved_body = exact_contract_body(edge_b['id'], body_id=99740, notes='Concurrent saved contract')
+    local_body = exact_contract_body(edge_b['id'], body_id=99750, notes='Authored local draft')
+
+    with create_pipe_input() as pipe:
+        desk = Desk(project=service.project, input=pipe, output=DummyOutput())
+        install_direct_worker(desk)
+        desk.page = 'coverage'
+        desk.build_page()
+        await desk.refresh()
+        assert desk.selected.record['id'] == saved_a['id']
+        desk.observation_draft = {
+            'kind': 'create_existing', 'shot_id': shot_b['id'],
+            'expected_shot_revision': shot_b['revision'], 'contract': copy.deepcopy(local_body),
+        }
+        # A second interface wins after the TUI loaded its contract list.
+        saved_b = ObservationContracts(service).create(shot_b['id'], shot_b['revision'], saved_body)
+
+        await desk._apply_observation_draft()
+
+        assert desk.observation_draft['contract'] == local_body
+        assert desk.observation_draft['contract']['source_pins'] == local_body['source_pins']
+        assert desk.observation_draft['conflict_contract_id'] == saved_b['id']
+        assert desk.observation_draft['conflict_revision'] == 1
+        assert desk.selected.record['id'] == saved_b['id']
+        assert desk.selected.record['shot_id'] == shot_b['id']
+        button_control(desk, 'Review draft on existing contract')
+        with pytest.raises(AssertionError, match='Retry saved draft'):
+            button_control(desk, 'Retry saved draft')
+
+        comparison = []
+        async def message_dialog(title, text):
+            comparison.append((title, text))
+        choices = ['no', 'yes', 'yes']
+        async def choose(*_args, **_kwargs):
+            return choices.pop(0)
+        desk.message_dialog = message_dialog
+        desk.choose = choose
+
+        # Declining keeps the local body and the saved header untouched.
+        await desk.recover_observation_create_conflict()
+        unchanged = ObservationContracts(service).show(saved_b['id'])
+        assert unchanged['revision'] == 1
+        assert unchanged['contract'] == saved_body
+        assert desk.observation_draft['contract'] == local_body
+        assert comparison and 'Current saved contract body' in comparison[0][1]
+        assert 'Retained local draft (unchanged)' in comparison[0][1]
+        assert edge_b['id'] in comparison[0][1]
+
+        # Simulate another revision landing after the confirmation read but before CAS save.
+        real_execute = tui_app.execute
+        raced = []
+        def revise_race(_service, name, payload):
+            if name == 'observation.revise' and not raced:
+                current = ObservationContracts(service).show(saved_b['id'])
+                concurrent = copy.deepcopy(current['contract'])
+                concurrent['notes'] = 'Changed while the author reviewed.'
+                ObservationContracts(service).revise(saved_b['id'], current['revision'], concurrent)
+                raced.append(True)
+            return real_execute(service, name, payload)
+        monkeypatch.setattr(tui_app, 'execute', revise_race)
+
+        await desk.recover_observation_create_conflict()
+        latest = ObservationContracts(service).show(saved_b['id'])
+        assert latest['revision'] == 2
+        assert latest['contract']['notes'] == 'Changed while the author reviewed.'
+        assert desk.observation_draft['kind'] == 'create_existing'
+        assert desk.observation_draft['conflict_revision'] == 2
+        assert desk.observation_draft['contract'] == local_body
+        assert desk.selected.record['id'] == saved_b['id']
+        button_control(desk, 'Review draft on existing contract')
+        with pytest.raises(AssertionError, match='Retry saved draft'):
+            button_control(desk, 'Retry saved draft')
+
+        # A fresh explicit comparison permits exactly one next revision.
+        await desk.recover_observation_create_conflict()
+        recovered = ObservationContracts(service).show(saved_b['id'])
+        assert recovered['revision'] == 3
+        assert recovered['contract'] == local_body
+        assert [pin['edge_id'] for pin in recovered['source_pins']] == [edge_b['id']]
+        assert desk.observation_draft is None
+        assert desk.selected.record['id'] == saved_b['id']
+        assert desk.selected.record['shot_id'] == shot_b['id']
+
+
+@pytest.mark.asyncio
+async def test_stale_shot_conflict_requires_explicit_latest_shot_revision(story, imported_screenplay):
+    service = story['service']
+    _, nodes = imported_screenplay
+    shot = service.create_entity('shot', 'Stale shot target', story['scene']['id'])
+    edge = Provenance(service).link('node', nodes[uid(99603)]['id'], 'entity', shot['id'], 'visualizes')
+    draft_body = exact_contract_body(edge['id'], body_id=99760)
+
+    with create_pipe_input() as pipe:
+        desk = Desk(project=service.project, input=pipe, output=DummyOutput())
+        install_direct_worker(desk)
+        desk.page = 'coverage'
+        desk.build_page()
+        await desk.refresh()
+        desk.observation_draft = {
+            'kind': 'create_existing', 'shot_id': shot['id'],
+            'expected_shot_revision': shot['revision'], 'contract': copy.deepcopy(draft_body),
+        }
+        changed = service.update_entity(shot['id'], shot['revision'], {'fields': {'action': 'Edited elsewhere.'}})
+
+        await desk._apply_observation_draft()
+
+        assert desk.observation_draft['expected_shot_revision'] == shot['revision']
+        assert desk.observation_draft['latest_shot_revision'] == changed['revision']
+        assert desk.observation_draft['contract'] == draft_body
+        assert ObservationContracts(service).list(shot_id=shot['id'])['total'] == 0
+        button_control(desk, f"Use shot revision {changed['revision']} and retry")
+        with pytest.raises(AssertionError, match='Retry saved draft'):
+            button_control(desk, 'Retry saved draft')
+
+        await desk.use_latest_shot_revision_for_draft()
+
+    created = ObservationContracts(service).list(shot_id=shot['id'])['items'][0]
+    assert desk.observation_draft is None
+    assert created['revision'] == 1
+    assert desk.selected.record['id'] == created['id']
+    assert desk.selected.record['shot_id'] == shot['id']
+    assert ObservationContracts(service).show(created['id'])['contract'] == draft_body
 
 
 @pytest.mark.asyncio
