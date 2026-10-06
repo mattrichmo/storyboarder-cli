@@ -55,7 +55,7 @@ async def main(args):
               "api_scope": "stubbed observation.*, shot.sources, and document.show/versions/node; session, project state, frontend, inspector, and inspector navigation are served by the actual local app",
               "url": args.url,
               "passed": [], "failed": [], "never_run": [], "requests": [], "page_errors": [], "console_errors": [], "expected_conflicts": []}
-    cases = ["draft_survives_tab_and_shot_switch", "delayed_save_is_owner_scoped", "create_revision_and_hidden_fields",
+    cases = ["first_create_conflict_recovers_without_duplicate", "draft_survives_tab_and_shot_switch", "delayed_save_is_owner_scoped", "create_revision_and_hidden_fields",
              "409_refresh_keeps_header_draft_and_exact_pins", "rebase_token_invalidates_and_retries", "keyboard_and_responsive_shot_intent"]
     async with async_playwright() as playwright:
         options = {"headless": True, "args": ["--no-sandbox"]}
@@ -88,6 +88,7 @@ async def main(args):
         source_node_map = {}
         create_committed = asyncio.Event()
         create_release = asyncio.Event()
+        create_conflict_shot_ids=set()
         issued_review_tokens=[]
         diff_changes={"items":[{"path":"/script_intents/intent-communication","before":"Saved communication","after":"Changed elsewhere"}]}
 
@@ -144,6 +145,16 @@ async def main(args):
                                           "changes": diff_changes["items"]})
             elif name == "observation.create":
                 mutation_payloads["create"].append(payload)
+                if payload["shot_id"] in create_conflict_shot_ids:
+                    remote_body=json.loads(json.dumps(payload["contract"]))
+                    remote_body["script_intents"][0]["communication"]="Saved by the concurrent first-create winner."
+                    remote_body["notes"]="Concurrent first-create note."
+                    contract_id=uid()
+                    remote=make_record(contract_id,payload["shot_id"],remote_body,1,1,shot_sources[payload["shot_id"]])
+                    records_by_shot[payload["shot_id"]]=remote;records_by_id[contract_id]=remote
+                    create_conflict_shot_ids.remove(payload["shot_id"])
+                    await route.fulfill(status=409,json={"error":{"code":"revision_conflict","message":"A contract was created for this shot elsewhere."}})
+                    return
                 contract_id = uid()
                 record = make_record(contract_id, payload["shot_id"], payload["contract"], 1, 1, shot_sources[payload["shot_id"]])
                 records_by_shot[payload["shot_id"]] = record
@@ -153,9 +164,10 @@ async def main(args):
                 await route.fulfill(json=record)
             elif name == "observation.revise":
                 mutation_payloads["revise"].append(payload)
-                revise_count["value"] += 1
                 record = records_by_id[payload["contract_id"]]
-                if revise_count["value"] == 1:
+                if record["shot_id"] == shot_b_id:
+                    revise_count["value"] += 1
+                if record["shot_id"] == shot_b_id and revise_count["value"] == 1:
                     external_body = json.loads(json.dumps(record["contract"]))
                     external_body["script_intents"][0]["communication"] = "Changed elsewhere"
                     new_current = source_row(record["shot_id"], inherited=True, node_type="action", title="Replacement current action", suffix="replacement")
@@ -211,10 +223,13 @@ async def main(args):
             shots=page.locator('.graph-node[aria-label^="Shot:"]')
             await shots.first.wait_for()
             assert await shots.count()>=2,"The browser fixture needs two visible shots."
-            shot_a=shots.nth(0);shot_b=shots.nth(1)
-            shot_a_id=await shot_a.get_attribute("data-node-id");shot_b_id=await shot_b.get_attribute("data-node-id")
-            assert shot_a_id and shot_b_id and shot_a_id!=shot_b_id
+            assert await shots.count()>=3,"The create-conflict browser fixture needs three visible shots."
+            shot_a=shots.nth(0);shot_b=shots.nth(1);shot_c=shots.nth(2)
+            shot_a_id=await shot_a.get_attribute("data-node-id");shot_b_id=await shot_b.get_attribute("data-node-id");shot_c_id=await shot_c.get_attribute("data-node-id")
+            assert shot_a_id and shot_b_id and shot_c_id and len({shot_a_id,shot_b_id,shot_c_id})==3
             shot_sources[shot_a_id]=[source_row(shot_a_id,title="First linked action",suffix="first")]
+            create_conflict_source=source_row(shot_c_id,title="Third shot linked action",suffix="create-conflict")
+            shot_sources[shot_c_id]=[create_conflict_source]
             direct_scene=source_row(shot_b_id,node_type="scene",title="Whole screenplay scene",suffix="direct-scene")
             scene_context=source_row(shot_b_id,inherited=True,node_type="action",title="Inherited scene action",suffix="scene-context")
             shot_sources[shot_b_id]=[direct_scene,scene_context]
@@ -240,6 +255,49 @@ async def main(args):
                 await card.locator('input[aria-label^="Purpose "]').fill("A purpose that survives navigation")
                 await card.locator('textarea[aria-label^="Communication "]').fill("Keep this local draft visible after leaving the tab.")
                 return intent
+
+            create_conflict_shot_ids.add(shot_c_id)
+            await select_shot(shot_c)
+            await page.locator(".shot-source-option input").first.check()
+            await page.get_by_role("button",name="Add purpose",exact=True).click()
+            conflict_intent=page.locator(".shot-intent-card[data-intent-id]").first
+            conflict_intent_id=await conflict_intent.get_attribute("data-intent-id")
+            await conflict_intent.locator('input[aria-label^="Purpose "]').fill("Keep my purpose after first-create conflict")
+            await conflict_intent.locator('textarea[aria-label^="Communication "]').fill("Retain my entered communication and exact source pin.")
+            await page.get_by_role("button",name="Add requirement",exact=True).click()
+            conflict_requirement=page.locator(".shot-intent-card[data-requirement-id]").first
+            conflict_requirement_id=await conflict_requirement.get_attribute("data-requirement-id")
+            await conflict_requirement.locator('textarea[aria-label^="Requirement statement "]').fill("Keep my linked requirement after the conflict.")
+            async with page.expect_response(lambda response: response.url.endswith("/commands/observation.create") and
+                                            (response.request.post_data_json or {}).get("shot_id")==shot_c_id) as create_response_info:
+                await page.get_by_role("button",name="Create observation contract",exact=True).click()
+            create_conflict_response=await create_response_info.value
+            assert create_conflict_response.status==409,create_conflict_response.status
+            await page.get_by_text("A contract now exists for this shot",exact=False).wait_for()
+            assert await page.get_by_label(f"Purpose {conflict_intent_id}",exact=True).input_value()=="Keep my purpose after first-create conflict"
+            assert await page.get_by_label(f"Communication {conflict_intent_id}",exact=True).input_value()=="Retain my entered communication and exact source pin."
+            assert await page.get_by_label(f"Requirement statement {conflict_requirement_id}",exact=True).input_value()=="Keep my linked requirement after the conflict."
+            assert await page.locator(".shot-source-option input:checked").count()==1
+            remote_create=records_by_shot[shot_c_id]
+            assert remote_create["contract"]["script_intents"][0]["communication"]=="Saved by the concurrent first-create winner."
+            await page.get_by_role("button",name="Use existing contract and keep my draft",exact=True).click()
+            await page.locator(".shot-intent-diff").get_by_text("Saved by the concurrent first-create winner.",exact=False).wait_for()
+            assert await page.get_by_label(f"Purpose {conflict_intent_id}",exact=True).input_value()=="Keep my purpose after first-create conflict"
+            assert await page.get_by_label("Observation contract").input_value()==remote_create["id"]
+            await page.get_by_role("button",name="Save draft",exact=True).click()
+            await page.get_by_role("status").filter(has_text="Shot intent saved as contract revision 2.").wait_for()
+            conflict_updates=[payload for payload in mutation_payloads["revise"] if payload["contract_id"]==remote_create["id"]]
+            conflict_creates=[payload for payload in mutation_payloads["create"] if payload["shot_id"]==shot_c_id]
+            assert len(conflict_creates)==1 and len(conflict_updates)==1,(len(conflict_creates),len(conflict_updates))
+            assert conflict_updates[0]["revision"]==1
+            assert conflict_updates[0]["contract"]["source_pins"]==[{"edge_id":create_conflict_source["edge_id"],"source_scope":"direct-element"}]
+            assert conflict_updates[0]["contract"]["script_intents"][0]["purpose"]=="Keep my purpose after first-create conflict"
+            assert records_by_shot[shot_c_id]["id"]==remote_create["id"] and records_by_shot[shot_c_id]["revision"]==2
+            report["first_create_conflict"]={"http_status":create_conflict_response.status,"draft_purpose_retained":True,"communication_retained":True,
+                "requirement_retained":True,"exact_pin_retained":True,"saved_local_diff_shown":True,
+                "create_requests_for_shot":len(conflict_creates),"revision_requests_for_same_contract":len(conflict_updates),
+                "result_contract_id":records_by_shot[shot_c_id]["id"],"result_revision":records_by_shot[shot_c_id]["revision"]}
+            report["passed"].append(cases[0])
 
             await select_shot(shot_a)
             await page.get_by_role("button",name="Create observation contract",exact=True).wait_for()
@@ -276,7 +334,7 @@ async def main(args):
                                     "tab_return_pins":restored_tab_pin,"shot_return_pins":restored_shot_pin,
                                     "beforeunload_cancelled_after_tab_unmount":unload_state["blocked"],"real_reload_prompt_dismissed":True,
                                     "beforeunload_cancelled_from_clean_other_shot":clean_shot_unload}
-            report["passed"].append(cases[0])
+            report["passed"].append(cases[1])
 
             await page.locator(".shot-intent-card[data-intent-id]").locator('input[aria-label^="Purpose "]').fill("Create from selected shot A")
             await page.locator(".shot-intent-card[data-intent-id]").locator('textarea[aria-label^="Communication "]').fill("The scene intent is shown clearly.")
@@ -304,16 +362,17 @@ async def main(args):
             await asyncio.sleep(.3)
             assert not await page.get_by_label(f"Purpose {intent_id}",exact=True).is_disabled()
             assert await page.get_by_label(f"Purpose {intent_id}",exact=True).input_value()=="Establish the room"
-            assert len(mutation_payloads["create"])==1
-            create_payload=mutation_payloads["create"][0]
+            create_payloads_for_a=[payload for payload in mutation_payloads["create"] if payload["shot_id"]==shot_a_id]
+            assert len(create_payloads_for_a)==1
+            create_payload=create_payloads_for_a[0]
             contract_a=records_by_shot[shot_a_id]["id"]
             assert create_payload["shot_id"]==shot_a_id and create_payload["expected_shot_revision"]>=1
             assert create_payload["contract"]["source_pins"]==[{"edge_id":shot_sources[shot_a_id][0]["edge_id"],"source_scope":"direct-element"}]
             assert create_payload["contract"]["script_intents"][0]["id"]==draft_a_intent
             assert create_payload["contract"]["script_intents"][0]["purpose"]=="Create from selected shot A"
-            report["pending_owner"]={"created_shot_id":shot_a_id,"visible_shot_id":shot_b_id,"create_posts":len(mutation_payloads["create"]),
+            report["pending_owner"]={"created_shot_id":shot_a_id,"visible_shot_id":shot_b_id,"create_posts_for_shot":len(create_payloads_for_a),
                                      "same_owner_remount_locked":True,"other_shot_purpose":await page.get_by_label(f"Purpose {intent_id}",exact=True).input_value()}
-            report["passed"].append(cases[1]);report["passed"].append(cases[2])
+            report["passed"].append(cases[2]);report["passed"].append(cases[3])
 
             await shot_a.focus();await shot_a.press("Enter");await page.get_by_role("tab",name="Shot intent",exact=True).click()
             await page.get_by_label(f"Purpose {draft_a_intent}",exact=True).wait_for()
@@ -347,8 +406,9 @@ async def main(args):
             assert await page.locator(".shot-source-option input:checked").count()==1
             assert await page.locator(f'.shot-intent-card[data-requirement-id="{requirement_id}"] .shot-edge-select input:checked').count()==1
             assert await page.locator(".shot-source-stale").get_by_text(direct_scene["edge_id"],exact=True).count()==0
-            assert len(mutation_payloads["revise"])==1
-            revise_payload=mutation_payloads["revise"][0]
+            shot_b_revisions=[payload for payload in mutation_payloads["revise"] if payload["contract_id"]==contract_b]
+            assert len(shot_b_revisions)==1
+            revise_payload=shot_b_revisions[0]
             assert revise_payload["revision"]==2 and revise_payload["contract_id"]==contract_b
             assert revise_payload["contract"]["source_pins"]==initial_body["source_pins"]
             report["conflict_preservation"]={"base_revision":2,"remote_revision":records_by_id[contract_b]["revision"],
@@ -357,7 +417,7 @@ async def main(args):
                 "old_exact_pin_retained_in_failed_request":revise_payload["contract"]["source_pins"]==initial_body["source_pins"],
                 "replacement_retained_unmodified_until_explicit_retarget":True,"explicit_retarget_edge":replacement["edge_id"],
                 "retarget_source_sha256":replacement["content_sha256"],"new_source_selected_after_confirm":await page.locator(".shot-source-option input:checked").count()==1}
-            report["passed"].append(cases[3])
+            report["passed"].append(cases[4])
 
             await page.get_by_role("button",name="Review rebase",exact=True).click()
             await page.get_by_role("heading",name="Reviewed basis changes",exact=True).wait_for()
@@ -391,7 +451,7 @@ async def main(args):
             assert final_body["script_intents"][0]["id"]==intent_id and final_body["requirements"][0]["id"]==requirement_id
             report["rebase_tokens"]={"attempts":len(rebase_payloads),"old_token_invalidated":True,"new_token_used":rebase_payloads[1]["expected_basis_sha256"],
                 "stable_ids_preserved":[intent_id,requirement_id],"hidden_fields_preserved":True}
-            report["passed"].append(cases[4])
+            report["passed"].append(cases[5])
 
             tab=page.get_by_role("tab",name="Shot intent",exact=True)
             await page.set_viewport_size({"width":390,"height":844})
@@ -408,7 +468,7 @@ async def main(args):
             snapshot=await page.locator(".inspector").evaluate("e=>({role:e.getAttribute('role'),modal:e.getAttribute('aria-modal'),activeInside:e.contains(document.activeElement),overflow:document.documentElement.scrollWidth>innerWidth})")
             assert snapshot=={"role":"dialog","modal":"true","activeInside":True,"overflow":False},snapshot
             report["responsive_keyboard"]=snapshot
-            report["passed"].append(cases[5])
+            report["passed"].append(cases[6])
             report["passed_all"]=True
         except Exception as error:
             report["failed"].append({"case":cases[len(report["passed"])] if len(report["passed"])<len(cases) else "setup_or_browser",
