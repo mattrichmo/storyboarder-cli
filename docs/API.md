@@ -62,10 +62,11 @@ information; missing records return 404; unsafe paths/launch grants are denied.
 Pydantic request schemas forbid unknown typed fields. The command dispatcher separately
 validates its complete allowlist and values.
 
-JSON bodies are bounded at 2 MiB, uploads at 51 MiB including multipart overhead,
-browser restores at 1 GiB. Streaming/chunked bodies are counted before parsing, not
-trusted from Content-Length. Negative/invalid lengths are rejected. Individual images
-still have the stricter 50 MiB and decoded-pixel limits.
+Most JSON bodies are bounded at 2 MiB; observation-plan import preview/apply requests
+allow 50 MiB for plans up to 48 MiB and their command envelope. Uploads allow 51 MiB
+including multipart overhead, and browser restores allow 1 GiB. Streaming/chunked bodies
+are counted before parsing, not trusted from Content-Length. Negative/invalid lengths
+are rejected. Individual images still have the stricter 50 MiB and decoded-pixel limits.
 
 Media/file routes resolve scoped paths and refuse private database/manifest leakage.
 Original images, safe thumbnails and created exports are read through controlled

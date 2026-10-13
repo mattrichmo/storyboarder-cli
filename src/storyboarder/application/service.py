@@ -58,6 +58,13 @@ class Service(AuthoringOperations, MediaOperations, AssetOperations, ContextOper
             return {"event_id": conn.execute("SELECT coalesce(max(id),0) FROM events").fetchone()[0]}
 
     def list_entities(self, kind=None, query="", asset_type=None, tag=None, parent_id=None, archived=False, limit=200, offset=0):
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 1000:
+            raise StoryboardError("Page size must be an integer from 1 to 1,000.")
+        if isinstance(offset, bool) or not isinstance(offset, int) or offset < 0:
+            raise StoryboardError("Page offset must be a nonnegative integer.")
+        # SQLite binds LIMIT/OFFSET as signed 64-bit integers. Larger Python ints
+        # are valid nonnegative offsets but must be capped before they reach SQL.
+        offset = min(offset, (1 << 63) - 1)
         where, args = (["1=1"], []) if archived else (["e.archived=0"], [])
         if kind:
             where.append("e.kind=?")
@@ -78,5 +85,8 @@ class Service(AuthoringOperations, MediaOperations, AssetOperations, ContextOper
         with self.repo.transaction(False) as conn:
             clause = " AND ".join(where)
             total = conn.execute("SELECT count(*) FROM entities e WHERE " + clause, args).fetchone()[0]
-            rows = conn.execute("SELECT e.id FROM entities e WHERE " + clause + " ORDER BY e.position,e.title,e.id LIMIT ? OFFSET ?", (*args, min(max(int(limit), 1), 1000), max(int(offset), 0))).fetchall()
-            return {"items": [self.entity(conn, r[0], active=False) for r in rows], "total": total, "offset": offset, "limit": limit}
+            rows = conn.execute("SELECT e.id FROM entities e WHERE " + clause + " ORDER BY e.position,e.title,e.id LIMIT ? OFFSET ?", (*args, limit, offset)).fetchall()
+            items = [self.entity(conn, r[0], active=False) for r in rows]
+            next_offset = offset + len(items) if offset + len(items) < total else None
+            return {"items": items, "total": total, "offset": offset, "limit": limit,
+                    "next_offset": next_offset, "truncated": next_offset is not None}

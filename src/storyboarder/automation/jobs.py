@@ -239,6 +239,7 @@ class Jobs:
             raise InUse("This job already has an active runner. Cancel it or wait for its current status.") from exc
 
     def _run(self, job_id, revision):
+        started = now()
         with self.repo.transaction() as conn:
             row = self.repo.get(conn, "jobs", job_id)
             self.repo.check(row, revision)
@@ -247,11 +248,12 @@ class Jobs:
             script = self.registry.get(row["script"])
             row = self.repo.update(conn, "jobs", job_id, revision, {"status": "running", "attempt": row["attempt"] + 1})
             self.repo.event(conn, "job.running", job_id)
-        work = Path(tempfile.mkdtemp(prefix="storyboarder-run-"))
-        storage = safe_path(self.service.root, f".storyboarder/jobs/{job_id}/attempt-{row['attempt']}")
-        process, started, stopped = None, now(), False
+        work, storage = None, None
+        process, stopped = None, False
         stdout, stderr = bytearray(), bytearray()
         try:
+            work = Path(tempfile.mkdtemp(prefix="storyboarder-run-"))
+            storage = safe_path(self.service.root, f".storyboarder/jobs/{job_id}/attempt-{row['attempt']}")
             storage.mkdir(parents=True, exist_ok=False)
             (work / "inputs").mkdir()
             (work / "output").mkdir()
@@ -321,18 +323,21 @@ class Jobs:
             result.update({"script": script["name"], "attempt": row["attempt"], "started_at": started, "finished_at": now(), "request_sha256": hashlib.sha256(dumps(request).encode()).hexdigest(), "return_code": process.returncode, "review": "pending"})
             json_file(storage / "result.json", result)
             return self._finish(job_id, "succeeded", result)
-        except (StoryboardError, OSError, ValueError) as exc:
+        except Exception as exc:
             if process:
                 self._stop(process)
                 stopped = True
-            result = {"script": script["name"], "attempt": row["attempt"], "started_at": started, "finished_at": now(), "error": str(exc), "return_code": process.returncode if process else None, "outputs": []}
-            if storage.exists():
-                json_file(storage / "result.json", result)
+            result = {"script": script["name"], "attempt": row["attempt"], "started_at": started, "finished_at": now(), "error": str(exc) or exc.__class__.__name__, "return_code": process.returncode if process else None, "outputs": []}
+            if storage is not None and storage.exists():
+                try:
+                    json_file(storage / "result.json", result)
+                except Exception:
+                    pass  # Persist the failure in the project database even if attempt storage is unavailable.
             return self._finish(job_id, "failed", result)
         finally:
             if process and not stopped:
                 self._stop(process)
-            if storage.exists():
+            if storage is not None and storage.exists():
                 for name, data in (("stdout.log", stdout), ("stderr.log", stderr)):
                     # Credentials explicitly supplied through env are redacted from saved logs.
                     decoded = bytes(data).decode("utf-8", errors="replace")
@@ -340,8 +345,12 @@ class Jobs:
                         value = os.environ.get(key)
                         if value:
                             decoded = decoded.replace(value, "[REDACTED]")
-                    (storage / name).write_text(decoded, encoding="utf-8")
-            shutil.rmtree(work, ignore_errors=True)
+                    try:
+                        (storage / name).write_text(decoded, encoding="utf-8")
+                    except OSError:
+                        pass
+            if work is not None:
+                shutil.rmtree(work, ignore_errors=True)
 
     def preview(self, job_id):
         row = self.service.get("jobs", job_id)

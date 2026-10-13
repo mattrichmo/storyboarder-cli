@@ -11,6 +11,8 @@ from storyboarder.media.files import MAX_FILE_BYTES
 def request_limit(path):
     if '/commands/production.' in path:
         return 33 * 1024 * 1024  # 32 MiB validated graph/package plus command envelope
+    if '/commands/observation.plan-import-' in path:
+        return 50 * 1024 * 1024  # 48 MiB plan plus bounded JSON/command envelope
     if '/commands/spatial.plan-import-' in path:
         return 135 * 1024 * 1024  # 100 MiB ZIP plus bounded base64/JSON envelope
     if '/commands/spatial.' in path:

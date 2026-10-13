@@ -23,11 +23,51 @@ class ScriptRegistry:
             return []
         try:
             document = json.loads(self.path.read_text())
+            if not isinstance(document, dict):
+                raise StoryboardError("Trusted script registry must be a JSON object.")
             if document.get("schema") != "storyboarder.scripts/v1":
                 raise StoryboardError("Unsupported script registry version.")
-            return document["scripts"]
-        except (ValueError, KeyError, OSError) as exc:
+            scripts = document.get("scripts")
+            if not isinstance(scripts, list):
+                raise StoryboardError("Trusted script registry must contain a scripts list.")
+            names = set()
+            for index, script in enumerate(scripts):
+                self._validate_record(script, index)
+                if script["name"] in names:
+                    raise StoryboardError(f"Trusted script registry contains duplicate script name '{script['name']}'.")
+                names.add(script["name"])
+            return scripts
+        except StoryboardError:
+            raise
+        except (ValueError, KeyError, OSError, TypeError) as exc:
             raise StoryboardError(f"Cannot read trusted script registry: {exc}") from exc
+
+    @staticmethod
+    def _validate_record(script, index):
+        label = f"Trusted script registry entry {index + 1}"
+        if not isinstance(script, dict):
+            raise StoryboardError(f"{label} must be a JSON object.")
+        required = {"name", "command", "timeout", "env_keys", "description", "max_file_bytes", "max_output_bytes"}
+        missing = required - script.keys()
+        if missing:
+            raise StoryboardError(f"{label} is missing required fields: {', '.join(sorted(missing))}.")
+        if not isinstance(script["name"], str) or not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", script["name"]):
+            raise StoryboardError(f"{label} has an invalid name.")
+        command = script["command"]
+        if not isinstance(command, list) or not command or len(command) > 32 or any(not isinstance(arg, str) or not arg or "\x00" in arg for arg in command):
+            raise StoryboardError(f"{label} has an invalid command argument array.")
+        if type(script["timeout"]) is not int or not 1 <= script["timeout"] <= 3600:
+            raise StoryboardError(f"{label} has an invalid timeout.")
+        env_keys = script["env_keys"]
+        if not isinstance(env_keys, list) or any(not isinstance(key, str) or not re.fullmatch(r"[A-Z_][A-Z0-9_]{0,127}", key) for key in env_keys):
+            raise StoryboardError(f"{label} has invalid environment variable names.")
+        if not isinstance(script["description"], str) or len(script["description"]) > 1000:
+            raise StoryboardError(f"{label} has an invalid description.")
+        max_file_bytes, max_output_bytes = script["max_file_bytes"], script["max_output_bytes"]
+        if type(max_file_bytes) is not int or not 1 <= max_file_bytes <= 50 * 1024 * 1024:
+            raise StoryboardError(f"{label} has an invalid per-file output limit.")
+        if type(max_output_bytes) is not int or not max_file_bytes <= max_output_bytes <= 250 * 1024 * 1024:
+            raise StoryboardError(f"{label} has an invalid combined output limit.")
 
     def get(self, name):
         result = next((r for r in self.list() if r["name"] == name), None)

@@ -125,10 +125,10 @@ receipt. All three commands are available in the CLI and JSON API, and appear in
 Coverage page. The CLI export result already wraps the sidecar under `plan`; save that
 JSON as `export.json` and pass `--payload @export.json` to preview. Apply uses a payload
 with both the unchanged `plan` object and returned `preview` receipt. Export and import preserve
-IDs, immutable history, operations, timestamps, and exact pins. API request bodies are
-capped at 2 MiB, including the plan and receipt; larger plans up to the application
-48 MiB limit can be passed to the CLI. These commands are API-safe and remain outside
-the browser command catalog.
+IDs, immutable history, operations, timestamps, and exact pins. Observation-plan import
+preview/apply API requests allow 50 MiB for plans up to the application’s 48 MiB limit
+and their command envelope; other JSON API requests remain capped at 2 MiB. These
+commands are API-safe and remain outside the browser command catalog.
 
 `observation.rebase-preview` accepts `contract_id` and the complete proposed `contract`
 body. It is read-only and returns saved/current basis values, exact requested pins, and an
