@@ -1,14 +1,16 @@
 # CLI reference
 
 `storyboarder` is the installed command. This reference includes lifecycle commands
-and all **111 commands** in the shared application catalog. The flag tables are
+and all **150 commands** in the shared application catalog. The flag tables are
 generated from that catalog. Run `storyboarder --help`, `storyboarder GROUP --help`,
 or `storyboarder GROUP ACTION --help` for the commands in your installed checkout.
 
-The original authoring workflows are available through the CLI, browser, and TUI.
-Source documents and provenance remain CLI/local API previews; the TUI now has a focused
-Observation coverage page for exact source pins and first contract authoring. A dedicated
-browser workspace remains unfinished. See [implementation status](V2_IMPLEMENTATION_STATUS.md).
+The browser includes the dedicated **Blocking & lighting** editor. The CLI exposes its
+spatial plan, binding, review, diagram, package, and recovery commands; the TUI does not
+include this visual editor. Source documents and provenance remain CLI/local API previews.
+The TUI has a focused Observation coverage page for exact source pins and contract
+authoring, while dedicated visual workspaces for these source workflows remain unfinished.
+See [implementation status](V2_IMPLEMENTATION_STATUS.md).
 
 ## Project selection and common options
 
@@ -135,6 +137,194 @@ body and header `revision` to `observation.rebase`. If the reviewed basis or con
 revision changes before the write, the command returns a 409 contract conflict (CLI exit
 3); preview again before retrying. Both commands are JSON/API-safe and agent-only.
 
+## Spatial blocking and lighting
+
+The browser's **Blocking & lighting** workspace is a visual editor for a scene
+plan. Open a scene, choose a blank plan or **Doorway example**, place actor, prop,
+and wall proxies, then add marks, cameras, lights, modifiers, beats, and timed
+tracks. The scrubber previews authored timing. **Review & save** creates a new
+immutable plan version. The full-screen TUI does not include this visual editor.
+
+The CLI works with the same project data. It starts with an existing project and
+scene; use the built-in Doorway fixture for a complete offline example. Set
+`PROJECT` to an existing project folder and `SCENE_ID` to one of its scenes. The
+commands below read the current project revision and create a fresh setup ID:
+
+```sh
+PROJECT_REVISION=$(storyboarder --project "$PROJECT" project show --json \
+  | python3 -c 'import json,sys; print(json.load(sys.stdin)["revision"])')
+SETUP_ID=$(python3 -c 'import uuid; print(uuid.uuid4())')
+storyboarder --project "$PROJECT" spatial fixture --scene-id "$SCENE_ID" --json > doorway-plan.json
+```
+
+`spatial fixture` prints the Doorway to table plan payload without changing the
+project. For `spatial create-preview` and `spatial create`, the generic
+`--payload` is the whole command request: wrap the plan under a nested `payload`
+key alongside a new UUID `setup_id` and the current `expected_project_revision`
+from `project show`. The commands above set `SETUP_ID` and `PROJECT_REVISION`;
+this builds the request from the fixture:
+
+```sh
+python3 - "$SETUP_ID" "$PROJECT_REVISION" <<'PY'
+import json, sys
+plan = json.load(open("doorway-plan.json", encoding="utf-8"))
+request = {
+    "setup_id": sys.argv[1],
+    "expected_project_revision": int(sys.argv[2]),
+    "payload": plan,
+}
+with open("create-request.json", "w", encoding="utf-8") as output:
+    json.dump(request, output)
+PY
+
+storyboarder --project "$PROJECT" spatial create-preview \
+  --payload @create-request.json --json > create-preview.json
+
+python3 - <<'PY'
+import json
+with open("create-request.json", encoding="utf-8") as source:
+    request = json.load(source)
+with open("create-preview.json", encoding="utf-8") as source:
+    preview = json.load(source)
+request["expected_basis_sha256"] = preview["expected_basis_sha256"]
+with open("create-apply.json", "w", encoding="utf-8") as output:
+    json.dump(request, output)
+PY
+
+storyboarder --project "$PROJECT" spatial create \
+  --payload @create-apply.json --json
+```
+
+The saved response identifies the immutable `version.id`; `spatial history`,
+`spatial show`, and `spatial diff` inspect saved versions. To edit a plan, send
+its current setup `revision` and the proposed full plan to
+`spatial revise-preview`, then apply with the exact returned basis token.
+Restore a previous version with `spatial restore-preview` and `spatial restore`;
+a restore creates another version rather than erasing history.
+
+A shot binding pins an exact `setup_version_id`, camera plan, and action-time
+sample. Prepare this request with IDs and revision from the project:
+
+```json
+{
+  "shot_id": "SHOT_ID",
+  "expected_shot_revision": 1,
+  "binding_id": "NEW_BINDING_UUID",
+  "binding": {
+    "schema": "storyboarder.spatial-binding/v1",
+    "status": "active",
+    "setup_version_id": "SETUP_VERSION_ID",
+    "camera_plan_id": "CAMERA_PLAN_ID",
+    "sample": {"kind": "instant", "time_us": 0},
+    "time_mapping": {"kind": "none"},
+    "notes": "Doorway demo shot"
+  }
+}
+```
+
+Pass it to `spatial bind-preview`; save with `spatial bind` using the returned
+`expected_basis_sha256`:
+
+```sh
+storyboarder --project "$PROJECT" spatial bind-preview \
+  --payload @binding-request.json --json > binding-preview.json
+# Add binding-preview.json's expected_basis_sha256 to the request.
+storyboarder --project "$PROJECT" spatial bind \
+  --payload @binding-apply.json --json
+```
+
+When action time maps to shot time, record that mapping explicitly. The binding
+does not change the shot's written duration. Rebinding is also preview-and-apply;
+`spatial binding-show` and `spatial binding-history` inspect its versions.
+
+An authored spatial review requires an existing v1 observation contract and a
+binding for the same shot. Submit a `storyboarder.observation-contract/v2`
+review that pins those exact version IDs. For the first review,
+`expected_previous_number` is `0`; otherwise read the latest number with
+`observation spatial-review-history`.
+
+```json
+{
+  "shot_id": "SHOT_ID",
+  "expected_previous_number": 0,
+  "review": {
+    "schema": "storyboarder.observation-contract/v2",
+    "observation_version_id": "OBSERVATION_VERSION_ID",
+    "binding_version_id": "BINDING_VERSION_ID",
+    "reviewed": {
+      "blocking": true,
+      "timing": true,
+      "camera_coverage": true,
+      "schematic_lighting": true
+    },
+    "assumptions": [],
+    "unresolved": [],
+    "notes": "Doorway blocking and coverage reviewed"
+  }
+}
+```
+
+`observation spatial-review-preview` checks the proposed review;
+`observation spatial-review` saves it with the exact preview token:
+
+```sh
+storyboarder --project "$PROJECT" observation spatial-review-preview \
+  --payload @review-request.json --json > review-preview.json
+# Add review-preview.json's expected_basis_sha256 to the request.
+storyboarder --project "$PROJECT" observation spatial-review \
+  --payload @review-apply.json --json
+```
+
+`observation spatial-review-show`, `observation spatial-review-validate`, and
+`observation spatial-review-history` inspect it. This is an authored checklist,
+not physical verification or storyboard-frame approval; it leaves the v1
+observation contract unchanged.
+
+Export diagrams for a specific immutable plan with `spatial diagram-export`
+and `--version-id VERSION_ID --format all`. Use
+`--binding-version-id BINDING_VERSION_ID` to export the exact shot binding, and
+optionally supply sample times in microseconds. For explicit times, put the full
+command payload in a JSON file because `times_us` is an array:
+
+```json
+{"version_id":"VERSION_ID","times_us":[0,4000000],"format":"all"}
+```
+
+Pass that file with `spatial diagram-export --payload @diagram-request.json`.
+When `times_us` is omitted for a version export, the diagram uses the default
+sample at `0`; for a binding export, it uses the binding's pinned sample. The
+command returns generated SVG, PNG, PDF, and JSON files under the project's
+`exports/boards` folder.
+
+For portable transfer, `spatial plan-export` with `--setup-id SETUP_ID` and
+`--scope full-history` writes a native spatial ZIP with setup versions and their
+history closure, including associated bindings and reviews. Use the
+`native-spatial.zip` path in the command result. Put its base64 contents in an
+`archive_base64` field in `import-request.json`, then preview and apply:
+
+```sh
+storyboarder --project "$PROJECT" spatial plan-import-preview \
+  --payload @import-request.json --json > import-preview.json
+# Keep the package and mode unchanged; add import-preview.json's basis token.
+storyboarder --project "$PROJECT" spatial plan-import-apply \
+  --payload @import-apply.json --json
+```
+
+**Exact** import preserves IDs and history and requires the same project
+identity. **Copy** creates a new setup root in another project; provide a new
+setup UUID and any scene, asset, or media mappings needed to match that project's
+IDs. Copy mode does not carry shot bindings or reviews.
+
+For recovery, `spatial doctor` checks spatial data without changing it.
+`spatial backup` creates a project backup that includes spatial data.
+`spatial backup-restore --archive ARCHIVE --destination NEW_PATH` restores into
+a new folder and checks spatial integrity before it completes. In the browser,
+the editor can recover an unsaved local draft from browser storage.
+
+Lighting, camera coverage, and floor-plan diagrams communicate authored intent.
+They do not calculate photometric exposure, rendered light transport, shadows,
+surveyed scale, or physical safety.
+
 ## Command catalog
 
 Flags below are command-specific; common options and `--payload` are also available.
@@ -143,7 +333,7 @@ catalog default or choices. The CLI always supports these commands; commands mar
 as local-file operations require explicit filesystem access and are not exposed through
 the generic browser command endpoint.
 
-[asset](#asset) · [sequence](#sequence) · [scene](#scene) · [shot](#shot) · [project](#project) · [entity](#entity) · [story](#story) · [link](#link) · [assignment](#assignment) · [context](#context) · [frame](#frame) · [canvas](#canvas) · [media](#media) · [intake](#intake) · [composition](#composition) · [export](#export) · [cache](#cache) · [job](#job) · [document](#document) · [screenplay](#screenplay) · [edit](#edit) · [provenance](#provenance) · [coverage](#coverage) · [observation](#observation) · [annotation](#annotation)
+[asset](#asset) · [sequence](#sequence) · [scene](#scene) · [shot](#shot) · [project](#project) · [entity](#entity) · [story](#story) · [link](#link) · [assignment](#assignment) · [context](#context) · [frame](#frame) · [canvas](#canvas) · [media](#media) · [intake](#intake) · [composition](#composition) · [export](#export) · [cache](#cache) · [job](#job) · [document](#document) · [screenplay](#screenplay) · [edit](#edit) · [provenance](#provenance) · [coverage](#coverage) · [observation](#observation) · [annotation](#annotation) · [spatial](#spatial)
 
 ### `asset`
 
@@ -743,6 +933,7 @@ Changes project data or creates output.
 | `--positions` | yes | json | Positions | — |
 | `--settings` | no | json | Settings | — |
 | `--revision` | no | integer | Existing layout revision | — |
+| `--layout-id` | no | select | Saved arrangement (record from layouts) | — |
 
 #### `canvas show` — Show saved arrangement
 
@@ -1297,6 +1488,55 @@ Changes project data or creates output.
 | `--plan` | yes | json | Portable observation plan | — |
 | `--preview` | yes | json | Exact preview receipt | — |
 
+#### `observation spatial-review-preview` — Preview an authored spatial review
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | yes | text | Storyboard shot | — |
+| `--expected-previous-number` | yes | integer | Last-read spatial review number | — |
+| `--review` | yes | json | Versioned authored spatial review object | — |
+
+#### `observation spatial-review` — Save an authored spatial review
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | yes | text | Storyboard shot | — |
+| `--expected-previous-number` | yes | integer | Last-read spatial review number | — |
+| `--review` | yes | json | Versioned authored spatial review object | — |
+| `--expected-basis-sha256` | yes | text | Exact basis token returned by preview | — |
+
+#### `observation spatial-review-show` — Show a spatial review
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | no | text | Storyboard shot | — |
+| `--review-id` | no | text | Spatial review identity | — |
+
+#### `observation spatial-review-validate` — Validate a spatial review
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | no | text | Storyboard shot | — |
+| `--review-id` | no | text | Spatial review identity | — |
+
+#### `observation spatial-review-history` — Review spatial review history
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | yes | text | Storyboard shot | — |
+| `--limit` | no | integer | Maximum results | default: `100` |
+| `--offset` | no | integer | Start at | default: `0` |
+
 ### `annotation`
 
 #### `annotation create` — Add a pinned review note
@@ -1330,3 +1570,352 @@ Changes project data or creates output.
 | `--revision` | yes | integer | Version check. Keeps a newer edit from being overwritten. | — |
 | `--content` | yes | textarea | Content | — |
 | `--state` | no | select | State | default: `"open"`; choices: `open`, `resolved` |
+
+### `spatial`
+
+#### `spatial schema` — Show spatial payload schemas
+
+Read-only operation.
+
+This command has no command-specific fields.
+
+#### `spatial fixture` — Get the Doorway to table plan payload
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--scene-id` | yes | text | Scene included in the plan | — |
+| `--chair-asset-id` | no | text | Optional shared chair asset | — |
+
+#### `spatial create-preview` — Preview a new spatial plan
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--expected-project-revision` | yes | integer | Last-read project revision | — |
+| `--payload` | yes | json | Complete spatial plan payload | — |
+
+#### `spatial create` — Save a new spatial plan version
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--expected-project-revision` | yes | integer | Last-read project revision | — |
+| `--payload` | yes | json | Complete spatial plan payload | — |
+| `--expected-basis-sha256` | yes | text | Exact basis token returned by preview | — |
+| `--operation-id` | no | text | Optional operation identity for retry safety | — |
+
+#### `spatial list` — List spatial plans
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--scene-id` | no | text | Scene included in the plan | — |
+| `--include-archived` | no | boolean | Include archived setups | default: false |
+| `--limit` | no | integer | Maximum results | default: `100` |
+| `--offset` | no | integer | Start at | default: `0` |
+
+#### `spatial show` — Show a spatial plan version
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--version-id` | no | text | Immutable spatial plan version | — |
+
+#### `spatial history` — Show spatial plan history
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--limit` | no | integer | Maximum results | default: `100` |
+| `--offset` | no | integer | Start at | default: `0` |
+
+#### `spatial validate` — Validate a spatial plan payload
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--payload` | yes | json | Complete spatial plan payload | — |
+| `--setup-id` | no | text | Spatial setup | — |
+
+#### `spatial revise-preview` — Preview a spatial plan revision
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+| `--payload` | yes | json | Complete spatial plan payload | — |
+
+#### `spatial revise` — Save a spatial plan revision
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+| `--payload` | yes | json | Complete spatial plan payload | — |
+| `--expected-basis-sha256` | yes | text | Exact basis token returned by preview | — |
+| `--operation-id` | no | text | Optional operation identity for retry safety | — |
+
+#### `spatial diff` — Compare spatial plan versions
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--from-version-id` | yes | text | Earlier plan version | — |
+| `--to-version-id` | yes | text | Later plan version | — |
+
+#### `spatial restore-preview` — Preview a spatial plan restore
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+| `--version-id` | yes | text | Immutable spatial plan version | — |
+
+#### `spatial restore` — Restore a prior spatial plan version
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+| `--version-id` | yes | text | Immutable spatial plan version | — |
+| `--expected-basis-sha256` | yes | text | Exact basis token returned by preview | — |
+
+#### `spatial archive` — Archive a spatial plan
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+
+#### `spatial unarchive` — Unarchive a spatial plan
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+
+#### `spatial duplicate-preview` — Preview a spatial plan duplicate
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--version-id` | yes | text | Immutable spatial plan version | — |
+| `--new-setup-id` | yes | text | UUID for the new setup | — |
+| `--title` | yes | text | Title for the duplicate | — |
+
+#### `spatial duplicate` — Duplicate a spatial plan version
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--version-id` | yes | text | Immutable spatial plan version | — |
+| `--new-setup-id` | yes | text | UUID for the new setup | — |
+| `--title` | yes | text | Title for the duplicate | — |
+| `--expected-basis-sha256` | yes | text | Exact basis token returned by preview | — |
+
+#### `spatial evaluate` — Evaluate a spatial plan at action times
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--version-id` | yes | text | Immutable spatial plan version | — |
+| `--times-us` | yes | json array | Action-time samples in microseconds | — |
+| `--target-plane-z-m` | no | number | Diagram target plane height in meters | default: `0.0` |
+| `--view-bounds` | no | json | Optional diagram view bounds | — |
+
+#### `spatial bind-preview` — Preview a shot binding
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | yes | text | Storyboard shot | — |
+| `--expected-shot-revision` | yes | integer | Last-read shot revision | — |
+| `--binding-id` | yes | text | Spatial binding identity | — |
+| `--binding` | yes | json | Versioned spatial binding object | — |
+
+#### `spatial bind` — Save a shot binding
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | yes | text | Storyboard shot | — |
+| `--expected-shot-revision` | yes | integer | Last-read shot revision | — |
+| `--binding-id` | yes | text | Spatial binding identity | — |
+| `--binding` | yes | json | Versioned spatial binding object | — |
+| `--expected-basis-sha256` | yes | text | Exact basis token returned by preview | — |
+| `--operation-id` | no | text | Optional operation identity for retry safety | — |
+
+#### `spatial rebind-preview` — Preview a shot rebind
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | yes | text | Storyboard shot | — |
+| `--expected-shot-revision` | yes | integer | Last-read shot revision | — |
+| `--binding-id` | yes | text | Spatial binding identity | — |
+| `--binding` | yes | json | Versioned spatial binding object | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+
+#### `spatial rebind` — Save a shot rebind
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | yes | text | Storyboard shot | — |
+| `--expected-shot-revision` | yes | integer | Last-read shot revision | — |
+| `--binding-id` | yes | text | Spatial binding identity | — |
+| `--binding` | yes | json | Versioned spatial binding object | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+| `--expected-basis-sha256` | yes | text | Exact basis token returned by preview | — |
+| `--operation-id` | no | text | Optional operation identity for retry safety | — |
+
+#### `spatial binding-show` — Show shot bindings
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--shot-id` | no | text | Storyboard shot | — |
+| `--binding-id` | no | text | Spatial binding identity | — |
+| `--version-id` | no | text | Immutable spatial plan version | — |
+
+#### `spatial binding-history` — Show binding history
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--binding-id` | yes | text | Spatial binding identity | — |
+| `--limit` | no | integer | Maximum results | default: `100` |
+| `--offset` | no | integer | Start at | default: `0` |
+
+#### `spatial detach` — Detach a shot binding
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--binding-id` | yes | text | Spatial binding identity | — |
+| `--revision` | yes | integer | Last-read setup or binding revision | — |
+| `--expected-shot-revision` | yes | integer | Last-read shot revision | — |
+
+#### `spatial impact` — Find spatial plan dependencies
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | no | text | Spatial setup | — |
+| `--dependency-id` | no | text | Spatial dependency identity | — |
+| `--limit` | no | integer | Maximum results | default: `100` |
+| `--offset` | no | integer | Start at | default: `0` |
+
+#### `spatial operation-show` — Show a spatial operation
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--operation-id` | yes | text | Optional operation identity for retry safety | — |
+
+#### `spatial doctor` — Check spatial project integrity
+
+Read-only operation.
+
+This command has no command-specific fields.
+
+#### `spatial backup` — Create a spatial project backup
+
+Changes project data or creates output.
+
+This command has no command-specific fields.
+
+#### `spatial plan-export` — Export a portable spatial plan
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--setup-id` | yes | text | Spatial setup | — |
+| `--scope` | no | select | History included in the portable package | default: "full-history"; choices: `full-history`, `selected-with-history-closure`, `sparse-snapshot` |
+| `--version-id` | no | text | Immutable spatial plan version | — |
+
+#### `spatial plan-import-preview` — Preview a spatial package import
+
+Read-only operation.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--package` | no | json | Portable spatial package object | — |
+| `--archive-base64` | no | text | Base64-encoded native spatial ZIP | — |
+| `--mode` | no | select | Import mode | default: "exact"; choices: `exact`, `copy` |
+| `--mappings` | no | json | Explicit IDs and dependency mappings | — |
+
+#### `spatial plan-import-apply` — Apply a reviewed spatial package import
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--package` | no | json | Portable spatial package object | — |
+| `--archive-base64` | no | text | Base64-encoded native spatial ZIP | — |
+| `--mode` | no | select | Import mode | default: "exact"; choices: `exact`, `copy` |
+| `--mappings` | no | json | Explicit IDs and dependency mappings | — |
+| `--expected-basis-sha256` | yes | text | Exact basis token returned by preview | — |
+
+#### `spatial diagram-export` — Export spatial diagrams
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--version-id` | no | text | Immutable spatial plan version | — |
+| `--binding-version-id` | no | text | Immutable shot binding version | — |
+| `--times-us` | no | json array | Action-time samples in microseconds | — |
+| `--target-plane-z-m` | no | number | Diagram target plane height in meters | default: `0.0` |
+| `--view-bounds` | no | json | Optional diagram view bounds | — |
+| `--format` | no | select | Diagram output format | default: "all"; choices: `all`, `svg`, `png`, `pdf` |
+
+#### `spatial backup-restore` — Restore a spatial project backup
+
+Changes project data or creates output.
+
+| Flag | Required | Type | Description | Default / choices |
+|---|---|---|---|---|
+| `--archive` | yes | text | Backup archive path | — |
+| `--destination` | yes | text | New destination folder | — |

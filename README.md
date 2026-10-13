@@ -34,16 +34,20 @@ Storyboarder is a local storyboard planning desk for filmmakers, storyboard arti
 small production teams. Organize sequences into scenes, then plan multiple shots and
 angles in each scene. Collect character, location, prop, and other references; record
 framing and camera intent; compare storyboard images; and export boards and production
-handoffs. Each project lives in a folder you choose. A shot can link to source elements
-in an imported screenplay. Source links and production provenance are available through
-the CLI and local API as preview workflows. Storyboarder records intent and connections;
-it does not solve camera moves, render a film, or integrate with Blender.
+handoffs. The spatial planner adds timed actor and prop blocking, camera plans, lighting
+intent, and coverage diagrams. Each project lives in a folder you choose. A shot can link
+to source elements in an imported screenplay. Source links and production provenance are
+available through the CLI and local API as preview workflows. Storyboarder records intent
+and connections; its camera plans are authored guides, not a motion solver. It does not
+render a film or integrate with Blender.
 
 People use the **browser** for visual planning and the **full-screen terminal desk** for
-keyboard authoring. The **CLI** supports repeatable work by scripts and agents with
-structured JSON output. All three work with the same project data. After installation,
-core authoring and exports work offline. There is no account, subscription, or bundled
-image-generation provider.
+keyboard authoring. The browser includes the **Blocking & lighting** workspace; the CLI
+supports its versioned plans, shot bindings, reviews, and exports. The TUI remains a
+separate keyboard desk without this visual editor. The **CLI** also supports repeatable
+work by scripts and agents with structured JSON output. All three work with the same
+project data. After installation, core authoring and exports work offline. There is no
+account, subscription, or bundled image-generation provider.
 
 ## What you can do
 
@@ -52,6 +56,7 @@ image-generation provider.
 | **Plan the story** | Ordered sequences, scenes, and shots with action, dialogue, framing, camera direction, duration, and continuity notes. |
 | **Organize references** | A typed library for characters, locations, props, and general references; tags, aliases, exact-image assignments, and duplicate intake review. |
 | **Carry direction into each shot** | Project, sequence, scene, and shot notes that append to, replace, or exclude inherited direction. |
+| **Plan blocking and lighting** | Browser editor for actor, prop, and wall proxies, marks, camera and light intent, modifiers, and timed tracks; CLI commands for immutable plan versions, exact shot bindings, authored reviews, diagrams, and portable transfer. |
 | **Arrange the production visually** | Story flow, asset network, and scene board canvases with pan/zoom, filtering, keyboard controls, typed connections, and saved layouts. |
 | **Review storyboard images** | Separate frame candidates, version history, comparison, and explicit draft, selected, approved, or archived states. |
 | **Deliver and recover** | HTML/PDF/PNG boards, JSON/Markdown handoff packages, managed media, manifest hashes, health checks, and portable backups. |
@@ -71,6 +76,31 @@ Screenshots show the original authoring interface. The reference panels are labe
 fictional demo graphics; they are examples of the workflow, not finished shot artwork.
 
 </details>
+
+## Spatial blocking and lighting
+
+In the browser, open **Blocking & lighting**, select a scene, and start a blank plan or
+the built-in **Doorway example**. Place actor, prop, and wall proxies with marks, cameras,
+lights, and modifiers; use beats and timed tracks with the scrubber to inspect the action.
+**Review & save** records an immutable plan version.
+
+Select a shot to bind an exact saved plan version, camera, and action-time sample. Choose
+an explicit mapping when action time needs to map to shot time; the binding leaves the
+shot's written duration unchanged. A spatial review is an authored checklist tied to that
+binding and an existing v1 observation contract. It does not verify physical results or
+approve a storyboard frame.
+
+The CLI provides plan, binding, review, export, transfer, and recovery operations as
+structured commands; it does not render the browser editor. Get the offline **Doorway to
+table** plan payload with `spatial fixture --scene-id SCENE_ID`, then follow the
+[CLI spatial workflow](docs/CLI.md#spatial-blocking-and-lighting). Export SVG, PNG, or PDF
+diagrams for an exact setup or shot binding, and use the native package commands to
+preview a transfer before applying it. The browser can recover an unsaved
+local draft; `spatial doctor` checks spatial integrity and `spatial backup` creates a
+recovery point.
+
+Lighting and coverage diagrams are schematic planning guides. They show authored intent,
+not photometric exposure, rendered light transport, or shadow results.
 
 ## Quick start
 
@@ -272,7 +302,7 @@ with a conflict instead of overwriting newer work. See the
 ## Command map
 
 Every group and subcommand has `--help`. The
-[full CLI reference](docs/CLI.md#command-catalog) documents all **111 shared application
+[full CLI reference](docs/CLI.md#command-catalog) documents all **150 shared application
 commands**, including their flags, choices, defaults, and required fields, plus lifecycle commands.
 
 | Area | Commands to reach for |
@@ -285,6 +315,7 @@ commands**, including their flags, choices, defaults, and required fields, plus 
 | Storyboard candidates | `frame add/attach/list/state/remove` |
 | Canvas arrangements | `canvas graph/neighbors/save/show/list/remove` |
 | Composition and handoffs | `compose`, `composition preview`, `export board/bundle` |
+| Spatial blocking and lighting | `spatial fixture/schema/create/revise/show/history/bind/evaluate/diagram-export/plan-export/plan-import-preview/plan-import-apply/doctor/backup`; `observation spatial-review-preview/spatial-review` |
 | Source drafts | `screenplay import/list`, `edit import/list`, `document import/list/show/tree/children/node/versions/validate/revise/diff/export/archive/restore` |
 | Production lineage and notes | `shot link-source/sources`, `provenance link/trace/impact/retire`, `coverage report`, `annotation create/list/update` |
 | Local adapters | `script register/list/remove`, `job create/run/preview/cancel/retry/approve/list` |
