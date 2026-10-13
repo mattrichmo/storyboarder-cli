@@ -45,13 +45,13 @@ SQL file and increase SCHEMA_VERSION. Run a full project backup before upgrades.
 On an internet-connected machine with the same platform/Python version as the target:
 
 ```sh
-python -m pip download --dest wheelhouse ./dist/storyboarder_desk-1.0.0-py3-none-any.whl
+python -m pip download --dest wheelhouse ./dist/storyboarder_desk-1.1.0-py3-none-any.whl
 ```
 
 Transfer the wheelhouse to the offline target, then:
 
 ```sh
-python -m pip install --no-index --find-links wheelhouse storyboarder-desk==1.0.0
+python -m pip install --no-index --find-links wheelhouse storyboarder-desk==1.1.0
 ```
 
 This release does not include all third-party Python dependency wheels. `pip install .`

@@ -9,6 +9,10 @@ from storyboarder.media.files import MAX_FILE_BYTES
 
 
 def request_limit(path):
+    if '/commands/spatial.plan-import-' in path:
+        return 135 * 1024 * 1024  # 100 MiB ZIP plus bounded base64/JSON envelope
+    if '/commands/spatial.' in path:
+        return 9 * 1024 * 1024  # 8 MiB validated payload plus command envelope
     if path.endswith('/documents/upload'):
         return 21 * 1024 * 1024
     if path.endswith('/restore'):

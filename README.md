@@ -397,7 +397,7 @@ python scripts/build_release.py
 separately and refresh after a rebuild. The release helper creates a wheel and source
 archive in the ignored `dist/` directory; those files are generated, not included in a
 fresh Git clone. Install a generated wheel with
-`python -m pip install dist/storyboarder_desk-1.0.0-py3-none-any.whl`.
+`python -m pip install dist/storyboarder_desk-1.1.0-py3-none-any.whl`.
 
 
 ## Scope and trust

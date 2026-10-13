@@ -18,6 +18,7 @@ try {
 const root = path.dirname(fileURLToPath(import.meta.url));
 const src = path.join(root, 'src');
 const dest = path.resolve(root, '../../src/storyboarder/static');
+const appVersion = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version;
 const digest = (value) => crypto.createHash('sha256').update(value).digest('hex');
 
 function walk(dir) {
@@ -108,7 +109,7 @@ function build() {
 
     const index = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f5f3ed"><title>Storyboarder — production desk</title><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="/assets/${cssName}"></head><body><div id="root"><p class="boot">Opening your production desk…</p></div><noscript>Storyboarder requires JavaScript. The CLI and TUI work without a browser.</noscript><script src="/assets/react-runtime.js"></script><script src="/assets/${appName}"></script></body></html>`;
     const buildInfo = {
-      appVersion: '1.0.0',
+      appVersion,
       typescript: ts.version,
       react: '18.2.0',
       entry: `assets/${appName}`,

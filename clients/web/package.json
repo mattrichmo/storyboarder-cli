@@ -1,6 +1,6 @@
 {
   "name": "storyboarder-web",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Offline React client with an in-house SVG/DOM canvas",

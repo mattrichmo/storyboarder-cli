@@ -51,6 +51,7 @@ COMMAND_GROUP_HELP = {
     "script": "Register, inspect, and remove trusted external scripts",
     "sequence": "Create and edit sequences",
     "shot": "Create and edit shots and their references",
+    "spatial": "Plan and review blocking and lighting",
     "story": "Move and reorder story items",
     "workspace": "Select and organize projects",
 }
@@ -167,8 +168,15 @@ def build_parser():
     for name, command in COMMANDS.items():
         group, action = name.split(".")
         child = add(group, action, command.label)
-        child.add_argument("--payload", help="JSON object or @path/to/payload.json; named flags override it")
+        payload_field = next((field for field in command.fields if field.name == "payload"), None)
+        payload_help = "JSON object or @path/to/payload.json; named flags override it"
+        if payload_field:
+            payload_help += ". " + field_help(payload_field)
+        child.add_argument("--payload", default=argparse.SUPPRESS, help=payload_help)
         for f in command.fields:
+            # A command's payload field is a key inside the CLI's JSON object.
+            if f.name == "payload":
+                continue
             kwargs = {"dest": "arg_" + f.name, "default": argparse.SUPPRESS, "help": field_help(f)}
             if f.type == "boolean":
                 kwargs["action"] = argparse.BooleanOptionalAction

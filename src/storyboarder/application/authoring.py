@@ -111,6 +111,8 @@ class AuthoringOperations:
               WHERE related.value=? ORDER BY version.contract_id""", (record_id,)),
         }
         result = {name: [r[0] for r in conn.execute(sql, args)] for name, (sql, args) in queries.items()}
+        from .spatial_plans import usage as spatial_usage
+        result.update(spatial_usage(conn, record_id))
         result["can_delete"] = not any(result.values())
         return result
 
@@ -147,6 +149,9 @@ class AuthoringOperations:
                 raise StoryboardError("Only sequences, scenes, and shots can be reordered.")
             new_parent = parent_id or row["parent_id"]
             self.entity(conn, new_parent, {"sequence": "project", "scene": "sequence", "shot": "scene"}[row["kind"]])
+            if row["kind"] == "shot":
+                from .spatial_plans import check_shot_move
+                check_shot_move(conn, record_id, new_parent)
             siblings = [r[0] for r in conn.execute("SELECT id FROM entities WHERE parent_id=? AND kind=? AND id<>? ORDER BY position,id", (new_parent, row["kind"], record_id))]
             siblings.insert(min(position, len(siblings)), record_id)
             old_parent = row["parent_id"]
