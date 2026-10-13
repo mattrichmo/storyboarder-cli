@@ -21,10 +21,15 @@ class DeliveryOperations:
 
     def doctor(self, hashes=False):
         from .recovery import doctor
-        return doctor(self, hashes)
+        result = doctor(self, hashes)
+        from .spatial_recovery import doctor as spatial_doctor
+        result["spatial"] = spatial_doctor(self)
+        if not result["spatial"]["healthy"]:
+            result["healthy"] = False
+        return result
 
     def backup(self):
-        from .recovery import backup
+        from .spatial_recovery import backup
         return backup(self)
 
     def cache(self, rebuild=False):

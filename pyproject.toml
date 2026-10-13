@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "storyboarder-desk"
-version = "1.0.0"
+version = "1.1.0"
 description = "A local-first editorial story production desk: CLI, TUI and React canvas"
 readme = "README.md"
 requires-python = ">=3.11"

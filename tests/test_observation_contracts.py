@@ -977,7 +977,7 @@ def test_doctor_handles_missing_contract_table_and_schema_four_without_mutation(
     before = database.read_bytes()
     missing = service.doctor()
     after = database.read_bytes()
-    assert missing["schema_version"] == 7 and not missing["healthy"]
+    assert missing["schema_version"] == 8 and not missing["healthy"]
     assert any(issue["code"] == "observation_contract_integrity_check" for issue in missing["issues"])
     assert before == after
 
@@ -994,7 +994,7 @@ def test_doctor_handles_missing_contract_table_and_schema_four_without_mutation(
     old_report = old_service.doctor()
     after = old_service.repo.path.read_bytes()
     old_codes = {issue["code"] for issue in old_report["issues"]}
-    assert old_report["schema_version"] == 4 and old_report["supported_schema_version"] == 7
+    assert old_report["schema_version"] == 4 and old_report["supported_schema_version"] == 8
     assert "migration_state" in old_codes and "observation_contract_integrity_check" not in old_codes
     assert before == after
 
