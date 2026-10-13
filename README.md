@@ -41,13 +41,13 @@ available through the CLI and local API as preview workflows. Storyboarder recor
 and connections; its camera plans are authored guides, not a motion solver. It does not
 render a film or integrate with Blender.
 
-People use the **browser** for visual planning and the **full-screen terminal desk** for
-keyboard authoring. The browser includes the **Blocking & lighting** workspace; the CLI
-supports its versioned plans, shot bindings, reviews, and exports. The TUI remains a
-separate keyboard desk without this visual editor. The **CLI** also supports repeatable
-work by scripts and agents with structured JSON output. All three work with the same
-project data. After installation, core authoring and exports work offline. There is no
-account, subscription, or bundled image-generation provider.
+Agents and scripts can create and manage spatial plans through structured CLI commands;
+the browser provides a visual companion for inspecting and editing those plans. People
+also use the browser for visual planning and the **full-screen terminal desk** for
+keyboard authoring. The TUI remains a separate keyboard desk without the visual editor.
+The **CLI** supports repeatable work by scripts and agents with structured JSON output.
+All three work with the same project data. After installation, core authoring and exports
+work offline. There is no account, subscription, or bundled image-generation provider.
 
 ## What you can do
 
@@ -79,25 +79,33 @@ fictional demo graphics; they are examples of the workflow, not finished shot ar
 
 ## Spatial blocking and lighting
 
-In the browser, open **Blocking & lighting**, select a scene, and start a blank plan or
-the built-in **Doorway example**. Place actor, prop, and wall proxies with marks, cameras,
-lights, and modifiers; use beats and timed tracks with the scrubber to inspect the action.
-**Review & save** records an immutable plan version.
+Agents and scripts can author and manage versioned plans through the structured spatial
+CLI. Start with the offline **Doorway to table** fixture and use preview/apply commands to
+save a version; follow the [CLI spatial workflow](docs/CLI.md#spatial-blocking-and-lighting).
 
-Select a shot to bind an exact saved plan version, camera, and action-time sample. Choose
-an explicit mapping when action time needs to map to shot time; the binding leaves the
-shot's written duration unchanged. A spatial review is an authored checklist tied to that
-binding and an existing v1 observation contract. It does not verify physical results or
-approve a storyboard frame.
+The browser's **Blocking & lighting** workspace is a visual companion for inspecting and
+editing the same plans. Open a scene to start a blank plan or load the built-in **Doorway
+example**. Place actor, prop, and wall proxies with marks, cameras, lights, and modifiers;
+use beats and timed tracks with the scrubber to inspect the action. **Review & save**
+records an immutable plan version.
 
-The CLI provides plan, binding, review, export, transfer, and recovery operations as
-structured commands; it does not render the browser editor. Get the offline **Doorway to
-table** plan payload with `spatial fixture --scene-id SCENE_ID`, then follow the
-[CLI spatial workflow](docs/CLI.md#spatial-blocking-and-lighting). Export SVG, PNG, or PDF
-diagrams for an exact setup or shot binding, and use the native package commands to
-preview a transfer before applying it. The browser can recover an unsaved
-local draft; `spatial doctor` checks spatial integrity and `spatial backup` creates a
-recovery point.
+![Blocking & lighting editor with the saved Doorway to table plan, shot, camera coverage, and lighting cues](docs/images/spatial-blocking-desktop.png)
+<p align="center"><em>The browser visualizes the Doorway plan authored through the structured CLI. Agents and scripts use CLI commands to create and manage exact versions.</em></p>
+
+![Blocking & lighting at four seconds with the key light selected and the 1.6 metre coverage plane visible](docs/images/spatial-lighting-desktop.png)
+<p align="center"><em>At 4 seconds and a 1.6 m plane, the same plan shows authored camera and lighting coverage. Colors and envelopes are schematic intent, not measured exposure.</em></p>
+
+A shot can bind an exact saved plan version, camera, and action-time sample. Choose an
+explicit mapping when action time needs to map to shot time; the binding leaves the shot's
+written duration unchanged. A spatial review is an authored checklist tied to that binding
+and an existing v1 observation contract. It does not verify physical results or approve
+a storyboard frame.
+
+The structured CLI also supports shot bindings, authored reviews, diagram exports,
+portable transfer, and recovery. Export SVG, PNG, or PDF diagrams for an exact setup or
+shot binding, and use the native package commands to preview a transfer before applying
+it. The browser can recover an unsaved local draft; `spatial doctor` checks spatial
+integrity and `spatial backup` creates a recovery point.
 
 Lighting and coverage diagrams are schematic planning guides. They show authored intent,
 not photometric exposure, rendered light transport, or shadow results.
