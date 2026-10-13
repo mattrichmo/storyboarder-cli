@@ -368,7 +368,9 @@ class Repository:
         conn.execute("INSERT INTO events(entity_id,action,details,created_at) VALUES (?,?,?,?)", (entity_id, action, dumps(details or {}), now()))
 
     def snapshot(self):
-        with self.transaction(False) as conn:
+        # A diagnostic read must not open a write-capable connection and trigger
+        # a WAL checkpoint when inspecting an incompatible/corrupt project.
+        with self.readonly_transaction() as conn:
             result = {}
             for table in sorted(SNAPSHOT_TABLES):
                 result[table] = [unpack(r) for r in conn.execute(f"SELECT * FROM {table} ORDER BY id")]

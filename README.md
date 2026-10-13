@@ -5,8 +5,8 @@
 <h1 align="center">Storyboarder</h1>
 
 <p align="center">
-  <strong>A local production desk for stories, references, and frames.</strong><br>
-  Plan your shots. Keep your references connected. Build a storyboard you can share.
+  <strong>An agent-first, local production desk for stories, references, and frames.</strong><br>
+  Agents and filmmakers plan shots, connect references, and build storyboards from the same project data.
 </p>
 
 <p align="center">
@@ -30,24 +30,48 @@
 
 <p align="center"><em>The story flow canvas, using the included fictional Winter Station demo.</em></p>
 
-Storyboarder is a local storyboard planning desk for filmmakers, storyboard artists, and
-small production teams. Organize sequences into scenes, then plan multiple shots and
-angles in each scene. Collect character, location, prop, and other references; record
-framing and camera intent; compare storyboard images; and export boards and production
-handoffs. The spatial planner adds timed actor and prop blocking, camera plans, lighting
-intent, and coverage diagrams. Each project lives in a folder you choose. A shot can link
-to source elements in an imported screenplay. Source links and production provenance are
-available through the CLI and local API as preview workflows. Storyboarder records intent
-and connections; its camera plans are authored guides, not a motion solver. It does not
-render a film or integrate with Blender.
+Storyboarder is a local storyboard planning desk built for agentic production workflows
+and film teams. Its center is a typed, allowlisted command catalog over a local SQLite
+project: agents inspect and update production data through the structured CLI or
+versioned loopback API, while filmmakers use the browser and full-screen terminal desk
+over the same application services. Plan sequences, scenes, and shots; collect character,
+location, prop, and other references; compare storyboard images; and export boards and
+production handoffs.
 
-Agents and scripts can create and manage spatial plans through structured CLI commands;
-the browser provides a visual companion for inspecting and editing those plans. People
-also use the browser for visual planning and the **full-screen terminal desk** for
-keyboard authoring. The TUI remains a separate keyboard desk without the visual editor.
-The **CLI** supports repeatable work by scripts and agents with structured JSON output.
-All three work with the same project data. After installation, core authoring and exports
-work offline. There is no account, subscription, or bundled image-generation provider.
+The spatial planner adds timed actor and prop blocking, camera plans, lighting intent, and
+coverage diagrams. Storyboarder records authored intent and connections; it is not a
+motion solver, film renderer, or Blender integration. A shot can link to source elements
+in an imported screenplay. Source links and production provenance are available through
+the CLI and local API as preview workflows.
+
+The agent-facing contract is documented and machine-readable: the CLI supports JSON and
+JSON Lines, and the API publishes its OpenAPI schema, command catalog, and typed authoring
+fields. Updates carry record revisions, so stale writes return a conflict instead of
+silently replacing newer work. Context composition includes the source and provenance of
+inherited direction.
+
+Agent integrations run against your local project. The API binds to loopback and uses a
+launch-scoped write token. Optional external scripts must be registered explicitly; runs,
+generated outputs, and imports have review and approval steps. The package stores project
+data locally without an account, subscription, cloud database, or bundled image-generation
+provider. Current agent entry points are the CLI and local API; an MCP server is not
+included. See [Local API](docs/API.md) and [External-script workflow](docs/AUTOMATION.md).
+Core authoring and exports work offline.
+
+## Connected production workspace
+
+The **Production** workspace and `storyboarder production` commands add a revision-pinned
+production graph: scripts and exact passages, reusable locations, shared scene action,
+camera/lighting setups, shots, storyboard panels, takes and editorial selections. The
+CLI and viewer use the same transactional mutation rules, explicit alternative selection,
+change-impact checks and readiness reports. Schema **009** is additive; older workspaces
+and records remain intact.
+
+Start with the [connected CLI-to-viewer walkthrough](docs/CONNECTED_PRODUCTION.md).
+The [18-area implementation matrix](docs/PRODUCTION_IMPLEMENTATION_STATUS.md) distinguishes
+implemented behavior from advanced features still requiring work; the new proxy viewer
+is not a physical renderer or a bundled autonomous creative agent.
+See [executed validation and environment limits](docs/PRODUCTION_VALIDATION.md).
 
 ## What you can do
 

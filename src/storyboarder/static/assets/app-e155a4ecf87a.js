@@ -1,0 +1,6956 @@
+(function(){'use strict';
+const modules={"App":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.App = App;
+const react_1 = __importStar(require("./react"));
+const api_1 = require("./api");
+const utils_1 = require("./utils");
+const Primitives_1 = require("./components/Primitives");
+const ActionDialog_1 = require("./components/ActionDialog");
+const Inspector_1 = require("./components/Inspector");
+const Canvas_1 = require("./canvas/Canvas");
+const SpatialEditor_1 = require("./spatial/SpatialEditor");
+const ProductionWorkspace_1 = require("./production/ProductionWorkspace");
+const ConnectedProduction = (props) => react_1.default.createElement(ProductionWorkspace_1.ProductionBoundary, null,
+    react_1.default.createElement(ProductionWorkspace_1.ProductionWorkspace, { ...props }));
+const Pages_1 = require("./pages/Pages");
+const NAV = [['production', 'Production workspace', 'graph'], ['overview', 'Project overview', 'home'], ['intake', 'Image intake', 'inbox'], ['library', 'Reference library', 'library'], ['outline', 'Story outline', 'outline'], ['guide', 'Story guide', 'guide'], ['editor', 'Scene & shot editor', 'edit'], ['canvas', 'Story canvas', 'graph'], ['blocking', 'Blocking & lighting', 'graph'], ['frames', 'Storyboard frames', 'frames'], ['composition', 'Board & exports', 'export'], ['automation', 'Image tools', 'automation'], ['settings', 'Project care', 'settings']];
+function App() {
+    const [session, setSession] = (0, react_1.useState)(null), [meta, setMeta] = (0, react_1.useState)(null), [state, setState] = (0, react_1.useState)(null);
+    const [page, setPage] = (0, react_1.useState)(location.hash.slice(1) || 'workspace'), [selected, setSelected] = (0, react_1.useState)(null), [loading, setLoading] = (0, react_1.useState)(true), [error, setError] = (0, react_1.useState)('');
+    const [dialog, setDialog] = (0, react_1.useState)(null), [resultModal, setResultModal] = (0, react_1.useState)(null), [result, setResult] = (0, react_1.useState)(null), [palette, setPalette] = (0, react_1.useState)(false), [paletteQuery, setPaletteQuery] = (0, react_1.useState)(''), [toast, setToast] = (0, react_1.useState)(null), [mobileNav, setMobileNav] = (0, react_1.useState)(false), [changed, setChanged] = (0, react_1.useState)(false), [writeRefreshError, setWriteRefreshError] = (0, react_1.useState)(null);
+    const canvasDrafts = (0, react_1.useRef)({});
+    (0, react_1.useEffect)(() => { const before = (e) => { if (Object.values(canvasDrafts.current).some(draft => draft.dirty)) {
+        e.preventDefault();
+        e.returnValue = '';
+    } }; window.addEventListener('beforeunload', before); return () => window.removeEventListener('beforeunload', before); }, []);
+    const navRef = (0, react_1.useRef)(null), mobileNavOpener = (0, react_1.useRef)(null), mobileNavWasOpen = (0, react_1.useRef)(false);
+    (0, react_1.useEffect)(() => { const media = window.matchMedia('(max-width:800px)'); const update = () => { if (navRef.current)
+        navRef.current.inert = media.matches && !mobileNav; }; update(); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, [mobileNav]);
+    (0, react_1.useEffect)(() => { if (mobileNav) {
+        mobileNavWasOpen.current = true;
+        const first = navRef.current?.querySelector('button:not(:disabled)');
+        first?.focus();
+        return;
+    } if (mobileNavWasOpen.current) {
+        mobileNavWasOpen.current = false;
+        const opener = mobileNavOpener.current;
+        mobileNavOpener.current = null;
+        if (opener?.isConnected && !opener.matches(':disabled') && !opener.closest('[inert]') && opener.getClientRects().length > 0)
+            opener.focus({ preventScroll: true });
+    } }, [mobileNav]);
+    const stateRef = (0, react_1.useRef)(null);
+    stateRef.current = state;
+    const dialogRef = (0, react_1.useRef)(dialog);
+    dialogRef.current = dialog;
+    const pageRef = (0, react_1.useRef)(page);
+    pageRef.current = page;
+    const canvasNavigationGuard = (0, react_1.useRef)(null);
+    const registerCanvasNavigationGuard = (0, react_1.useCallback)((guard) => { canvasNavigationGuard.current = guard; return () => { if (canvasNavigationGuard.current === guard)
+        canvasNavigationGuard.current = null; }; }, []);
+    function notify(message, outcome = 'success') { setToast({ message, outcome }); }
+    function commitNavigation(next) { if (next !== pageRef.current) {
+        if (location.hash !== `#${next}`)
+            location.hash = next;
+        pageRef.current = next;
+        setPage(next);
+    } setMobileNav(false); }
+    function go(next) { if (next === pageRef.current) {
+        setMobileNav(false);
+        return;
+    } const commit = () => commitNavigation(next); const guard = canvasNavigationGuard.current; if (guard && !guard(commit)) {
+        setMobileNav(false);
+        return;
+    } commit(); }
+    const stateLoadEpoch = (0, react_1.useRef)(0), stateLoadAbort = (0, react_1.useRef)(null);
+    (0, react_1.useEffect)(() => () => { stateLoadEpoch.current++; stateLoadAbort.current?.abort(); }, []);
+    async function load(id) { const epoch = ++stateLoadEpoch.current; stateLoadAbort.current?.abort(); const controller = new AbortController(); stateLoadAbort.current = controller; const next = await (0, api_1.api)((0, api_1.projectPath)(id, '/state'), 'GET', undefined, controller.signal); if (epoch !== stateLoadEpoch.current)
+        throw new DOMException('Superseded project read', 'AbortError'); setState(next); setChanged(false); return next; }
+    async function refresh() { const id = stateRef.current?.project.id; if (!id)
+        throw new Error('Open a project first.'); const next = await load(id); setWriteRefreshError(current => current?.projectId === id ? null : current); return next; }
+    async function refreshSession() { const s = await (0, api_1.openSession)(); setSession(s); setMeta(await (0, api_1.api)('/meta')); }
+    async function open(id) { setError(''); setLoading(true); try {
+        await (0, api_1.api)('/active', 'POST', { id });
+        const previousId = stateRef.current?.project.id;
+        await load(id);
+        if (previousId !== id)
+            setWriteRefreshError(null);
+        setSelected(null);
+        setResult(null);
+        await refreshSession();
+        go('overview');
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setLoading(false);
+    } }
+    (0, react_1.useEffect)(() => { let alive = true; (async () => { try {
+        const s = await (0, api_1.openSession)();
+        const m = await (0, api_1.api)('/meta');
+        if (!alive)
+            return;
+        setSession(s);
+        setMeta(m);
+        if (s.active_project_id)
+            await load(s.active_project_id);
+        else
+            go('workspace');
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        if (alive)
+            setLoading(false);
+    } })(); const h = () => { const next = location.hash.slice(1) || 'workspace'; if (next === pageRef.current)
+        return; const previous = pageRef.current; const commit = () => commitNavigation(next); const guard = canvasNavigationGuard.current; if (guard && !guard(commit)) {
+        history.replaceState(null, '', `${location.pathname}${location.search}${previous ? `#${previous}` : ''}`);
+        return;
+    } commit(); }; window.addEventListener('hashchange', h); return () => { alive = false; window.removeEventListener('hashchange', h); }; }, []);
+    (0, react_1.useEffect)(() => { if (!toast)
+        return; const timer = setTimeout(() => setToast(null), 6500); return () => clearTimeout(timer); }, [toast]);
+    (0, react_1.useEffect)(() => { const keys = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPalette(v => !v);
+    } if (e.key === 'Escape')
+        setMobileNav(false); }; window.addEventListener('keydown', keys); return () => window.removeEventListener('keydown', keys); }, []);
+    // A background read only marks stale UI. It never overwrites a modal's unsaved edits.
+    (0, react_1.useEffect)(() => { let running = false; const check = async () => { const current = stateRef.current; if (!current || document.hidden || running)
+        return; running = true; try {
+        const next = await (0, api_1.api)((0, api_1.projectPath)(current.project.id, '/changes'));
+        if (stateRef.current?.project.id !== current.project.id)
+            return;
+        if (next.event_id !== (current.events[0]?.id || 0))
+            setChanged(true);
+    }
+    catch { }
+    finally {
+        running = false;
+    } }; const timer = setInterval(check, 6500); window.addEventListener('focus', check); return () => { clearInterval(timer); window.removeEventListener('focus', check); }; }, []);
+    function action(name, defaults = {}) { const command = meta?.commands.find(c => c.name === name); if (!command) {
+        notify('That action is not available here.');
+        return;
+    } if (!state) {
+        notify('Open a project first.');
+        return;
+    } setDialog({ command, defaults }); }
+    async function done(data, name) { const command = meta?.commands.find(c => c.name === name), label = command?.label || 'Changes', projectId = stateRef.current?.project.id; const readOnly = !!command?.read_only, exportAction = name.startsWith('export.'), failed = data?.status === 'failed', cancelled = data?.status === 'cancelled', inProgress = ['queued', 'running'].includes(data?.status); const outcomeMessage = failed ? 'The image tool run needs attention.' : cancelled ? 'The image tool run was stopped.' : name === 'job.run' && inProgress ? 'The image tool is still running.' : name === 'job.run' && data?.status === 'succeeded' ? 'The image tool run finished.' : 'Your changes were saved.'; let refreshFailure = ''; if (!readOnly && !exportAction && projectId) {
+        try {
+            await refresh();
+        }
+        catch (e) {
+            refreshFailure = e?.message || 'The project view could not be refreshed.';
+            if (stateRef.current?.project.id === projectId)
+                setWriteRefreshError({ projectId, message: refreshFailure, summary: outcomeMessage });
+        }
+    } if (exportAction) {
+        setResult(data);
+        setResultModal({ title: 'Export ready', data });
+    }
+    else if (readOnly) {
+        setResultModal({ title: label || 'Project details', data });
+    }
+    else if (refreshFailure) {
+        const outcome = failed ? 'failed' : cancelled ? 'cancelled' : name === 'job.run' && inProgress ? 'running' : 'success';
+        notify(`${outcomeMessage} The project view could not refresh; use Retry project refresh.`, outcome);
+    }
+    else if (failed) {
+        notify('The image tool needs attention. Review its run details.', 'failed');
+    }
+    else if (cancelled) {
+        notify('The image tool run was stopped.', 'cancelled');
+    }
+    else if (name === 'job.run' && inProgress) {
+        notify('The image tool is still running. You can review its status in Recent activity.', 'running');
+    }
+    else if (name === 'job.run' && data?.status === 'succeeded') {
+        notify('The image tool run finished. Review its results.');
+    }
+    else {
+        notify(`${label} saved to the project.`);
+    } }
+    async function retryWriteRefresh(warning) { if (stateRef.current?.project.id !== warning.projectId)
+        return; try {
+        await refresh();
+    }
+    catch (e) {
+        if (stateRef.current?.project.id === warning.projectId)
+            setWriteRefreshError({ ...warning, message: e?.message || 'The project view could not be refreshed.' });
+    } }
+    const props = state && session && meta ? { state, session, meta, action, select: setSelected, selected, refresh, notify, go, result, setResult } : null;
+    const screens = { overview: Pages_1.OverviewPage, intake: Pages_1.IntakePage, library: Pages_1.LibraryPage, outline: Pages_1.OutlinePage, guide: Pages_1.GuidePage, editor: Pages_1.EditorPage, frames: Pages_1.FramesPage, composition: Pages_1.CompositionPage, settings: Pages_1.SettingsPage, automation: Pages_1.AutomationPage, blocking: SpatialEditor_1.SpatialEditor, production: ConnectedProduction };
+    const Page = screens[page];
+    return react_1.default.createElement("div", { className: "app-shell" },
+        react_1.default.createElement("a", { className: "skip-link", href: "#main-content", onClick: (e) => { e.preventDefault(); document.getElementById('main-content')?.focus(); } }, "Skip to workspace"),
+        react_1.default.createElement("aside", { ref: navRef, className: `navigation ${mobileNav ? 'is-open' : ''}`, "aria-label": "Main navigation" },
+            react_1.default.createElement("button", { className: "wordmark", disabled: loading, onClick: () => go('workspace'), "aria-label": "Storyboarder workspace" },
+                react_1.default.createElement("span", { className: "brand-mark" },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "grid", size: 23 })),
+                react_1.default.createElement("span", null,
+                    "Storyboarder",
+                    react_1.default.createElement("small", null, "LOCAL PRODUCTION DESK"))),
+            react_1.default.createElement("button", { disabled: loading, className: `workspace-switch ${page === 'workspace' ? 'active' : ''}`, onClick: () => go('workspace') },
+                react_1.default.createElement(Primitives_1.Icon, { name: "grid" }),
+                react_1.default.createElement("span", null, "Workspace")),
+            react_1.default.createElement("div", { className: "nav-project" },
+                react_1.default.createElement("span", { className: "eyebrow" }, "Current project"),
+                react_1.default.createElement("strong", { title: state?.project.title }, state ? (0, utils_1.displayTitle)(state.project.title) : 'No project open'),
+                react_1.default.createElement("small", null, state ? 'Saved on this computer' : 'Create a project to begin')),
+            react_1.default.createElement("nav", null, NAV.map(([key, label, icon]) => react_1.default.createElement("button", { key: key, "aria-label": label, className: page === key ? 'active' : '', disabled: loading || !state, onClick: () => go(key), "aria-current": page === key ? 'page' : undefined },
+                react_1.default.createElement(Primitives_1.Icon, { name: icon }),
+                react_1.default.createElement("span", null, label),
+                key === 'intake' && state?.project.counts.intake ? react_1.default.createElement("span", { className: "nav-count" }, state.project.counts.intake) : null))),
+            react_1.default.createElement("div", { className: "nav-bottom" },
+                react_1.default.createElement("button", { "data-action-search": true, onClick: () => setPalette(true), disabled: !state },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
+                    "Search actions ",
+                    react_1.default.createElement("kbd", null, "\u2318/Ctrl K")),
+                react_1.default.createElement("p", null,
+                    react_1.default.createElement("span", { className: "local-dot" }),
+                    "On this computer \u00B7 v",
+                    session?.version || '1.1.0'))),
+        mobileNav && react_1.default.createElement("button", { className: "nav-scrim", onClick: () => setMobileNav(false), "aria-label": "Close navigation" }),
+        react_1.default.createElement("div", { className: "app-column" },
+            react_1.default.createElement("header", { className: "topbar" },
+                react_1.default.createElement("button", { className: "mobile-menu icon-button", "aria-label": "Open navigation", onClick: (e) => { mobileNavOpener.current = e.currentTarget; setMobileNav(true); } },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "menu" })),
+                react_1.default.createElement("div", { className: "breadcrumbs" },
+                    react_1.default.createElement("button", { onClick: () => go('workspace') }, "Workspace"),
+                    state && react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("span", null, "/"),
+                        react_1.default.createElement("button", { onClick: () => go('overview') }, (0, utils_1.displayTitle)(state.project.title))),
+                    page !== 'workspace' && react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("span", null, "/"),
+                        react_1.default.createElement("strong", null, NAV.find(n => n[0] === page)?.[1] || 'Project overview'))),
+                react_1.default.createElement("div", { className: "topbar-actions" },
+                    state && react_1.default.createElement("button", { className: "text-button", onClick: () => refresh().then(() => notify('Project refreshed.')).catch(e => setError(e.message)) },
+                        react_1.default.createElement(Primitives_1.Icon, { name: "refresh" }),
+                        react_1.default.createElement("span", null, "Refresh")),
+                    react_1.default.createElement("span", { className: "local-indicator" }, "On this computer"))),
+            changed && react_1.default.createElement("div", { className: "external-change", role: "status" },
+                "This project was updated in the terminal or another window. Your unsaved edits are safe. ",
+                react_1.default.createElement("button", { onClick: () => refresh().catch(e => setError(e.message)) }, "Refresh project")),
+            react_1.default.createElement("div", { className: `work-area ${selected && page !== 'workspace' && page !== 'blocking' && page !== 'production' ? 'with-inspector' : ''}` },
+                react_1.default.createElement("main", { id: "main-content", tabIndex: -1, className: `main-content ${page === 'canvas' ? 'canvas-main' : ''}` },
+                    error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error },
+                        react_1.default.createElement("button", { onClick: () => location.reload() }, "Try again")),
+                    writeRefreshError && state && writeRefreshError.projectId === state.project.id && react_1.default.createElement("div", { className: "external-change", role: "status" },
+                        writeRefreshError.summary,
+                        " The project view could not refresh. ",
+                        writeRefreshError.message,
+                        react_1.default.createElement("button", { onClick: () => void retryWriteRefresh(writeRefreshError) }, "Retry project refresh")),
+                    loading ? react_1.default.createElement("div", { className: "loading-state", role: "status" },
+                        react_1.default.createElement(Primitives_1.Icon, { name: "grid", size: 30 }),
+                        react_1.default.createElement("h2", null, "Opening your project\u2026")) : session && meta && (page === 'workspace' || !state) ? react_1.default.createElement(Pages_1.WorkspacePage, { session: session, projects: session.projects, onOpen: open, onRefresh: refreshSession }) : props && page === 'canvas' ? react_1.default.createElement(Canvas_1.Canvas, { key: props.state.project.id, draft: canvasDrafts.current[props.state.project.id], onDraftChange: draft => { canvasDrafts.current[props.state.project.id] = draft; }, state: props.state, selected: selected, onSelect: setSelected, action: action, refresh: refresh, notify: notify, registerNavigationGuard: registerCanvasNavigationGuard }) : props && Page ? react_1.default.createElement(Page, { key: ['blocking', 'production'].includes(page) ? props.state.project.id : page, ...props, registerNavigationGuard: registerCanvasNavigationGuard }) : props ? react_1.default.createElement(Pages_1.OverviewPage, { ...props }) : !error ? react_1.default.createElement(Primitives_1.Empty, { title: "Open a project" }, "Choose a project from Workspace or create a new one.") : null),
+                state && selected && page !== 'workspace' && page !== 'blocking' && page !== 'production' && react_1.default.createElement(Inspector_1.Inspector, { state: state, id: selected, onClose: () => setSelected(null), onSelect: setSelected, action: action })),
+            react_1.default.createElement("footer", { className: "app-footer" },
+                page === 'canvas' && react_1.default.createElement("span", null, "Drag cards to arrange this view. The story sequence stays the same."),
+                state && react_1.default.createElement("span", null,
+                    state.media.length,
+                    " reference images \u00B7 ",
+                    state.frames.filter(f => f.state === 'approved').length,
+                    " approved storyboard frames"))),
+        toast && react_1.default.createElement("div", { className: "toast", role: "status", "data-outcome": toast.outcome },
+            react_1.default.createElement(Primitives_1.Icon, { name: toast.outcome === 'cancelled' ? 'stop' : toast.outcome === 'failed' ? 'warning' : toast.outcome === 'running' ? 'refresh' : 'check' }),
+            react_1.default.createElement("span", null, toast.message),
+            react_1.default.createElement("button", { "aria-label": "Dismiss notification", onClick: () => setToast(null) },
+                react_1.default.createElement(Primitives_1.Icon, { name: "close", size: 16 }))),
+        dialog && state && meta && react_1.default.createElement(ActionDialog_1.ActionDialog, { key: dialog.command.name + JSON.stringify(dialog.defaults), command: dialog.command, defaults: dialog.defaults, state: state, meta: meta, onClose: () => setDialog(null), onDone: done, onReload: refresh }),
+        resultModal && react_1.default.createElement(Primitives_1.Modal, { title: resultModal.title, onClose: () => setResultModal(null), wide: true },
+            react_1.default.createElement("div", { className: "modal-body" }, resultModal.data?.archive && state ? react_1.default.createElement(Primitives_1.ExportLinks, { project: state.project.id, result: resultModal.data }) : resultModal.data?.chain ? react_1.default.createElement(Primitives_1.ContextView, { value: resultModal.data }) : resultModal.data?.can_delete !== undefined ? react_1.default.createElement("div", { className: "usage-summary" },
+                react_1.default.createElement("p", null, resultModal.data.can_delete ? 'This item is not used elsewhere.' : 'This item is used in these places:'),
+                react_1.default.createElement("ul", null, Object.entries(resultModal.data).filter(([key, value]) => key !== 'can_delete' && Array.isArray(value) && value.length > 0).map(([key, value]) => react_1.default.createElement("li", { key: key },
+                    (0, utils_1.human)(key),
+                    " \u00B7 ",
+                    value.length)))) : react_1.default.createElement("div", { className: "muted" },
+                react_1.default.createElement("p", null, "Open the related project page to review these details.")))),
+        palette && meta && react_1.default.createElement(Primitives_1.Modal, { title: "Search actions", onClose: () => setPalette(false), wide: true },
+            react_1.default.createElement("div", { className: "modal-body" },
+                react_1.default.createElement("label", { className: "search" },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
+                    react_1.default.createElement("input", { autoFocus: true, placeholder: "Find an action\u2026", "aria-label": "Find an action", value: paletteQuery, onChange: (e) => setPaletteQuery(e.target.value) })),
+                react_1.default.createElement("div", { className: "command-list" }, meta.commands.filter(c => !c.read_only && c.browser && !['entity.update', 'canvas.save', 'project.sync'].includes(c.name) && c.label.toLowerCase().includes(paletteQuery.toLowerCase())).map(c => react_1.default.createElement("button", { key: c.name, onClick: () => { setPalette(false); action(c.name); } },
+                    react_1.default.createElement("span", null, c.label),
+                    react_1.default.createElement("small", null, c.destructive ? 'Confirmation required' : '')))),
+                !meta.commands.some(c => !c.read_only && c.browser && !['entity.update', 'canvas.save', 'project.sync'].includes(c.name) && c.label.toLowerCase().includes(paletteQuery.toLowerCase())) && react_1.default.createElement("p", { className: "muted" }, "No matching actions."))));
+}
+
+},
+"api":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.runCommand = exports.jobImageUrl = exports.exportUrl = exports.originalUrl = exports.mediaUrl = exports.projectPath = exports.ApiError = void 0;
+exports.api = api;
+exports.openSession = openSession;
+let launchToken = '';
+class ApiError extends Error {
+    constructor(code, message, details = {}, status = 0) {
+        super(message);
+        this.code = code;
+        this.details = details;
+        this.status = status;
+    }
+}
+exports.ApiError = ApiError;
+async function api(path, method = 'GET', data, signal) {
+    if (!path.startsWith('/') || path.startsWith('//') || path.includes('\\') || path.includes('://'))
+        throw new ApiError('invalid_request', 'Invalid local API path.');
+    method = method.toUpperCase();
+    if (!['GET', 'POST', 'PUT', 'PATCH', 'DELETE'].includes(method))
+        throw new ApiError('invalid_request', 'Unsupported HTTP method.');
+    const headers = { 'Accept': 'application/json' };
+    if (method !== 'GET')
+        headers['X-Storyboarder-Token'] = launchToken;
+    const multipart = data instanceof FormData;
+    if (data !== undefined && !multipart)
+        headers['Content-Type'] = 'application/json';
+    const controller = new AbortController();
+    let timedOut = false;
+    const abort = () => controller.abort();
+    signal?.addEventListener('abort', abort, { once: true });
+    if (signal?.aborted)
+        controller.abort();
+    const timeout = setTimeout(() => { timedOut = true; controller.abort(); }, 90000);
+    try {
+        const response = await fetch('/api/v1' + path, { method, headers, body: data === undefined ? undefined : multipart ? data : JSON.stringify(data), credentials: 'same-origin', cache: 'no-store', signal: controller.signal });
+        let result;
+        try {
+            result = await response.json();
+        }
+        catch (e) {
+            if (controller.signal.aborted)
+                throw e;
+            throw new ApiError('connection', 'Storyboarder returned an unreadable response. A write may have completed; retry only with the same operation ID.', {}, response.status);
+        }
+        if (!response.ok) {
+            const code = result?.error?.code || 'request';
+            const messages = { revision_conflict: 'This item changed elsewhere. Your edits are still here; refresh the project before saving again.', not_found: 'This item is no longer available. Refresh the project and try again.', unsafe_path: 'Choose a file inside the project folder.', in_use: 'This item is still connected to other records. Review its dependencies or archive it instead.', invalid_request: 'Some details need attention. Review the form and try again.', internal: 'Storyboarder could not finish that action. Check Project care if the problem continues.' };
+            throw new ApiError(code, messages[code] || result?.error?.message || 'The request could not be completed.', result?.error?.details || {}, response.status);
+        }
+        return result;
+    }
+    catch (error) {
+        if (timedOut)
+            throw new ApiError('timeout', 'The request timed out. A write may already have completed. Retry the same operation ID to retrieve its receipt, rather than create a duplicate.');
+        if (error instanceof ApiError)
+            throw error;
+        if (signal?.aborted || (error instanceof Error && error.name === 'AbortError'))
+            throw error;
+        throw new ApiError('connection', 'Could not reach Storyboarder on this computer. A write may already have completed; retry with the same operation ID.');
+    }
+    finally {
+        clearTimeout(timeout);
+        signal?.removeEventListener('abort', abort);
+    }
+}
+async function openSession() { const session = await api('/session'); launchToken = session.token; return session; }
+const projectPath = (id, path = '') => `/projects/${encodeURIComponent(id)}${path}`;
+exports.projectPath = projectPath;
+const mediaUrl = (project, media, size = 480) => `/api/v1/projects/${encodeURIComponent(project)}/media/${encodeURIComponent(media)}?size=${size}`;
+exports.mediaUrl = mediaUrl;
+const originalUrl = (project, media) => `/api/v1/projects/${encodeURIComponent(project)}/media/${encodeURIComponent(media)}`;
+exports.originalUrl = originalUrl;
+const exportUrl = (project, path, download = false) => `/api/v1/projects/${encodeURIComponent(project)}/files/${path.split('/').map(encodeURIComponent).join('/')}${download ? '?download=true' : ''}`;
+exports.exportUrl = exportUrl;
+const jobImageUrl = (project, job, key) => `/api/v1/projects/${encodeURIComponent(project)}/jobs/${encodeURIComponent(job)}/outputs/${encodeURIComponent(key)}`;
+exports.jobImageUrl = jobImageUrl;
+const runCommand = (project, name, payload = {}, signal) => api((0, exports.projectPath)(project, `/commands/${encodeURIComponent(name)}`), 'POST', payload, signal);
+exports.runCommand = runCommand;
+
+},
+"canvas/Canvas":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Canvas = Canvas;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const utils_1 = require("../utils");
+const Primitives_1 = require("../components/Primitives");
+const geometry_1 = require("./geometry");
+function clone(value) { return JSON.parse(JSON.stringify(value)); }
+function flatten(value, path = [], result = new Map()) {
+    const isObject = value !== null && typeof value === 'object' && !Array.isArray(value);
+    const entries = isObject ? Object.entries(value) : [];
+    if (entries.length) {
+        for (const [key, child] of entries)
+            flatten(child, [...path, key], result);
+    }
+    else if (path.length)
+        result.set(JSON.stringify(path), { path, value: { present: true, value: clone(value) } });
+    return result;
+}
+function valueAt(fields, key) { return fields.get(key)?.value || { present: false }; }
+function stableValue(value) { if (Array.isArray(value))
+    return value.map(stableValue); if (value && typeof value === 'object')
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, stableValue(value[key])])); return value; }
+function sameValue(a, b) { return a.present === b.present && (!a.present || JSON.stringify(stableValue(a.value)) === JSON.stringify(stableValue(b.value))); }
+function writePath(target, path, entry) { let parent = target; for (const key of path.slice(0, -1)) {
+    if (!parent[key] || typeof parent[key] !== 'object' || Array.isArray(parent[key]))
+        parent[key] = {};
+    parent = parent[key];
+} const leaf = path[path.length - 1]; if (!entry.present)
+    delete parent[leaf];
+else
+    parent[leaf] = clone(entry.value); }
+function compareLayouts(base, local, saved) {
+    const baseFields = flatten(base || {}), localFields = flatten(local), savedFields = flatten(saved), keys = new Set([...baseFields.keys(), ...localFields.keys(), ...savedFields.keys()]);
+    const merged = clone(base || local), changes = [];
+    for (const key of keys) {
+        const path = (localFields.get(key) || savedFields.get(key) || baseFields.get(key)).path;
+        const before = valueAt(baseFields, key), ours = valueAt(localFields, key), theirs = valueAt(savedFields, key);
+        const localChanged = !sameValue(ours, before), savedChanged = !sameValue(theirs, before), conflict = base ? localChanged && savedChanged && !sameValue(ours, theirs) : !sameValue(ours, theirs);
+        const selected = conflict ? ours : localChanged ? ours : theirs;
+        writePath(merged, path, selected);
+        if (!sameValue(ours, theirs) || localChanged || savedChanged) {
+            changes.push({ key, path, base: before, local: ours, saved: theirs, conflict, label: path.join('.') });
+        }
+    }
+    return { merged, changes };
+}
+function applyNewLocalEdits(reference, current, saved) { const before = flatten(reference), now = flatten(current), result = clone(saved); for (const key of new Set([...before.keys(), ...now.keys()])) {
+    const old = valueAt(before, key), next = valueAt(now, key);
+    if (!sameValue(old, next)) {
+        const path = (now.get(key) || before.get(key)).path;
+        writePath(result, path, next);
+    }
+} return result; }
+function asLayoutDraft(layout) { return { name: layout.name, mode: layout.mode, positions: clone(layout.positions), settings: clone(layout.settings) }; }
+function draftFromLayoutResult(layout) { return { id: layout.id, name: layout.name, mode: layout.mode, positions: clone(layout.positions), settings: clone(layout.settings), revision: layout.revision, updated_at: layout.updated_at }; }
+function edgeLabel(edge) {
+    if (edge.kind === 'relationship')
+        return (0, utils_1.human)(edge.label);
+    if (edge.kind === 'assignment') {
+        const [role, selection] = edge.label.split(' · ');
+        return `${(0, utils_1.roleLabel)(role)} · ${selection === 'specific image selected' ? 'Specific image selected' : 'No specific image selected'}`;
+    }
+    if (edge.kind === 'location_default')
+        return 'Location';
+    return edge.label;
+}
+function Canvas({ state, draft, onDraftChange, selected, onSelect, action, refresh, notify, registerNavigationGuard }) {
+    const [newKind, setNewKind] = (0, react_1.useState)(draft?.mode === 'assets' ? 'asset' : draft?.mode === 'scene' ? 'shot' : 'sequence');
+    const [mode, setMode] = (0, react_1.useState)(draft?.mode || 'story'), [scene, setScene] = (0, react_1.useState)(draft?.scene || ''), [sequence, setSequence] = (0, react_1.useState)(draft?.sequence || '');
+    const [query, setQuery] = (0, react_1.useState)(draft?.query || ''), [assetType, setAssetType] = (0, react_1.useState)(draft?.assetType || ''), [tag, setTag] = (0, react_1.useState)(draft?.tag || ''), [relation, setRelation] = (0, react_1.useState)(draft?.relation || '');
+    const [graph, setGraph] = (0, react_1.useState)({ nodes: [], edges: [], mode: 'story', total: 0, truncated: false });
+    const [positions, setPositions] = (0, react_1.useState)(draft?.positions || {}), [view, setView] = (0, react_1.useState)(draft?.view || { x: 50, y: 50, scale: .7 });
+    const [hidden, setHidden] = (0, react_1.useState)(draft?.hidden || []), [collapsed, setCollapsed] = (0, react_1.useState)(draft?.collapsed || []), [multi, setMulti] = (0, react_1.useState)([]);
+    const [error, setError] = (0, react_1.useState)(draft?.error || ''), [loading, setLoading] = (0, react_1.useState)(false), [dirty, setDirty] = (0, react_1.useState)(draft?.dirty || false), [saving, setSaving] = (0, react_1.useState)(false), [layoutConflict, setLayoutConflict] = (0, react_1.useState)(draft?.layoutConflict || false), [layoutUnavailable, setLayoutUnavailable] = (0, react_1.useState)(draft?.layoutUnavailable || false), [conflictId, setConflictId] = (0, react_1.useState)(draft?.conflictId || null), [review, setReview] = (0, react_1.useState)(draft?.review || null), [refreshingConflict, setRefreshingConflict] = (0, react_1.useState)(false), [pendingNavigation, setPendingNavigation] = (0, react_1.useState)(null), [linkFrom, setLinkFrom] = (0, react_1.useState)(null);
+    const [layoutName, setLayoutName] = (0, react_1.useState)(draft?.layoutName || 'Working arrangement'), [layoutRevision, setLayoutRevision] = (0, react_1.useState)(draft?.layoutRevision), [layoutId, setLayoutId] = (0, react_1.useState)(draft?.layoutId || '');
+    const layoutNameRef = (0, react_1.useRef)(layoutName);
+    layoutNameRef.current = layoutName;
+    const [selectedEdge, setSelectedEdge] = (0, react_1.useState)(null), [deleteId, setDeleteId] = (0, react_1.useState)(null), [usage, setUsage] = (0, react_1.useState)(null), [usageLoading, setUsageLoading] = (0, react_1.useState)(false), [usageError, setUsageError] = (0, react_1.useState)('');
+    const usageRequest = (0, react_1.useRef)(0), deleteTarget = (0, react_1.useRef)(null);
+    const stage = (0, react_1.useRef)(null);
+    const drag = (0, react_1.useRef)(null);
+    const moved = (0, react_1.useRef)(false);
+    const positionsRef = (0, react_1.useRef)(positions);
+    positionsRef.current = positions;
+    const layoutBaseline = (0, react_1.useRef)(draft?.baseline || null);
+    const restoreView = (0, react_1.useRef)(!!draft);
+    const currentDraft = { name: layoutName, mode, positions, settings: { hidden, collapsed, viewport: view, filters: { query, asset_type: assetType, tag, relation }, scene_id: scene, sequence_id: sequence } };
+    const draftRef = (0, react_1.useRef)(currentDraft);
+    draftRef.current = currentDraft;
+    const dirtyRef = (0, react_1.useRef)(draft?.dirty || false), editVersion = (0, react_1.useRef)(draft?.editVersion || 0), savePromise = (0, react_1.useRef)(null);
+    function markDirty() { editVersion.current += 1; dirtyRef.current = true; setDirty(true); }
+    (0, react_1.useEffect)(() => registerNavigationGuard(commit => { if (!savePromise.current)
+        return true; setPendingNavigation(() => commit); return false; }), [registerNavigationGuard]);
+    (0, react_1.useEffect)(() => { if (!scene)
+        setScene((0, utils_1.activeEntities)(state, 'scene')[0]?.id || ''); }, [state.entities]);
+    (0, react_1.useEffect)(() => {
+        const cancel = new AbortController();
+        let active = true;
+        setLoading(true);
+        const params = new URLSearchParams({ mode, query, limit: '250' });
+        if (mode === 'assets') {
+            if (assetType)
+                params.set('asset_type', assetType);
+            if (tag)
+                params.set('tag', tag);
+            if (relation)
+                params.set('relation', relation);
+        }
+        if (mode === 'scene' && scene)
+            params.set('scene_id', scene);
+        if (mode === 'story' && sequence)
+            params.set('sequence_id', sequence);
+        const timer = setTimeout(() => { (0, api_1.api)((0, api_1.projectPath)(state.project.id, '/graph?' + params), 'GET', undefined, cancel.signal).then(next => { if (!active)
+            return; setGraph(next); const base = (0, geometry_1.tidy)(next.nodes, next.edges, mode); const merged = { ...base, ...positionsRef.current }; setPositions(merged); const rect = stage.current?.getBoundingClientRect(); if (rect && query && !restoreView.current)
+            setView((0, geometry_1.fit)(Object.fromEntries(next.nodes.map(n => [n.id, merged[n.id]])), rect.width, rect.height)); restoreView.current = false; }).catch(e => active && setError(e.message)).finally(() => active && setLoading(false)); }, query ? 150 : 0);
+        return () => { active = false; cancel.abort(); clearTimeout(timer); };
+    }, [state, mode, scene, sequence, query, assetType, tag, relation]);
+    // Capture before the next navigation event; preserve the exact CAS baseline and conflict choices.
+    function publishDraft(overrides = {}) { onDraftChange({ mode, scene, sequence, query, assetType, tag, relation, positions, view, hidden, collapsed, layoutName, layoutRevision, layoutId, dirty, baseline: layoutBaseline.current, layoutConflict, layoutUnavailable, conflictId, review, editVersion: editVersion.current, error, ...overrides }); }
+    function snapshotFields(next) { const settings = next.settings, filters = settings.filters || {}; return { layoutName: next.name, mode: next.mode, positions: next.positions, hidden: settings.hidden || [], collapsed: settings.collapsed || [], view: settings.viewport || view, query: filters.query || '', assetType: filters.asset_type || '', tag: filters.tag || '', relation: filters.relation || '', scene: settings.scene_id || '', sequence: settings.sequence_id || '' }; }
+    (0, react_1.useLayoutEffect)(() => { publishDraft(); }, [onDraftChange, mode, scene, sequence, query, assetType, tag, relation, positions, view, hidden, collapsed, layoutName, layoutRevision, layoutId, dirty, layoutConflict, layoutUnavailable, conflictId, review, error]);
+    const suppressed = (0, react_1.useMemo)(() => new Set([...hidden, ...(0, geometry_1.descendants)(graph.nodes, collapsed)]), [hidden, collapsed, graph]);
+    const visible = graph.nodes.filter(n => !suppressed.has(n.id)), visibleIds = new Set(visible.map(n => n.id));
+    const edges = graph.edges.filter(e => visibleIds.has(e.source) && visibleIds.has(e.target));
+    const bounds = () => stage.current?.getBoundingClientRect();
+    const fitView = () => { const rect = bounds(); if (rect) {
+        setView((0, geometry_1.fit)(Object.fromEntries(visible.map(n => [n.id, positions[n.id] || { x: 0, y: 0 }])), rect.width, rect.height));
+        markDirty();
+    } };
+    function restoreSaved(saved) { layoutBaseline.current = draftFromLayoutResult(saved); setLayoutId(saved.id); setLayoutName(saved.name); layoutNameRef.current = saved.name; setLayoutRevision(saved.revision); setLayoutConflict(false); setLayoutUnavailable(false); setConflictId(null); setReview(null); setPositions(saved.positions); setHidden(saved.settings.hidden || []); setCollapsed(saved.settings.collapsed || []); if (saved.settings.viewport)
+        setView(saved.settings.viewport); setScene(saved.settings.scene_id || scene); setSequence(saved.settings.sequence_id || ''); const filters = saved.settings.filters || {}; setQuery(filters.query || ''); setAssetType(filters.asset_type || ''); setTag(filters.tag || ''); setRelation(filters.relation || ''); dirtyRef.current = false; setDirty(false); }
+    function switchMode(next) { if (next === mode)
+        return; const change = () => { setMode(next); setNewKind(next === 'assets' ? 'asset' : next === 'scene' ? 'shot' : 'sequence'); const sameName = state.layouts.find(layout => layout.mode === next && layout.name === layoutName); if (sameName)
+        restoreSaved(sameName);
+    else {
+        layoutBaseline.current = null;
+        setPositions({});
+        setHidden([]);
+        setCollapsed([]);
+        setLayoutId('');
+        setLayoutName('Working arrangement');
+        layoutNameRef.current = 'Working arrangement';
+        setLayoutRevision(undefined);
+        setLayoutConflict(false);
+        setLayoutUnavailable(false);
+        setConflictId(null);
+        setReview(null);
+        dirtyRef.current = false;
+        setDirty(false);
+        setView({ x: 50, y: 50, scale: .65 });
+    } setSelectedEdge(null); }; if (dirtyRef.current) {
+        setPendingNavigation(() => change);
+        return;
+    } change(); }
+    function select(node, event) {
+        if (moved.current) {
+            moved.current = false;
+            return;
+        }
+        if (linkFrom) {
+            const source = state.entities.find(n => n.id === linkFrom);
+            setLinkFrom(null);
+            if (!source)
+                return;
+            if (source.id === node.id) {
+                setError('Choose a different item to connect to.');
+                return;
+            }
+            if (source.kind === 'asset' && node.kind === 'asset')
+                action('link.create', { source_id: source.id, target_id: node.id });
+            else if (source.kind === 'shot' && node.kind === 'asset')
+                action('assignment.create', { shot_id: source.id, asset_id: node.id });
+            else if ((source.kind === 'sequence' && node.kind === 'scene') || (source.kind === 'scene' && node.kind === 'shot'))
+                action('story.move', { id: node.id, revision: node.revision, parent_id: source.id, position: 0 });
+            else
+                setError(`These items can’t be connected in that way. Connect library items to each other, add a reference to a shot, or place a scene or shot in the story.`);
+            return;
+        }
+        onSelect(node.id);
+        setSelectedEdge(null);
+        setMulti(event?.shiftKey ? (multi.includes(node.id) ? multi.filter(id => id !== node.id) : [...multi, node.id]) : [node.id]);
+    }
+    function startDrag(e, node) { if (e.button !== 0 && e.button !== 1)
+        return; if (e.target.closest('button,a,input,select'))
+        return; if (linkFrom && node)
+        return; const rect = bounds(); if (!rect)
+        return; e.currentTarget.setPointerCapture(e.pointerId); moved.current = false; const ids = node ? (multi.includes(node.id) ? multi : [node.id]) : []; if (node) {
+        onSelect(node.id);
+        if (!multi.includes(node.id))
+            setMulti([node.id]);
+    } drag.current = { kind: node ? 'node' : 'pan', pointer: e.pointerId, x: e.clientX, y: e.clientY, view: { ...view }, positions: { ...positions }, ids }; e.preventDefault(); e.stopPropagation(); }
+    function move(e) { const d = drag.current; if (!d || d.pointer !== e.pointerId)
+        return; const dx = e.clientX - d.x, dy = e.clientY - d.y; if (Math.abs(dx) + Math.abs(dy) > 3)
+        moved.current = true; if (d.kind === 'pan') {
+        setView({ ...d.view, x: d.view.x + dx, y: d.view.y + dy });
+    }
+    else {
+        setPositions(old => { const next = { ...old }; d.ids.forEach((id) => { const p = d.positions[id] || { x: 0, y: 0 }; next[id] = { x: p.x + dx / d.view.scale, y: p.y + dy / d.view.scale }; }); return next; });
+    } markDirty(); }
+    function end(e) { if (drag.current?.pointer === e.pointerId) {
+        drag.current = null;
+        try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        }
+        catch { }
+    } }
+    function wheel(e) { if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const r = bounds();
+        if (r)
+            setView(v => (0, geometry_1.zoomAt)(v, { x: e.clientX - r.left, y: e.clientY - r.top }, Math.exp(-e.deltaY * .002)));
+    }
+    else {
+        e.preventDefault();
+        setView(v => ({ ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }));
+    } markDirty(); }
+    (0, react_1.useEffect)(() => { const el = stage.current; if (!el)
+        return; el.addEventListener('wheel', wheel, { passive: false }); return () => el.removeEventListener('wheel', wheel); }, []);
+    function key(e, node) { const target = e.target; if (target && target !== e.currentTarget && target.closest('button,a,input,select,textarea,[contenteditable="true"]'))
+        return; if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        e.stopPropagation();
+        select(node, e);
+        return;
+    } if (e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        setLinkFrom(node.id);
+        notify('Choose an eligible destination, then press Enter or click it.');
+        return;
+    } if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        requestDelete(node.id);
+        return;
+    } const delta = { ArrowLeft: { x: -1, y: 0 }, ArrowRight: { x: 1, y: 0 }, ArrowUp: { x: 0, y: -1 }, ArrowDown: { x: 0, y: 1 } }; if (delta[e.key]) {
+        e.preventDefault();
+        const d = delta[e.key], step = e.shiftKey ? 50 : 10;
+        setPositions(old => ({ ...old, [node.id]: { x: (old[node.id]?.x || 0) + d.x * step, y: (old[node.id]?.y || 0) + d.y * step } }));
+        markDirty();
+    } }
+    async function refreshUsage(id) { const request = ++usageRequest.current; deleteTarget.current = id; setUsage(null); setUsageError(''); setUsageLoading(true); try {
+        const result = await (0, api_1.runCommand)(state.project.id, 'entity.usage', { id });
+        if (request === usageRequest.current && deleteTarget.current === id)
+            setUsage(result);
+    }
+    catch (e) {
+        if (request === usageRequest.current && deleteTarget.current === id)
+            setUsageError(e.message || 'Could not check where this item is used.');
+    }
+    finally {
+        if (request === usageRequest.current && deleteTarget.current === id)
+            setUsageLoading(false);
+    } }
+    function closeDelete() { usageRequest.current += 1; deleteTarget.current = null; setDeleteId(null); setUsage(null); setUsageError(''); setUsageLoading(false); }
+    function requestDelete(id) { deleteTarget.current = id; setDeleteId(id); void refreshUsage(id); }
+    async function refreshConflict() { setRefreshingConflict(true); try {
+        const latestState = await refresh();
+        const stableId = conflictId || layoutId;
+        const latest = stableId ? latestState.layouts.find(item => item.id === stableId) : latestState.layouts.find(item => item.name === layoutName && item.mode === mode);
+        if (!latest) {
+            setReview(null);
+            setLayoutUnavailable(true);
+            setError('This saved arrangement is no longer available. Your local Canvas edits remain. Use Save as new to keep them under a new name.');
+            return;
+        }
+        setLayoutUnavailable(false);
+        const local = clone(draftRef.current);
+        const base = layoutBaseline.current?.id === latest.id ? asLayoutDraft(layoutBaseline.current) : null;
+        const compared = compareLayouts(base, local, asLayoutDraft(latest));
+        setReview({ remote: draftFromLayoutResult(latest), local, merged: compared.merged, changes: compared.changes, choices: {}, editVersion: editVersion.current });
+        setConflictId(latest.id);
+        setError('Latest saved revision loaded. Compare the saved and local fields, choose each conflicting value, then reapply.');
+    }
+    catch (e) {
+        setError(`Could not refresh the saved arrangement. Your local Canvas edits remain: ${e.message}`);
+    }
+    finally {
+        setRefreshingConflict(false);
+    } }
+    function labelChange(path) { if (path[0] === 'positions') {
+        const id = path[1], node = state.entities.find(item => item.id === id);
+        return `Card ${node ? (0, utils_1.displayTitle)(node.title) : 'removed card'} (${id}) · ${path[2] === 'x' ? 'horizontal position (x)' : 'vertical position (y)'}`;
+    } if (path[0] === 'settings')
+        return `Canvas setting · ${path.slice(1).join(' · ')}`; if (path[0] === 'name')
+        return 'Arrangement name'; if (path[0] === 'mode')
+        return 'Canvas view'; return path.join(' · '); }
+    function resolvedReviewDraft(active) { const next = clone(active.merged); for (const change of active.changes) {
+        if (!change.conflict)
+            continue;
+        const choice = active.choices[change.key];
+        if (choice)
+            writePath(next, change.path, choice === 'local' ? change.local : change.saved);
+    } return next; }
+    function setCanvasDraft(next) { setLayoutName(next.name); layoutNameRef.current = next.name; setMode(next.mode); setPositions(clone(next.positions)); const settings = next.settings || {}; setHidden(settings.hidden || []); setCollapsed(settings.collapsed || []); if (settings.viewport)
+        setView(settings.viewport); const filters = settings.filters || {}; setQuery(filters.query || ''); setAssetType(filters.asset_type || ''); setTag(filters.tag || ''); setRelation(filters.relation || ''); setScene(settings.scene_id || ''); setSequence(settings.sequence_id || ''); }
+    function saveAsNew() { const base = `${layoutName.trim() || 'Working arrangement'} copy`; let next = base, index = 2; while (state.layouts.some(item => item.mode === mode && item.name === next)) {
+        next = `${base} ${index++}`;
+    } setLayoutId(''); setLayoutRevision(undefined); layoutBaseline.current = null; setLayoutConflict(false); setLayoutUnavailable(false); setConflictId(null); setReview(null); setLayoutName(next); layoutNameRef.current = next; setError(''); markDirty(); }
+    async function save(approved) { if (savePromise.current)
+        return savePromise.current; if (!layoutName.trim() || (layoutConflict && !approved))
+        return false; if (approved && review?.changes.some(change => change.conflict && !review.choices[change.key]))
+        return false; const version = editVersion.current, requested = approved ? applyNewLocalEdits(approved.reference, draftRef.current, approved.draft) : clone(draftRef.current), snapshot = { name: requested.name, mode: requested.mode, positions: requested.positions, settings: requested.settings, ...((approved?.revision ?? layoutRevision) !== undefined ? { revision: approved?.revision ?? layoutRevision } : {}), ...(approved?.id || layoutId ? { layout_id: approved?.id || layoutId } : {}) }; setSaving(true); setError(''); const operation = (async () => { try {
+        const result = await (0, api_1.runCommand)(state.project.id, 'canvas.save', snapshot);
+        const saved = draftFromLayoutResult(result);
+        const current = editVersion.current === version ? saved : applyNewLocalEdits(requested, draftRef.current, asLayoutDraft(result));
+        if (approved)
+            setCanvasDraft(current);
+        layoutBaseline.current = saved;
+        setLayoutId(result.id);
+        setLayoutName(current.name);
+        layoutNameRef.current = current.name;
+        setLayoutRevision(result.revision);
+        setLayoutConflict(false);
+        setLayoutUnavailable(false);
+        setConflictId(null);
+        setReview(null);
+        const hasNewerEdits = editVersion.current !== version;
+        if (!hasNewerEdits) {
+            dirtyRef.current = false;
+            setDirty(false);
+        }
+        else {
+            dirtyRef.current = true;
+            setDirty(true);
+        }
+        publishDraft({ ...snapshotFields(current), baseline: saved, layoutId: result.id, layoutRevision: result.revision, dirty: hasNewerEdits, layoutConflict: false, layoutUnavailable: false, conflictId: null, review: null, error: '' });
+        let refreshFailure = '';
+        try {
+            await refresh();
+        }
+        catch (e) {
+            refreshFailure = e.message;
+            setError(`Arrangement saved, but the project view could not refresh: ${e.message}`);
+        }
+        notify(refreshFailure ? 'Arrangement saved, but the project view could not refresh.' : 'Canvas arrangement saved. Story order and connections stay the same.');
+        return true;
+    }
+    catch (e) {
+        setError(e.message);
+        if (e.code === 'revision_conflict') {
+            setLayoutConflict(true);
+            setLayoutUnavailable(false);
+            setConflictId(e.details?.id ? String(e.details.id) : layoutId || null);
+            setReview(null);
+        }
+        return false;
+    }
+    finally {
+        savePromise.current = null;
+        setSaving(false);
+    } })(); savePromise.current = operation; return operation; }
+    async function reapplyConflict() { if (!review)
+        return; const active = review; if (active.changes.some(change => change.conflict && !active.choices[change.key]))
+        return; const draft = resolvedReviewDraft(active); const saved = await save({ draft, id: active.remote.id, revision: active.remote.revision, reference: active.local }); if (saved && pendingNavigation && !dirtyRef.current) {
+        const commit = pendingNavigation;
+        setPendingNavigation(null);
+        commit();
+    } }
+    async function saveAndNavigate() { if (layoutConflict && review) {
+        await reapplyConflict();
+        return;
+    } const saved = await save(); if (saved && pendingNavigation && !dirtyRef.current) {
+        const commit = pendingNavigation;
+        setPendingNavigation(null);
+        commit();
+    }
+    else if (saved && dirtyRef.current)
+        setError('Canvas changed while the save was pending. Save again to keep those edits before leaving.'); }
+    function discardAndNavigate() { if (savePromise.current)
+        return; const baseline = layoutBaseline.current; const next = baseline ? asLayoutDraft(baseline) : { name: layoutName, mode, positions: {}, settings: { viewport: { x: 50, y: 50, scale: .7 } } }; setCanvasDraft(next); dirtyRef.current = false; setDirty(false); setLayoutConflict(false); setLayoutUnavailable(false); setConflictId(null); setReview(null); setError(''); publishDraft({ ...snapshotFields(next), dirty: false, layoutConflict: false, layoutUnavailable: false, conflictId: null, review: null, error: '' }); const commit = pendingNavigation; setPendingNavigation(null); commit?.(); }
+    function load(id) { if (savePromise.current)
+        return; const saved = state.layouts.find(l => l.id === id); if (!saved)
+        return; const restore = () => restoreSaved(saved); if (dirtyRef.current) {
+        setPendingNavigation(() => restore);
+        return;
+    } restore(); }
+    const conflictPanel = layoutConflict ? react_1.default.createElement("div", { className: "notice warning", role: "status" },
+        react_1.default.createElement("p", null, layoutUnavailable ? 'This saved arrangement is no longer available. Your local Canvas edits remain. Save them as a new arrangement to keep them.' : 'The saved arrangement changed elsewhere. Your local Canvas edits remain. Refresh the latest saved version, compare the changed fields, and choose how to resolve each overlap.'),
+        react_1.default.createElement("button", { onClick: () => void refreshConflict(), disabled: saving || refreshingConflict }, refreshingConflict ? 'Refreshing saved version…' : 'Refresh latest saved revision'),
+        layoutUnavailable && react_1.default.createElement("button", { onClick: saveAsNew, disabled: saving }, "Save as new arrangement"),
+        review && react_1.default.createElement("div", { className: "layout-conflict-review", "aria-label": "Saved and local arrangement changes" },
+            react_1.default.createElement("h3", null,
+                "Saved version ",
+                review.remote.revision,
+                " \u00B7 compare changes"),
+            review.changes.length ? react_1.default.createElement("ul", null, review.changes.map(change => react_1.default.createElement("li", { key: change.key, "data-conflict-path": change.key },
+                react_1.default.createElement("strong", null, labelChange(change.path)),
+                react_1.default.createElement("div", { className: "layout-conflict-values" },
+                    react_1.default.createElement("span", null,
+                        "Saved: ",
+                        change.saved.present ? JSON.stringify(change.saved.value) : 'Not set'),
+                    react_1.default.createElement("span", null,
+                        "Local: ",
+                        change.local.present ? JSON.stringify(change.local.value) : 'Not set')),
+                change.conflict ? react_1.default.createElement("div", { className: "layout-conflict-choices" },
+                    react_1.default.createElement("button", { "aria-pressed": review.choices[change.key] === 'local', onClick: () => setReview(old => old ? { ...old, choices: { ...old.choices, [change.key]: 'local' } } : old) }, "Keep local"),
+                    react_1.default.createElement("button", { "aria-pressed": review.choices[change.key] === 'saved', onClick: () => setReview(old => old ? { ...old, choices: { ...old.choices, [change.key]: 'saved' } } : old) }, "Use saved")) : react_1.default.createElement("small", null, "These edits do not overlap and will be merged automatically.")))) : react_1.default.createElement("p", null, "The saved and local arrangement fields match. You can safely reapply the current draft."),
+            react_1.default.createElement("button", { className: "primary", onClick: () => void reapplyConflict(), disabled: saving || review.changes.some(change => change.conflict && !review.choices[change.key]) }, "Reapply merged arrangement"))) : null;
+    const selectedNode = state.entities.find(n => n.id === selected);
+    const tags = [...new Set(state.entities.flatMap(e => e.tags))].sort();
+    return react_1.default.createElement("div", { className: "canvas-page" },
+        react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Story map", title: "Canvas", description: "Arrange story cards and connect people, places, shots, and references.", actions: react_1.default.createElement(react_1.default.Fragment, null,
+                react_1.default.createElement("select", { "aria-label": "Item to create", value: newKind, onChange: (e) => setNewKind(e.target.value) },
+                    react_1.default.createElement("option", { value: "asset" }, "Library item"),
+                    react_1.default.createElement("option", { value: "sequence" }, "Sequence"),
+                    react_1.default.createElement("option", { value: "scene" }, "Scene"),
+                    react_1.default.createElement("option", { value: "shot" }, "Shot")),
+                react_1.default.createElement("button", { onClick: () => action(newKind + '.create', newKind === 'shot' && scene ? { parent_id: scene } : newKind === 'scene' && sequence ? { parent_id: sequence } : {}) },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "plus" }),
+                    "Create ",
+                    (0, utils_1.human)(newKind).toLowerCase()),
+                react_1.default.createElement("button", { onClick: () => action('link.create') }, "Connect items")) }),
+        react_1.default.createElement("div", { className: "canvas-controls" },
+            react_1.default.createElement("div", { className: "segmented", "aria-label": "Canvas view" }, [['story', 'Story flow'], ['assets', 'Reference map'], ['scene', 'Scene board']].map(([value, label]) => react_1.default.createElement("button", { key: value, "aria-pressed": mode === value, onClick: () => switchMode(value), disabled: saving }, label))),
+            react_1.default.createElement("label", { className: "search" },
+                react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
+                react_1.default.createElement("input", { "aria-label": "Search canvas cards", placeholder: "Find a card\u2026", value: query, onChange: (e) => { setQuery(e.target.value); markDirty(); } })),
+            mode === 'scene' && react_1.default.createElement("select", { "aria-label": "Scene to show", value: scene, onChange: (e) => { setScene(e.target.value); markDirty(); } },
+                react_1.default.createElement("option", { value: "" }, "Choose a scene"),
+                (0, utils_1.activeEntities)(state, 'scene').map(n => react_1.default.createElement("option", { key: n.id, value: n.id }, n.title))),
+            mode === 'story' && react_1.default.createElement("select", { "aria-label": "Show sequence", value: sequence, onChange: (e) => { setSequence(e.target.value); markDirty(); } },
+                react_1.default.createElement("option", { value: "" }, "All sequences"),
+                (0, utils_1.activeEntities)(state, 'sequence').map(n => react_1.default.createElement("option", { key: n.id, value: n.id }, n.title))),
+            mode === 'assets' && react_1.default.createElement(react_1.default.Fragment, null,
+                react_1.default.createElement("select", { "aria-label": "Filter by item type", value: assetType, onChange: (e) => { setAssetType(e.target.value); markDirty(); } },
+                    react_1.default.createElement("option", { value: "" }, "All item types"),
+                    ['character', 'location', 'prop', 'reference'].map(t => react_1.default.createElement("option", { key: t, value: t }, (0, utils_1.human)(t)))),
+                react_1.default.createElement("select", { "aria-label": "Tag filter", value: tag, onChange: (e) => { setTag(e.target.value); markDirty(); } },
+                    react_1.default.createElement("option", { value: "" }, "All tags"),
+                    tags.map(t => react_1.default.createElement("option", { key: t, value: t }, (0, utils_1.human)(t)))),
+                react_1.default.createElement("select", { "aria-label": "Filter by connection", value: relation, onChange: (e) => { setRelation(e.target.value); markDirty(); } },
+                    react_1.default.createElement("option", { value: "" }, "All connections"),
+                    ['appears-at', 'alternate-view-of', 'wears', 'part-of', 'related-to'].map(t => react_1.default.createElement("option", { key: t, value: t }, (0, utils_1.human)(t)))))),
+        error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+        " ",
+        linkFrom && react_1.default.createElement("div", { className: "notice" },
+            "Link from ",
+            react_1.default.createElement("strong", null, (0, utils_1.displayTitle)(state.entities.find(n => n.id === linkFrom)?.title || 'Selected item')),
+            ". Tab to a destination and press Enter, or click a node. ",
+            react_1.default.createElement("button", { onClick: () => setLinkFrom(null) }, "Cancel link")),
+        react_1.default.createElement("div", { className: "canvas-layout-bar" },
+            react_1.default.createElement("select", { "aria-label": "Saved arrangement", value: layoutId, disabled: saving, onChange: (e) => load(e.target.value) },
+                react_1.default.createElement("option", { value: "" }, "New arrangement"),
+                layoutId && !state.layouts.some(l => l.id === layoutId) && react_1.default.createElement("option", { value: layoutId }, "Unavailable arrangement"),
+                state.layouts.filter(l => l.mode === mode).map(l => react_1.default.createElement("option", { key: l.id, value: l.id }, l.name))),
+            react_1.default.createElement("input", { "aria-label": "Arrangement name", value: layoutName, onChange: (e) => { layoutNameRef.current = e.target.value; setLayoutName(e.target.value); markDirty(); } }),
+            react_1.default.createElement("button", { onClick: () => void save(), disabled: !layoutName.trim() || saving || layoutConflict }, saving ? 'Saving…' : 'Save arrangement'),
+            layoutId && react_1.default.createElement("button", { onClick: saveAsNew, disabled: saving }, "Save as new"),
+            react_1.default.createElement("button", { onClick: () => { setPositions((0, geometry_1.tidy)(graph.nodes, graph.edges, mode)); markDirty(); } }, "Arrange cards"),
+            react_1.default.createElement("button", { onClick: fitView }, "Fit canvas"),
+            dirty && react_1.default.createElement("span", { role: "status" }, "Unsaved changes"),
+            hidden.length > 0 && react_1.default.createElement("button", { onClick: () => { setHidden([]); markDirty(); } },
+                "Show ",
+                hidden.length,
+                " hidden cards")),
+        conflictPanel,
+        react_1.default.createElement("div", { ref: stage, className: `graph-stage ${linkFrom ? 'linking' : ''}`, tabIndex: 0, "aria-label": "Interactive story canvas. Use Tab to select a card, arrow keys to move it, L to connect it, and Delete to review removal.", onPointerDown: (e) => startDrag(e), onPointerMove: move, onPointerUp: end, onPointerCancel: end, onKeyDown: (e) => { if (e.key === 'Escape') {
+                setLinkFrom(null);
+                setSelectedEdge(null);
+            } } },
+            react_1.default.createElement("div", { className: "canvas-world", style: { transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` } },
+                react_1.default.createElement("svg", { className: "edge-layer", width: "1", height: "1", "aria-label": "Story and image connections" },
+                    react_1.default.createElement("defs", null,
+                        react_1.default.createElement("marker", { id: "edge-arrow", viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "6", markerHeight: "6", orient: "auto-start-reverse" },
+                            react_1.default.createElement("path", { d: "M 0 0 L 10 5 L 0 10 z" }))),
+                    edges.map(edge => { const a = positions[edge.source], b = positions[edge.target]; if (!a || !b)
+                        return null; const label = edgeLabel(edge); const curve = (0, geometry_1.edgePath)(a, b); return react_1.default.createElement("g", { key: edge.id, className: `graph-edge ${edge.kind} ${selectedEdge?.id === edge.id ? 'is-selected' : ''}` },
+                        react_1.default.createElement("path", { d: curve.path, markerEnd: "url(#edge-arrow)" }),
+                        react_1.default.createElement("path", { d: curve.path, className: "edge-hit", onClick: (e) => { e.stopPropagation(); setSelectedEdge(edge); } }),
+                        react_1.default.createElement("g", { transform: `translate(${curve.label.x}, ${curve.label.y})`, role: "button", tabIndex: 0, "aria-label": `${label} connection. Select to see options.`, onPointerDown: (e) => e.stopPropagation(), onClick: () => setSelectedEdge(edge), onKeyDown: (e) => { if (e.key === 'Enter') {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSelectedEdge(edge);
+                            } } },
+                            react_1.default.createElement("rect", { x: -Math.max(18, label.length * 3.7 + 8), y: "-12", width: Math.max(36, label.length * 7.4 + 16), height: "24", rx: "4" }),
+                            react_1.default.createElement("text", { textAnchor: "middle", dominantBaseline: "central" },
+                                edge.kind === 'order' ? '# ' : edge.kind === 'assignment' ? '↳ ' : '',
+                                label))); })),
+                visible.map(node => {
+                    const pos = positions[node.id] || { x: 0, y: 0 }, type = (0, utils_1.kindLabel)(node);
+                    const thumbnail = node.thumbnail_media_id || node.reference_media_ids?.[0];
+                    return react_1.default.createElement("article", { key: node.id, "data-node-id": node.id, className: `graph-node ${type} ${selected === node.id || multi.includes(node.id) ? 'is-selected' : ''} ${linkFrom === node.id ? 'link-source' : ''}`, style: { width: geometry_1.NODE_W, height: geometry_1.NODE_H, transform: `translate(${pos.x}px,${pos.y}px)` }, tabIndex: 0, role: "button", "aria-label": `${type}: ${node.title}. Used ${node.reference_count || 0} times.`, "aria-pressed": selected === node.id, onPointerDown: (e) => startDrag(e, node), onPointerMove: move, onPointerUp: end, onClick: (e) => { e.stopPropagation(); select(node, e); }, onKeyDown: (e) => key(e, node) },
+                        react_1.default.createElement("div", { className: "node-type" },
+                            react_1.default.createElement("span", null, type),
+                            react_1.default.createElement("span", null, node.kind === 'asset' ? `${node.media_count || 0} images` : `${String(node.position + 1).padStart(2, '0')}`)),
+                        thumbnail ? react_1.default.createElement("img", { className: "node-image", src: (0, api_1.mediaUrl)(state.project.id, thumbnail), alt: `${(0, utils_1.displayTitle)(node.title)} ${node.frame_state ? 'storyboard image' : 'reference image'}`, draggable: false }) : react_1.default.createElement("div", { className: "node-text-preview" }, String(node.fields.action || node.fields.summary || node.fields.arc || node.description || 'Add a description or story direction')),
+                        react_1.default.createElement("div", { className: "node-content" },
+                            react_1.default.createElement("h3", null, (0, utils_1.displayTitle)(node.title)),
+                            react_1.default.createElement("p", null, node.kind === 'shot' ? `${node.fields.framing || 'Framing not set'} · ${node.reference_count || 0} references` : node.kind === 'asset' ? `${node.link_count || 0} connections · used in ${node.reference_count || 0} shots` : `${node.child_count || 0} ${node.kind === 'sequence' ? 'scenes' : 'shots'}`),
+                            react_1.default.createElement("div", { className: "node-footer" },
+                                node.frame_state ? react_1.default.createElement(Primitives_1.Badge, { kind: node.frame_state },
+                                    (0, utils_1.statusLabel)(node.frame_state),
+                                    " image") : node.tags.slice(0, 2).map(t => react_1.default.createElement("span", { key: t, className: "tag" }, t)),
+                                node.child_count > 0 && node.kind !== 'asset' && react_1.default.createElement("button", { "aria-label": `${collapsed.includes(node.id) ? 'Expand' : 'Collapse'} ${(0, utils_1.displayTitle)(node.title)}`, onClick: (e) => { e.stopPropagation(); setCollapsed(v => v.includes(node.id) ? v.filter(id => id !== node.id) : [...v, node.id]); markDirty(); } }, collapsed.includes(node.id) ? '+' : '−'))));
+                })),
+            !visible.length && !loading && react_1.default.createElement(Primitives_1.Empty, { title: mode === 'scene' ? 'Choose a scene to build its board' : mode === 'assets' ? 'Build your reference library' : 'Start your story map', action: react_1.default.createElement("button", { onClick: () => action(mode === 'assets' ? 'asset.create' : mode === 'scene' ? 'scene.create' : 'sequence.create') },
+                    "Create a ",
+                    mode === 'assets' ? 'reference item' : mode === 'scene' ? 'scene' : 'sequence') }, mode === 'assets' ? 'Add characters, places, props, and other references here. Their connections will appear as your library grows.' : 'Create items here or in the story outline. Story order and reference connections will appear as you build.'),
+            react_1.default.createElement("div", { className: "canvas-zoom", onPointerDown: (e) => e.stopPropagation() },
+                react_1.default.createElement("button", { "aria-label": "Zoom out", onClick: () => { setView(v => (0, geometry_1.zoomAt)(v, { x: 200, y: 200 }, .8)); markDirty(); } }, "\u2212"),
+                react_1.default.createElement("span", null,
+                    Math.round(view.scale * 100),
+                    "%"),
+                react_1.default.createElement("button", { "aria-label": "Zoom in", onClick: () => { setView(v => (0, geometry_1.zoomAt)(v, { x: 200, y: 200 }, 1.25)); markDirty(); } }, "+"))),
+        react_1.default.createElement("div", { className: "canvas-status" },
+            dirty && react_1.default.createElement("span", { role: "status" }, "Unsaved arrangement \u00B7 kept while you navigate"),
+            react_1.default.createElement("span", null,
+                loading ? 'Loading…' : `${visible.length} cards · ${edges.length} connections`,
+                graph.truncated && ` · ${graph.total} matches; narrow your search to see more (up to 250 cards at a time)`),
+            react_1.default.createElement("span", null, "Drag the background to move \u00B7 Ctrl + scroll to zoom \u00B7 Arrow keys to arrange \u00B7 L to connect")),
+        selectedNode && react_1.default.createElement("div", { className: "selection-tools" },
+            react_1.default.createElement("strong", null, (0, utils_1.displayTitle)(selectedNode.title)),
+            react_1.default.createElement("button", { onClick: () => action(selectedNode.kind + '.update', (0, utils_1.commandDefaults)(selectedNode)) }, "Edit"),
+            react_1.default.createElement("button", { onClick: () => setLinkFrom(selectedNode.id) }, "Connect from here"),
+            ['sequence', 'scene', 'shot'].includes(selectedNode.kind) && react_1.default.createElement("button", { onClick: () => action('story.move', (0, utils_1.commandDefaults)(selectedNode)) }, "Move / reorder"),
+            react_1.default.createElement("button", { onClick: () => requestDelete(selectedNode.id) }, "Remove\u2026")),
+        selectedEdge && react_1.default.createElement("div", { className: "selection-tools" },
+            react_1.default.createElement("strong", null, edgeLabel(selectedEdge)),
+            react_1.default.createElement("span", null, selectedEdge.kind === 'order' ? 'Story order' : selectedEdge.kind === 'assignment' ? 'Shot reference' : selectedEdge.kind === 'location_default' ? `Location from ${(0, utils_1.human)(selectedEdge.source_scope?.kind || 'project').toLowerCase()}` : 'Connection between library items'),
+            selectedEdge.kind === 'order' ? react_1.default.createElement("button", { onClick: () => { const child = state.entities.find(n => n.id === selectedEdge.target); if (child)
+                    action('story.move', (0, utils_1.commandDefaults)(child)); } }, "Move in story") : selectedEdge.kind === 'location_default' ? react_1.default.createElement("button", { onClick: () => { const owner = state.entities.find(n => n.id === selectedEdge.source); if (owner)
+                    action(owner.kind + '.update', (0, utils_1.commandDefaults)(owner)); } }, "Edit location\u2026") : react_1.default.createElement("button", { onClick: () => action(selectedEdge.kind === 'assignment' ? 'assignment.remove' : 'link.remove', { id: selectedEdge.id, revision: selectedEdge.revision }) }, "Remove connection\u2026"),
+            react_1.default.createElement("button", { onClick: () => setSelectedEdge(null) }, "Close")),
+        deleteId && react_1.default.createElement(Primitives_1.Modal, { title: "Remove this card?", onClose: closeDelete },
+            react_1.default.createElement("div", { className: "modal-body", "data-removal-id": deleteId },
+                react_1.default.createElement("p", null, "Hiding a card removes it from this arrangement. Archiving takes the item out of the active story; deleting removes it permanently."),
+                usage ? react_1.default.createElement("div", { className: "usage-summary" },
+                    react_1.default.createElement("p", null, usage.can_delete ? 'This item is not used elsewhere.' : 'This item is used in these places:'),
+                    Object.entries(usage).filter(([key, value]) => key !== 'can_delete' && Array.isArray(value) && value.length > 0).length > 0 && react_1.default.createElement("ul", null, Object.entries(usage).filter(([key, value]) => key !== 'can_delete' && Array.isArray(value) && value.length > 0).map(([key, value]) => react_1.default.createElement("li", { key: key },
+                        (0, utils_1.human)(key),
+                        " \u00B7 ",
+                        value.length)))) : usageLoading ? react_1.default.createElement("p", { role: "status" }, "Checking where this item is used\u2026") : usageError ? react_1.default.createElement("div", { className: "notice error", role: "alert" },
+                    react_1.default.createElement("strong", null, "We couldn\u2019t check where this item is used."),
+                    react_1.default.createElement("p", null, usageError),
+                    react_1.default.createElement("button", { onClick: () => void refreshUsage(deleteId) }, "Retry usage check")) : react_1.default.createElement("p", { role: "status" }, "Usage details are unavailable."),
+                react_1.default.createElement("div", { className: "form-stack" },
+                    react_1.default.createElement("button", { onClick: () => { setHidden([...hidden, deleteId]); markDirty(); closeDelete(); } }, "Hide from this arrangement"),
+                    react_1.default.createElement("button", { disabled: !usage || usageLoading, onClick: () => { const n = state.entities.find(n => n.id === deleteId); if (n)
+                            action('entity.archive', (0, utils_1.commandDefaults)(n)); closeDelete(); } }, "Archive item\u2026"),
+                    react_1.default.createElement("button", { className: "danger", disabled: !usage?.can_delete || usageLoading, onClick: () => { const n = state.entities.find(n => n.id === deleteId); if (n)
+                            action('entity.delete', (0, utils_1.commandDefaults)(n)); closeDelete(); } }, "Delete item\u2026")))),
+        pendingNavigation && react_1.default.createElement(Primitives_1.Modal, { title: "Unsaved canvas arrangement", onClose: () => setPendingNavigation(null) },
+            react_1.default.createElement("div", { className: "modal-body" },
+                react_1.default.createElement("p", null, "Your Canvas changes have not been saved. Save them to this arrangement, discard them, or stay on this view. Page and project navigation keep your draft. This action replaces the current arrangement, or waits for an active save. The current geometry remains available while you decide."),
+                error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+                " ",
+                conflictPanel),
+            react_1.default.createElement("div", { className: "modal-footer" },
+                react_1.default.createElement("button", { onClick: () => setPendingNavigation(null) }, "Stay"),
+                react_1.default.createElement("button", { onClick: discardAndNavigate, disabled: saving }, "Discard changes"),
+                react_1.default.createElement("button", { className: "primary", disabled: !layoutName.trim() || saving || layoutConflict, onClick: () => void saveAndNavigate() }, saving ? 'Saving…' : 'Save and continue'))));
+}
+
+},
+"canvas/geometry":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.clamp = exports.NODE_H = exports.NODE_W = void 0;
+exports.screenToWorld = screenToWorld;
+exports.zoomAt = zoomAt;
+exports.hitTest = hitTest;
+exports.tidy = tidy;
+exports.fit = fit;
+exports.edgePath = edgePath;
+exports.descendants = descendants;
+exports.NODE_W = 238, exports.NODE_H = 222;
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+exports.clamp = clamp;
+function screenToWorld(point, view) { return { x: (point.x - view.x) / view.scale, y: (point.y - view.y) / view.scale }; }
+function zoomAt(view, point, factor) { const scale = (0, exports.clamp)(view.scale * factor, .15, 3); const world = screenToWorld(point, view); return { scale, x: point.x - world.x * scale, y: point.y - world.y * scale }; }
+function hitTest(point, positions) { return Object.keys(positions).reverse().find(id => { const p = positions[id]; return point.x >= p.x && point.x <= p.x + exports.NODE_W && point.y >= p.y && point.y <= p.y + exports.NODE_H; }) || null; }
+function tidy(nodes, edges, mode) {
+    const result = {};
+    const sorted = [...nodes].sort((a, b) => a.position - b.position || a.title.localeCompare(b.title) || a.id.localeCompare(b.id));
+    if (mode === 'assets') {
+        const types = ['character', 'location', 'prop', 'reference'];
+        types.forEach((type, column) => sorted.filter(n => n.fields.type === type).forEach((n, row) => { result[n.id] = { x: column * 320, y: row * 280 }; }));
+        return result;
+    }
+    if (mode === 'scene') {
+        let row = 0;
+        sorted.filter(n => n.kind === 'scene').forEach(n => { result[n.id] = { x: 0, y: -300 }; });
+        sorted.filter(n => n.kind === 'shot').forEach((n, i) => { result[n.id] = { x: i * 310, y: 0 }; });
+        sorted.filter(n => n.kind === 'asset').forEach((n, i) => { result[n.id] = { x: (i % 5) * 310, y: 330 + Math.floor(i / 5) * 280 }; });
+        return result;
+    }
+    const children = (id) => sorted.filter(n => n.parent_id === id);
+    const visit = (node, depth, top) => { const kids = children(node.id); let cursor = top; for (const child of kids)
+        cursor = visit(child, depth + 1, cursor); const height = Math.max(280, cursor - top); result[node.id] = { x: depth * 340, y: top + (height - 280) / 2 }; return top + height; };
+    const ids = new Set(nodes.map(n => n.id));
+    let cursor = 0;
+    for (const root of sorted.filter(n => !n.parent_id || !ids.has(n.parent_id))) {
+        cursor = visit(root, root.kind === 'sequence' ? 0 : root.kind === 'scene' ? 1 : 2, cursor) + 60;
+    }
+    return result;
+}
+function fit(positions, width, height) { const points = Object.values(positions); if (!points.length)
+    return { x: 60, y: 60, scale: 1 }; const x = Math.min(...points.map(p => p.x)), y = Math.min(...points.map(p => p.y)); const w = Math.max(...points.map(p => p.x)) + exports.NODE_W - x, h = Math.max(...points.map(p => p.y)) + exports.NODE_H - y; const scale = (0, exports.clamp)(Math.min((width - 100) / w, (height - 100) / h), .15, 1.2); return { scale, x: (width - w * scale) / 2 - x * scale, y: (height - h * scale) / 2 - y * scale }; }
+function edgePath(a, b) { const start = { x: a.x + exports.NODE_W, y: a.y + exports.NODE_H / 2 }, end = { x: b.x, y: b.y + exports.NODE_H / 2 }; const bend = Math.max(65, Math.abs(end.x - start.x) * .5); return { path: `M ${start.x} ${start.y} C ${start.x + bend} ${start.y}, ${end.x - bend} ${end.y}, ${end.x} ${end.y}`, label: { x: (start.x + end.x) / 2, y: (start.y + end.y) / 2 } }; }
+function descendants(nodes, collapsed) { const result = new Set(); const visit = (id) => nodes.filter(n => n.parent_id === id).forEach(n => { result.add(n.id); visit(n.id); }); collapsed.forEach(visit); return result; }
+
+},
+"components/ActionDialog":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ActionDialog = ActionDialog;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const utils_1 = require("../utils");
+const Primitives_1 = require("./Primitives");
+const remoteSources = new Set(['documents', 'document_nodes', 'versions', 'provenance_edges', 'annotations', 'provenance_endpoints', 'provenance_source', 'provenance_target', 'provenance_typed_endpoint']);
+function ActionDialog({ command, state, meta, defaults = {}, onClose, onDone, onReload }) {
+    const initialize = (initial) => ({ ...Object.fromEntries(command.fields.map(f => [f.name, initial[f.name] ?? f.default ?? (f.type === 'boolean' ? false : f.type === 'json' ? '{}' : '')])), ...(initial.asset_id ? { asset_id: initial.asset_id } : {}) });
+    const [values, setValues] = (0, react_1.useState)(() => initialize(defaults));
+    const [busy, setBusy] = (0, react_1.useState)(false);
+    const busyRef = (0, react_1.useRef)(false);
+    const [cancelBusy, setCancelBusy] = (0, react_1.useState)(false);
+    const [error, setError] = (0, react_1.useState)(null);
+    const [confirmed, setConfirmed] = (0, react_1.useState)(false);
+    const [choices, setChoices] = (0, react_1.useState)({});
+    const [queries, setQueries] = (0, react_1.useState)({});
+    const [choiceRecords, setChoiceRecords] = (0, react_1.useState)({});
+    const [choiceLoading, setChoiceLoading] = (0, react_1.useState)({});
+    const [resolving, setResolving] = (0, react_1.useState)({});
+    const valuesRef = (0, react_1.useRef)(values);
+    valuesRef.current = values;
+    const queriesRef = (0, react_1.useRef)(queries);
+    queriesRef.current = queries;
+    const alive = (0, react_1.useRef)(true);
+    const requests = (0, react_1.useRef)({});
+    const stateRef = (0, react_1.useRef)(state);
+    stateRef.current = state;
+    const contextFields = ['id', 'document_id', 'version_id', 'source_type', 'target_type', 'endpoint_type', 'kind', 'record_id', 'endpoint_id'];
+    const context = Object.fromEntries(command.fields.filter(f => ['id', 'document_id', 'version_id', 'source_type', 'target_type', 'endpoint_type', 'kind', 'record_id', 'endpoint_id'].includes(f.name)).map(f => [f.name, values[f.name]]));
+    const contextKey = JSON.stringify(context);
+    function contextFor(current) { return JSON.stringify(Object.fromEntries(command.fields.filter(f => contextFields.includes(f.name)).map(f => [f.name, current[f.name]]))); }
+    function selectionKey(current) { return JSON.stringify(Object.fromEntries(command.fields.filter(f => remoteSources.has(f.source) || f.name.endsWith('_id')).map(f => [f.name, current[f.name]]))); }
+    function scopedRequestKey(current) { return JSON.stringify({ project: stateRef.current.project.id, command: command.name, context: contextFor(current), selection: selectionKey(current) }); }
+    function scopedRequestIsCurrent(name, controller, key, current = valuesRef.current) { return alive.current && !controller.signal.aborted && requests.current[name] === controller && scopedRequestKey(current) === key; }
+    function invalidateScopedRequests(previous, next) {
+        const changed = command.fields.some(f => (remoteSources.has(f.source) || f.name.endsWith('_id') || contextFields.includes(f.name)) && previous[f.name] !== next[f.name]);
+        if (changed)
+            for (const name of ['reload', 'cancelRun']) {
+                requests.current[name]?.abort();
+                delete requests.current[name];
+            }
+    }
+    function fieldContext(name, current = valuesRef.current) {
+        const source = command.fields.find(f => f.name === name)?.source;
+        const names = source === 'document_nodes' ? ['document_id', 'version_id'] : source === 'versions' ? ['document_id', 'id'] : source === 'provenance_source' ? ['source_type'] : source === 'provenance_target' ? ['target_type'] : source === 'provenance_typed_endpoint' ? ['kind', 'endpoint_type'] : source === 'provenance_endpoints' ? ['source_type', 'target_type', 'kind', 'endpoint_type'] : [];
+        return JSON.stringify(Object.fromEntries(names.filter(key => command.fields.some(f => f.name === key)).map(key => [key, current[key]])));
+    }
+    function requestKey(name) { return fieldContext(name) + '|' + (queriesRef.current[name] || ''); }
+    function dependentFields(name) {
+        if (name === 'document_id' || name === 'id' && command.fields.find(f => f.name === name)?.source === 'documents')
+            return ['version_id', 'node_id', 'parent_id'];
+        return { version_id: ['parent_id', 'node_id'], source_type: ['source_id'], target_type: ['target_id'], kind: ['record_id'], endpoint_type: ['endpoint_id'] }[name] || [];
+    }
+    function clearDependents(name, value) {
+        const cleared = valuesRef.current[name] !== value ? dependentFields(name) : [];
+        for (const field of cleared) {
+            requests.current['record:' + field]?.abort();
+            delete requests.current['record:' + field];
+        }
+        if (cleared.length) {
+            invalidateScopedRequests(valuesRef.current, { ...valuesRef.current, ...Object.fromEntries(cleared.map(field => [field, ''])) });
+            setResolving(previous => ({ ...previous, ...Object.fromEntries(cleared.map(field => [field, false])) }));
+            setChoiceRecords(previous => { const next = { ...previous }; for (const field of cleared)
+                delete next[field]; return next; });
+        }
+        return cleared;
+    }
+    (0, react_1.useEffect)(() => { alive.current = true; return () => { alive.current = false; for (const controller of Object.values(requests.current))
+        controller.abort(); }; }, []);
+    function choicePath(name, id) { return (0, api_1.projectPath)(stateRef.current.project.id, `/commands/${encodeURIComponent(command.name)}/fields/${encodeURIComponent(name)}/choices${id ? '/' + encodeURIComponent(id) : ''}`); }
+    function asError(e) { return e instanceof api_1.ApiError ? e : new api_1.ApiError('invalid', e instanceof Error ? e.message : String(e)); }
+    function recordValues(previous, name, record, preserveDraft = false) {
+        const next = { ...previous };
+        if (['id', 'document_id', 'node_id', 'edge_id', 'annotation_id'].includes(name) && record.revision !== undefined)
+            next.revision = record.revision;
+        if (!preserveDraft && command.name === 'annotation.update' && name === 'annotation_id') {
+            next.content = record.text;
+            next.state = record.state;
+        }
+        return next;
+    }
+    (0, react_1.useEffect)(() => {
+        const controller = new AbortController();
+        for (const field of command.fields.filter(f => remoteSources.has(f.source))) {
+            requests.current['page:' + field.name]?.abort();
+            delete requests.current['page:' + field.name];
+            const key = requestKey(field.name);
+            setChoiceLoading(previous => ({ ...previous, [field.name]: true }));
+            const params = new URLSearchParams({ values: contextKey, query: queries[field.name] || '', limit: '100', offset: '0' });
+            (0, api_1.api)(choicePath(field.name) + '?' + params, 'GET', undefined, controller.signal)
+                .then(page => { if (alive.current && !controller.signal.aborted && requestKey(field.name) === key)
+                setChoices(previous => ({ ...previous, [field.name]: page })); })
+                .catch(e => { if (alive.current && e.name !== 'AbortError' && !controller.signal.aborted)
+                setError(asError(e)); })
+                .finally(() => { if (!controller.signal.aborted)
+                setChoiceLoading(previous => ({ ...previous, [field.name]: false })); });
+        }
+        return () => controller.abort();
+    }, [command.name, state.project.id, contextKey, JSON.stringify(queries)]);
+    (0, react_1.useEffect)(() => { for (const field of command.fields.filter(f => remoteSources.has(f.source) && valuesRef.current[f.name]))
+        void selectRemote(field.name, valuesRef.current[field.name]); }, [command.name, state.project.id]);
+    async function selectRemote(name, value) {
+        requests.current['record:' + name]?.abort();
+        const before = valuesRef.current;
+        const cleared = clearDependents(name, value);
+        const nextValues = { ...before, ...Object.fromEntries(cleared.map(field => [field, ''])), [name]: value, ...(['id', 'document_id', 'node_id', 'edge_id', 'annotation_id'].includes(name) ? { revision: '' } : {}) };
+        invalidateScopedRequests(before, nextValues);
+        setValues(previous => ({ ...previous, ...Object.fromEntries(cleared.map(field => [field, ''])), [name]: value, ...(['id', 'document_id', 'node_id', 'edge_id', 'annotation_id'].includes(name) ? { revision: '' } : {}) }));
+        setChoiceRecords(previous => { const next = { ...previous }; delete next[name]; return next; });
+        if (!value) {
+            delete requests.current['record:' + name];
+            setResolving(previous => ({ ...previous, [name]: false }));
+            return;
+        }
+        const controller = new AbortController();
+        requests.current['record:' + name] = controller;
+        const key = fieldContext(name);
+        setResolving(previous => ({ ...previous, [name]: true }));
+        try {
+            const record = await (0, api_1.api)(choicePath(name, value) + '?' + new URLSearchParams({ values: contextKey }), 'GET', undefined, controller.signal);
+            if (!alive.current || controller.signal.aborted || requests.current['record:' + name] !== controller || fieldContext(name) !== key || valuesRef.current[name] !== value)
+                return;
+            setValues(previous => previous[name] === value ? recordValues(previous, name, record) : previous);
+            setChoiceRecords(previous => ({ ...previous, [name]: record }));
+        }
+        catch (e) {
+            if (alive.current && !controller.signal.aborted)
+                setError(asError(e));
+        }
+        finally {
+            if (alive.current && requests.current['record:' + name] === controller) {
+                delete requests.current['record:' + name];
+                setResolving(previous => ({ ...previous, [name]: false }));
+            }
+        }
+    }
+    async function moreChoices(name) {
+        const offset = choices[name]?.next_offset;
+        if (offset == null)
+            return;
+        requests.current['page:' + name]?.abort();
+        const controller = new AbortController();
+        requests.current['page:' + name] = controller;
+        const key = requestKey(name);
+        setChoiceLoading(previous => ({ ...previous, [name]: true }));
+        try {
+            const page = await (0, api_1.api)(choicePath(name) + '?' + new URLSearchParams({ values: contextKey, query: queries[name] || '', limit: '100', offset: String(offset) }), 'GET', undefined, controller.signal);
+            if (!alive.current || controller.signal.aborted || requestKey(name) !== key)
+                return;
+            setChoices(previous => ({ ...previous, [name]: { ...page, items: [...(previous[name]?.items || []), ...page.items] } }));
+        }
+        catch (e) {
+            if (alive.current && !controller.signal.aborted)
+                setError(asError(e));
+        }
+        finally {
+            if (alive.current && requests.current['page:' + name] === controller) {
+                delete requests.current['page:' + name];
+                setChoiceLoading(previous => ({ ...previous, [name]: false }));
+            }
+        }
+    }
+    const set = (name, value) => {
+        const before = valuesRef.current, cleared = clearDependents(name, value), next = { ...before, ...Object.fromEntries(cleared.map(field => [field, ''])), [name]: value };
+        const record = (0, utils_1.allRecords)(state).find(r => r.id === value);
+        if (record && ['id', 'source_id'].includes(name)) {
+            next.revision = record.revision;
+            if (command.name.endsWith('.update')) {
+                Object.assign(next, (0, utils_1.commandDefaults)(record));
+            }
+        }
+        if (record && name === 'target_id' && 'target_revision' in next)
+            next.target_revision = record.revision;
+        if (name === 'asset_id')
+            next.media_id = '';
+        invalidateScopedRequests(before, next);
+        setValues(next);
+    };
+    async function submit(e) {
+        e.preventDefault();
+        if (busyRef.current || Object.values(resolving).some(Boolean) || !alive.current)
+            return;
+        busyRef.current = true;
+        setBusy(true);
+        setError(null);
+        const controller = new AbortController();
+        requests.current.submit?.abort();
+        requests.current.submit = controller;
+        try {
+            const payload = {};
+            for (const f of command.fields) {
+                let v = values[f.name];
+                if (v === '' && !f.required) {
+                    if (command.name.endsWith('.update') && ['location_id', 'duration', 'media_id'].includes(f.name)) {
+                        payload[f.name] = null;
+                        continue;
+                    }
+                    if (f.source || ['integer', 'number', 'json', 'select'].includes(f.type))
+                        continue;
+                    if (!command.name.endsWith('.update') && !['content', 'notes'].includes(f.name) && f.type !== 'tags')
+                        continue;
+                }
+                if (f.type === 'integer')
+                    v = Number.parseInt(v, 10);
+                if (f.type === 'number')
+                    v = v === '' ? null : Number(v);
+                if (f.type === 'json')
+                    v = typeof v === 'string' ? JSON.parse(v) : v;
+                if (f.type === 'tags')
+                    v = Array.isArray(v) ? v : String(v).split(',').map(s => s.trim()).filter(Boolean);
+                payload[f.name] = v;
+            }
+            const result = await (0, api_1.api)((0, api_1.projectPath)(stateRef.current.project.id, `/commands/${encodeURIComponent(command.name)}`), 'POST', payload, controller.signal);
+            if (!alive.current || controller.signal.aborted || requests.current.submit !== controller)
+                return;
+            await onDone(result, command.name);
+            if (alive.current && !controller.signal.aborted && requests.current.submit === controller)
+                onClose();
+        }
+        catch (e) {
+            if (alive.current && !controller.signal.aborted && requests.current.submit === controller)
+                setError(e instanceof api_1.ApiError ? e : new api_1.ApiError('invalid', e instanceof Error ? e.message : String(e)));
+        }
+        finally {
+            busyRef.current = false;
+            if (alive.current && requests.current.submit === controller) {
+                delete requests.current.submit;
+                setBusy(false);
+            }
+        }
+    }
+    async function cancelRun() {
+        if (!alive.current || cancelBusy)
+            return;
+        requests.current.cancelRun?.abort();
+        const controller = new AbortController();
+        requests.current.cancelRun = controller;
+        const key = scopedRequestKey(valuesRef.current);
+        setCancelBusy(true);
+        const current = () => scopedRequestIsCurrent('cancelRun', controller, key);
+        try {
+            const fresh = await onReload();
+            if (!current())
+                return;
+            const job = fresh.jobs.find(j => j.id === valuesRef.current.id);
+            if (job && ['queued', 'running'].includes(job.status)) {
+                await (0, api_1.api)((0, api_1.projectPath)(stateRef.current.project.id, '/commands/job.cancel'), 'POST', { id: job.id, revision: job.revision }, controller.signal);
+            }
+        }
+        catch (e) {
+            if (current())
+                setError(asError(e));
+        }
+        finally {
+            if (requests.current.cancelRun === controller) {
+                delete requests.current.cancelRun;
+                if (alive.current && !controller.signal.aborted)
+                    setCancelBusy(false);
+            }
+        }
+    }
+    async function reload() {
+        requests.current.reload?.abort();
+        const controller = new AbortController();
+        requests.current.reload = controller;
+        const selected = { ...valuesRef.current };
+        const key = scopedRequestKey(selected);
+        const serializedContext = contextFor(selected);
+        const current = () => scopedRequestIsCurrent('reload', controller, key);
+        try {
+            const fresh = await onReload();
+            if (!current())
+                return;
+            const field = command.fields.find(f => remoteSources.has(f.source) && ['id', 'document_id', 'node_id', 'edge_id', 'annotation_id'].includes(f.name) && selected[f.name]);
+            if (field) {
+                const recordId = selected[field.name];
+                const record = await (0, api_1.api)(choicePath(field.name, recordId) + '?' + new URLSearchParams({ values: serializedContext }), 'GET', undefined, controller.signal);
+                if (!current() || valuesRef.current[field.name] !== recordId)
+                    return;
+                setValues(previous => scopedRequestKey(previous) === key && previous[field.name] === recordId ? recordValues(previous, field.name, record, true) : previous);
+                setChoiceRecords(previous => scopedRequestKey(valuesRef.current) === key && valuesRef.current[field.name] === recordId ? ({ ...previous, [field.name]: record }) : previous);
+                if (current())
+                    setError(null);
+                return;
+            }
+            const currentRecord = (0, utils_1.allRecords)(fresh).find(record => record.id === selected.id);
+            if (currentRecord) {
+                setValues(previous => scopedRequestKey(previous) === key && previous.id === selected.id ? recordValues(previous, 'id', currentRecord, true) : previous);
+                if (current())
+                    setError(null);
+            }
+        }
+        catch (e) {
+            if (current())
+                setError(asError(e));
+        }
+        finally {
+            if (requests.current.reload === controller)
+                delete requests.current.reload;
+        }
+    }
+    return react_1.default.createElement(Primitives_1.Modal, { title: command.label, returnFocusSelector: "[data-action-search]", onClose: () => { if (!busy)
+            onClose(); }, wide: command.fields.length > 10 },
+        react_1.default.createElement("form", { onSubmit: submit },
+            react_1.default.createElement("div", { className: "modal-body" },
+                react_1.default.createElement("p", { className: "muted" }, command.read_only ? 'View information saved in this project.' : 'Changes are saved to this project and appear throughout Storyboarder.'),
+                command.name === 'job.run' && react_1.default.createElement("div", { className: "notice warning" }, "Only run tools you trust. They run on this computer with the access allowed to your account."),
+                busy && react_1.default.createElement("div", { className: "notice", role: "status" }, "Saving this action. Editing is paused until the request finishes."),
+                error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error.message }, error.status === 409 && react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("p", null, "Your edits are still here. Refresh the project to see the latest saved details, then reapply your changes."),
+                    react_1.default.createElement("button", { type: "button", onClick: reload }, "Refresh project details"))),
+                react_1.default.createElement("fieldset", { className: "action-fields", disabled: busy },
+                    react_1.default.createElement("div", { className: command.fields.length > 10 ? 'form-grid' : 'form-stack' }, command.fields.map(f => {
+                        const remote = remoteSources.has(f.source);
+                        const records = choices[f.name]?.items || [];
+                        const opts = remote ? records.map(r => ({ value: r.id, label: r.label })) : (0, utils_1.selectOptions)(f, state, meta, values);
+                        const chosen = choiceRecords[f.name];
+                        if (remote && chosen && chosen.id === values[f.name] && !opts.some(o => o.value === chosen.id))
+                            opts.push({ value: chosen.id, label: chosen.label || chosen.title || chosen.id });
+                        const isSource = !!f.source || !!f.options.length;
+                        const label = (0, utils_1.fieldLabel)(f.name, f.label);
+                        if (f.name === 'revision' || f.name === 'target_revision')
+                            return react_1.default.createElement("input", { type: "hidden", key: f.name, value: values[f.name] ?? '' });
+                        if (f.type === 'boolean')
+                            return react_1.default.createElement("label", { className: "check-field", key: f.name },
+                                react_1.default.createElement("input", { type: "checkbox", checked: !!values[f.name], onChange: (e) => set(f.name, e.target.checked) }),
+                                react_1.default.createElement("span", null, label));
+                        return react_1.default.createElement("div", { className: `field ${f.type === 'textarea' || f.type === 'json' ? 'full' : ''}`, key: f.name },
+                            remote && react_1.default.createElement("input", { "aria-label": `Search ${label}`, type: "search", placeholder: `Search ${label.toLowerCase()}…`, value: queries[f.name] || '', onChange: (e) => setQueries(previous => ({ ...previous, [f.name]: e.target.value })) }),
+                            react_1.default.createElement("label", { className: "field" },
+                                react_1.default.createElement("span", null,
+                                    label,
+                                    f.required && react_1.default.createElement("span", { "aria-hidden": "true" }, " *")),
+                                isSource ? react_1.default.createElement("select", { value: values[f.name] ?? '', onChange: (e) => remote ? void selectRemote(f.name, e.target.value) : set(f.name, e.target.value), required: f.required },
+                                    react_1.default.createElement("option", { value: "" }, f.required ? 'Choose…' : f.name === 'location_id' ? 'Use location from above' : 'Not set'),
+                                    opts.map(o => react_1.default.createElement("option", { key: o.value, value: o.value }, o.label))) : f.type === 'textarea' || f.type === 'json' ? react_1.default.createElement("textarea", { rows: f.type === 'json' ? 5 : 3, value: typeof values[f.name] === 'object' ? JSON.stringify(values[f.name], null, 2) : values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required, spellCheck: f.type !== 'json' }) : react_1.default.createElement("input", { type: f.type === 'integer' || f.type === 'number' ? 'number' : 'text', step: f.type === 'number' ? 'any' : undefined, value: Array.isArray(values[f.name]) ? values[f.name].join(', ') : values[f.name] ?? '', onChange: (e) => set(f.name, e.target.value), required: f.required })),
+                            remote && choiceLoading[f.name] && react_1.default.createElement("small", { role: "status" }, "Loading choices\u2026"),
+                            remote && choices[f.name]?.next_offset != null && react_1.default.createElement("button", { type: "button", disabled: choiceLoading[f.name], onClick: () => void moreChoices(f.name) },
+                                "Load more ",
+                                label.toLowerCase(),
+                                " choices"),
+                            " ",
+                            f.help && react_1.default.createElement("small", null, f.help),
+                            isSource && !opts.length && !choiceLoading[f.name] && f.required && react_1.default.createElement("small", { className: "warning-text" }, (0, utils_1.emptySourceMessage)(f.source)));
+                    }))),
+                command.destructive && react_1.default.createElement("label", { className: "confirm-field" },
+                    react_1.default.createElement("input", { type: "checkbox", checked: confirmed, onChange: (e) => setConfirmed(e.target.checked), required: true, disabled: busy }),
+                    "I understand this will change the project.")),
+            react_1.default.createElement("div", { className: "modal-footer" },
+                busy && command.name === 'job.run' && react_1.default.createElement("button", { type: "button", className: "danger", disabled: cancelBusy, onClick: cancelRun }, "Stop this run"),
+                react_1.default.createElement("button", { type: "button", onClick: onClose, disabled: busy }, "Cancel"),
+                react_1.default.createElement("button", { className: command.destructive ? 'danger' : 'primary', type: "submit", disabled: busy || Object.values(resolving).some(Boolean) || (command.destructive && !confirmed) }, busy ? 'Working…' : command.read_only ? 'Show result' : command.label))));
+}
+
+},
+"components/Inspector":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Inspector = Inspector;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const utils_1 = require("../utils");
+const Primitives_1 = require("./Primitives");
+const ShotIntent_1 = require("./ShotIntent");
+function shotTitle(entity) {
+    const number = String(entity.fields.number || '');
+    return number && entity.title.startsWith(number)
+        ? entity.title.slice(number.length).replace(/^\s*[·—:-]\s*/, '') || entity.title
+        : entity.title;
+}
+function labeledRows(value) {
+    return String(value || '').split(/\n+/).flatMap(line => {
+        const colon = line.indexOf(':');
+        if (colon < 1)
+            return [];
+        const label = line.slice(0, colon).trim(), text = line.slice(colon + 1).trim();
+        return label && text ? [{ label, value: text }] : [];
+    });
+}
+function SpecList({ rows, className = '' }) {
+    return react_1.default.createElement("dl", { className: `shot-spec-list ${className}` }, rows.map((row, index) => react_1.default.createElement("div", { className: "shot-spec", key: `${row.label}-${index}` },
+        react_1.default.createElement("dt", null, row.label),
+        react_1.default.createElement("dd", null, row.value))));
+}
+function ShotDetails({ entity, state }) {
+    const fields = entity.fields;
+    const cameraRows = labeledRows(fields.camera);
+    const noteRows = labeledRows(fields.notes);
+    const framing = String(fields.framing || '');
+    const framingBreak = framing.indexOf(' — ');
+    const framingLabel = framingBreak < 0 ? framing : framing.slice(0, framingBreak);
+    const framingDetail = framingBreak < 0 ? '' : framing.slice(framingBreak + 3);
+    const location = state.entities.find(e => e.id === fields.location_id)?.title;
+    const scene = state.entities.find(e => e.id === entity.parent_id);
+    const sequence = scene && state.entities.find(e => e.id === scene.parent_id);
+    const frames = state.frames.filter(frame => frame.shot_id === entity.id);
+    const special = new Set(['number', 'action', 'framing', 'duration', 'time', 'location_id', 'camera', 'notes', 'continuity', 'constraints']);
+    const otherFields = Object.entries(fields).filter(([key, value]) => !special.has(key) && value !== null && value !== '');
+    const action = String(fields.action || entity.description || 'No action has been added yet.');
+    const displayBeat = shotTitle(entity);
+    const summary = action.endsWith(` — ${displayBeat}`) ? action.slice(0, -displayBeat.length - 3) : action;
+    const duration = fields.duration == null ? '' : `${Number(fields.duration)} sec`;
+    return react_1.default.createElement(react_1.default.Fragment, null,
+        react_1.default.createElement("div", { className: "shot-detail-hero" },
+            (sequence || scene) && react_1.default.createElement("div", { className: "shot-path" },
+                sequence ? (0, utils_1.displayTitle)(sequence.title) : '',
+                sequence && scene ? ' / ' : '',
+                scene ? (0, utils_1.displayTitle)(scene.title) : ''),
+            react_1.default.createElement("p", { className: "shot-action" }, summary),
+            react_1.default.createElement("div", { className: "shot-facts" },
+                framing && react_1.default.createElement("div", { className: "shot-fact" },
+                    react_1.default.createElement("span", null, "Framing"),
+                    react_1.default.createElement("strong", null, framingLabel),
+                    framingDetail && react_1.default.createElement("small", null, framingDetail)),
+                fields.time && react_1.default.createElement("div", { className: "shot-fact" },
+                    react_1.default.createElement("span", null, "Time"),
+                    react_1.default.createElement("strong", null, String(fields.time))),
+                duration && react_1.default.createElement("div", { className: "shot-fact" },
+                    react_1.default.createElement("span", null, "Duration"),
+                    react_1.default.createElement("strong", null, duration)),
+                react_1.default.createElement("div", { className: "shot-fact" },
+                    react_1.default.createElement("span", null, "Location"),
+                    react_1.default.createElement("strong", null, location ? (0, utils_1.displayTitle)(location) : 'Not assigned')),
+                react_1.default.createElement("div", { className: "shot-fact" },
+                    react_1.default.createElement("span", null, "Storyboard"),
+                    react_1.default.createElement("strong", null, frames.length ? `${frames.length} storyboard image${frames.length === 1 ? '' : 's'}` : 'No storyboard image yet')))),
+        fields.camera && react_1.default.createElement("section", { className: "detail-field shot-camera-field" },
+            react_1.default.createElement("div", { className: "shot-section-heading" },
+                react_1.default.createElement("h4", null, "Camera plan"),
+                cameraRows.length > 0 && react_1.default.createElement("small", null,
+                    cameraRows.length,
+                    " settings")),
+            cameraRows.length ? react_1.default.createElement(SpecList, { rows: cameraRows }) : react_1.default.createElement("p", { className: "prose" }, String(fields.camera))),
+        fields.continuity && react_1.default.createElement("section", { className: "detail-field shot-callout" },
+            react_1.default.createElement("h4", null, "Continuity"),
+            react_1.default.createElement("p", { className: "prose" }, String(fields.continuity))),
+        fields.constraints && react_1.default.createElement("section", { className: "detail-field shot-callout" },
+            react_1.default.createElement("h4", null, "Production notes"),
+            react_1.default.createElement("p", { className: "prose" }, String(fields.constraints))),
+        fields.notes && react_1.default.createElement("details", { className: "shot-notes-block" },
+            react_1.default.createElement("summary", null,
+                react_1.default.createElement("span", null, "Image, sound & story notes"),
+                react_1.default.createElement("small", null, noteRows.length ? `${noteRows.length} notes` : 'Show notes')),
+            noteRows.length ? react_1.default.createElement(SpecList, { rows: noteRows, className: "shot-note-list" }) : react_1.default.createElement("p", { className: "prose" }, String(fields.notes))),
+        otherFields.map(([key, value]) => react_1.default.createElement("section", { className: "detail-field", key: key },
+            react_1.default.createElement("h4", null, (0, utils_1.human)(key)),
+            react_1.default.createElement("p", { className: "prose" }, String(value)))));
+}
+function Inspector({ state, id, onClose, onSelect, action }) {
+    const entity = state.entities.find(e => e.id === id);
+    const contextRefreshRevision = state.events[0]?.id;
+    const [tab, setTab] = (0, react_1.useState)('details'), [context, setContext] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''), [contextLoading, setContextLoading] = (0, react_1.useState)(false);
+    const contextRequest = (0, react_1.useRef)(0), contextOwner = (0, react_1.useRef)({ id, projectId: state.project.id });
+    contextOwner.current = { id, projectId: state.project.id };
+    async function loadContext(ownerId, projectId) { const request = ++contextRequest.current; setContextLoading(true); setError(''); try {
+        const value = await (0, api_1.runCommand)(projectId, 'context.resolve', { owner_id: ownerId });
+        if (request === contextRequest.current && contextOwner.current.id === ownerId && contextOwner.current.projectId === projectId)
+            setContext(value);
+    }
+    catch (e) {
+        if (request === contextRequest.current && contextOwner.current.id === ownerId && contextOwner.current.projectId === projectId)
+            setError(e.message || 'Could not load story direction.');
+    }
+    finally {
+        if (request === contextRequest.current && contextOwner.current.id === ownerId && contextOwner.current.projectId === projectId)
+            setContextLoading(false);
+    } }
+    (0, react_1.useEffect)(() => { setContext(null); setError(''); if (entity && entity.kind !== 'asset')
+        void loadContext(id, state.project.id);
+    else
+        setContextLoading(false); return () => { contextRequest.current += 1; }; }, [state.project.id, id, entity?.kind, contextRefreshRevision]);
+    const panel = (0, react_1.useRef)(null);
+    const closeRef = (0, react_1.useRef)(onClose);
+    closeRef.current = onClose;
+    (0, react_1.useEffect)(() => { if (entity?.kind === 'asset' && tab === 'context')
+        setTab('details'); }, [entity?.kind, tab]);
+    (0, react_1.useEffect)(() => {
+        const narrow = window.matchMedia('(max-width:800px)');
+        const el = panel.current;
+        let previous = null;
+        const sync = () => {
+            const main = document.getElementById('main-content');
+            if (main)
+                main.inert = narrow.matches;
+            if (el) {
+                el.setAttribute('role', narrow.matches ? 'dialog' : 'complementary');
+                if (narrow.matches) {
+                    el.setAttribute('aria-modal', 'true');
+                    previous = document.activeElement;
+                    el.querySelector('button')?.focus();
+                }
+                else
+                    el.removeAttribute('aria-modal');
+            }
+        };
+        const key = (e) => {
+            if (!narrow.matches)
+                return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeRef.current();
+            }
+            if (e.key === 'Tab') {
+                const items = Array.from(el?.querySelectorAll('button:not(:disabled),a[href],input,select,textarea,[tabindex="0"]') || []).filter(i => i.offsetParent !== null);
+                const first = items[0], last = items[items.length - 1];
+                if (e.shiftKey && document.activeElement === first) {
+                    e.preventDefault();
+                    last?.focus();
+                }
+                else if (!e.shiftKey && document.activeElement === last) {
+                    e.preventDefault();
+                    first?.focus();
+                }
+            }
+        };
+        sync();
+        narrow.addEventListener('change', sync);
+        el?.addEventListener('keydown', key);
+        return () => { narrow.removeEventListener('change', sync); el?.removeEventListener('keydown', key); const main = document.getElementById('main-content'); if (main)
+            main.inert = false; previous?.focus(); };
+    }, []);
+    if (!entity)
+        return null;
+    const tabs = ['details', 'references', ...(entity.kind === 'shot' ? ['shot-intent'] : []), ...(entity.kind === 'asset' ? [] : ['context'])];
+    const activeTab = tabs.includes(tab) ? tab : 'details';
+    const tabPrefix = `inspector-${encodeURIComponent(id)}`;
+    function moveTab(event, index) { let next = null; if (event.key === 'ArrowRight')
+        next = (index + 1) % tabs.length;
+    else if (event.key === 'ArrowLeft')
+        next = (index + tabs.length - 1) % tabs.length;
+    else if (event.key === 'Home')
+        next = 0;
+    else if (event.key === 'End')
+        next = tabs.length - 1; if (next === null)
+        return; event.preventDefault(); const nextTab = tabs[next]; setTab(nextTab); document.getElementById(`${tabPrefix}-tab-${nextTab}`)?.focus(); }
+    const members = state.asset_media.filter(m => m.asset_id === id), assignments = state.assignments.filter(a => a.shot_id === id || a.asset_id === id), links = state.links.filter(l => l.source_id === id || l.target_id === id), frames = state.frames.filter(f => f.shot_id === id);
+    return react_1.default.createElement("aside", { ref: panel, className: "inspector", "aria-label": "Item details" },
+        react_1.default.createElement("div", { className: "inspector-top" },
+            react_1.default.createElement("span", { className: "eyebrow" }, "Details"),
+            react_1.default.createElement("button", { className: "icon-button", onClick: onClose, "aria-label": "Close inspector" },
+                react_1.default.createElement(Primitives_1.Icon, { name: "close" }))),
+        react_1.default.createElement("div", { className: "inspector-title" },
+            react_1.default.createElement(Primitives_1.Badge, { kind: (0, utils_1.kindLabel)(entity) }, (0, utils_1.kindLabel)(entity)),
+            !!entity.archived && react_1.default.createElement(Primitives_1.Badge, null, "Archived"),
+            react_1.default.createElement("h2", null, entity.kind === 'shot' ? (0, utils_1.displayTitle)(shotTitle(entity)) : (0, utils_1.displayTitle)(entity.title)),
+            entity.kind === 'shot' && react_1.default.createElement("span", { className: "shot-code" },
+                "Shot ",
+                String(entity.fields.number || String(entity.position + 1).padStart(2, '0'))),
+            react_1.default.createElement("details", { className: "technical-meta" },
+                react_1.default.createElement("summary", null, "Technical details"),
+                react_1.default.createElement("small", null,
+                    "Internal ID ",
+                    id,
+                    " \u00B7 saved version ",
+                    entity.revision)),
+            react_1.default.createElement("button", { className: "full-button", onClick: () => action(entity.kind + '.update', (0, utils_1.commandDefaults)(entity)) },
+                react_1.default.createElement(Primitives_1.Icon, { name: "edit" }),
+                "Edit ",
+                (0, utils_1.kindLabel)(entity).toLowerCase(),
+                " details")),
+        react_1.default.createElement("div", { className: "tabs", role: "tablist", "aria-label": "Item details sections" }, tabs.map((t, index) => react_1.default.createElement("button", { key: t, id: `${tabPrefix}-tab-${t}`, type: "button", role: "tab", "aria-selected": activeTab === t, "aria-controls": `${tabPrefix}-panel-${t}`, tabIndex: activeTab === t ? 0 : -1, onClick: () => setTab(t), onKeyDown: (event) => moveTab(event, index) }, t === 'shot-intent' ? 'Shot intent' : (0, utils_1.human)(t)))),
+        tabs.filter(t => t !== activeTab).map(t => react_1.default.createElement("div", { key: t, hidden: true, role: "tabpanel", id: `${tabPrefix}-panel-${t}`, "aria-labelledby": `${tabPrefix}-tab-${t}`, tabIndex: 0 })),
+        react_1.default.createElement("div", { className: "inspector-body", role: "tabpanel", id: `${tabPrefix}-panel-${activeTab}`, "aria-labelledby": `${tabPrefix}-tab-${activeTab}`, tabIndex: 0 },
+            activeTab === 'details' && react_1.default.createElement(react_1.default.Fragment, null,
+                entity.kind === 'shot' ? react_1.default.createElement(ShotDetails, { entity: entity, state: state }) : react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("p", { className: "prose" }, entity.description || 'No description yet.'),
+                    Object.entries(entity.fields).filter(([k, v]) => v !== null && v !== '' && k !== 'type').map(([key, value]) => react_1.default.createElement("section", { className: "detail-field", key: key },
+                        react_1.default.createElement("h4", null, (0, utils_1.human)(key)),
+                        react_1.default.createElement("p", { className: "prose" }, key === 'location_id' ? (0, utils_1.displayTitle)(state.entities.find(e => e.id === value)?.title || String(value)) : String(value))))),
+                entity.tags.length > 0 && react_1.default.createElement("section", null,
+                    react_1.default.createElement("h4", null, "Tags"),
+                    react_1.default.createElement("div", { className: "tags" }, entity.tags.map(t => react_1.default.createElement("span", { key: t, className: "tag" }, t)))),
+                entity.aliases.length > 0 && react_1.default.createElement("section", null,
+                    react_1.default.createElement("h4", null, "Also known as"),
+                    react_1.default.createElement("p", null, entity.aliases.join(', '))),
+                entity.parent_id && react_1.default.createElement("button", { className: "text-button", onClick: () => onSelect(entity.parent_id) },
+                    "Part of: ",
+                    (0, utils_1.displayTitle)(state.entities.find(n => n.id === entity.parent_id)?.title || ''),
+                    " \u2192"),
+                links.length > 0 && react_1.default.createElement("h4", null, "Connected to"),
+                links.map(l => react_1.default.createElement("div", { key: l.id, className: "neighbor-row" },
+                    react_1.default.createElement("button", { className: "text-button", onClick: () => onSelect(l.source_id === id ? l.target_id : l.source_id) },
+                        l.source_id === id ? '→' : '←',
+                        " ",
+                        state.entities.find(n => n.id === (l.source_id === id ? l.target_id : l.source_id))?.title ? (0, utils_1.displayTitle)(state.entities.find(n => n.id === (l.source_id === id ? l.target_id : l.source_id)).title) : 'Connected item'),
+                    react_1.default.createElement("small", null, (0, utils_1.human)(l.relation)),
+                    react_1.default.createElement("button", { onClick: () => action('link.remove', (0, utils_1.commandDefaults)(l)) }, "Remove\u2026"))),
+                entity.kind === 'asset' && react_1.default.createElement("button", { onClick: () => action('link.create', { source_id: id }) }, "Connect to another library item"),
+                ['sequence', 'scene', 'shot'].includes(entity.kind) && react_1.default.createElement("button", { onClick: () => action('story.move', (0, utils_1.commandDefaults)(entity)) }, "Move / reorder\u2026"),
+                react_1.default.createElement("details", { className: "record-actions" },
+                    react_1.default.createElement("summary", null, "More options"),
+                    react_1.default.createElement("p", { className: "muted" }, "Changes affect this item wherever it appears."),
+                    react_1.default.createElement("button", { onClick: () => action('entity.usage', { id }) }, "See where it\u2019s used"),
+                    react_1.default.createElement("button", { onClick: () => action(entity.archived ? 'entity.restore' : 'entity.archive', (0, utils_1.commandDefaults)(entity)) }, entity.archived ? 'Restore item' : 'Archive item…'),
+                    react_1.default.createElement("button", { className: "danger", onClick: () => action('entity.delete', (0, utils_1.commandDefaults)(entity)) }, "Delete item\u2026"),
+                    entity.kind === 'asset' && react_1.default.createElement("button", { onClick: () => action('asset.merge', { source_id: id, revision: entity.revision }) }, "Combine with another library item\u2026"))),
+            activeTab === 'references' && react_1.default.createElement(react_1.default.Fragment, null,
+                entity.kind === 'asset' && react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("div", { className: "section-heading" },
+                        react_1.default.createElement("h3", null, "Reference images"),
+                        react_1.default.createElement("button", { onClick: () => action('asset.attach', { asset_id: id }) }, "Add image")),
+                    members.map(m => { const image = state.media.find(media => media.id === m.media_id); return react_1.default.createElement("div", { className: "inspector-image", key: m.id },
+                        react_1.default.createElement("a", { href: (0, api_1.originalUrl)(state.project.id, m.media_id), target: "_blank", rel: "noreferrer" },
+                            react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(state.project.id, m.media_id), alt: image?.original_name || 'Library image' })),
+                        react_1.default.createElement("strong", null, image?.original_name),
+                        react_1.default.createElement("small", null,
+                            image?.width,
+                            " \u00D7 ",
+                            image?.height,
+                            " \u00B7 ",
+                            image?.format?.toUpperCase()),
+                        react_1.default.createElement("div", { className: "button-row" },
+                            m.is_primary ? react_1.default.createElement(Primitives_1.Badge, null, "Cover image") : react_1.default.createElement("button", { onClick: () => action('asset.primary', (0, utils_1.commandDefaults)(m)) }, "Set as cover image"),
+                            react_1.default.createElement("button", { onClick: () => action('asset.detach', (0, utils_1.commandDefaults)(m)) }, "Remove\u2026"))); }),
+                    !members.length && react_1.default.createElement("p", { className: "muted" }, "No images here yet. Import one, then add it to this library item.")),
+                assignments.length > 0 && react_1.default.createElement("h3", null, entity.kind === 'asset' ? 'Used by shots' : 'References in this shot'),
+                assignments.map(a => { const other = state.entities.find(n => n.id === (entity.kind === 'asset' ? a.shot_id : a.asset_id)); return react_1.default.createElement("div", { className: "reference-row", key: a.id },
+                    a.media_id && react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(state.project.id, a.media_id, 160), alt: `${(0, utils_1.roleLabel)(a.role)} reference` }),
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("button", { className: "text-button", onClick: () => onSelect(other.id) }, other ? (0, utils_1.displayTitle)(other.title) : 'Library item'),
+                        react_1.default.createElement("small", null,
+                            (0, utils_1.roleLabel)(a.role),
+                            " \u00B7 ",
+                            a.media_id ? 'specific image selected' : 'no specific image selected'),
+                        react_1.default.createElement("div", { className: "button-row" },
+                            react_1.default.createElement("button", { onClick: () => action('assignment.update', { ...(0, utils_1.commandDefaults)(a), asset_id: a.asset_id }) }, "Edit"),
+                            react_1.default.createElement("button", { onClick: () => action('assignment.remove', (0, utils_1.commandDefaults)(a)) }, "Remove\u2026")))); }),
+                entity.kind === 'shot' && react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("button", { onClick: () => action('assignment.create', { shot_id: id }) }, "Add a reference"),
+                    react_1.default.createElement("h3", null, "Storyboard frames"),
+                    frames.map(f => react_1.default.createElement("div", { className: "frame-mini", key: f.id },
+                        react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(state.project.id, f.media_id), alt: `Storyboard image ${f.version}` }),
+                        react_1.default.createElement("span", null,
+                            "Image ",
+                            f.version),
+                        react_1.default.createElement(Primitives_1.Badge, { kind: f.state }, (0, utils_1.statusLabel)(f.state)))),
+                    react_1.default.createElement("button", { onClick: () => action('frame.attach', { shot_id: id }) }, "Add storyboard image"))),
+            activeTab === 'context' && react_1.default.createElement(react_1.default.Fragment, null,
+                error && react_1.default.createElement("div", { role: "alert", className: "notice error" },
+                    react_1.default.createElement("strong", null, "Could not load story direction."),
+                    react_1.default.createElement("p", null, error),
+                    react_1.default.createElement("button", { onClick: () => void loadContext(id, state.project.id) }, "Retry loading direction")),
+                contextLoading && !context && !error && react_1.default.createElement("p", { role: "status" }, "Loading story direction\u2026"),
+                context && react_1.default.createElement(Primitives_1.ContextView, { value: context }),
+                react_1.default.createElement("button", { onClick: () => action('context.put', { owner_id: id }) }, "Add direction note")),
+            activeTab === 'shot-intent' && entity.kind === 'shot' && react_1.default.createElement(ShotIntent_1.ShotIntent, { key: id, projectId: state.project.id, shot: entity })));
+}
+
+},
+"components/Primitives":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.Icon = Icon;
+exports.Empty = Empty;
+exports.PageHeading = PageHeading;
+exports.Badge = Badge;
+exports.ErrorNotice = ErrorNotice;
+exports.Modal = Modal;
+exports.Validation = Validation;
+exports.ContextView = ContextView;
+exports.ExportLinks = ExportLinks;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const utils_1 = require("../utils");
+function Icon({ name, size = 18 }) {
+    const paths = {
+        grid: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("rect", { x: "3", y: "3", width: "7", height: "7", rx: "1" }),
+            react_1.default.createElement("rect", { x: "14", y: "3", width: "7", height: "7", rx: "1" }),
+            react_1.default.createElement("rect", { x: "3", y: "14", width: "7", height: "7", rx: "1" }),
+            react_1.default.createElement("rect", { x: "14", y: "14", width: "7", height: "7", rx: "1" })),
+        home: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "m3 10 9-7 9 7v11H3z" }),
+            react_1.default.createElement("path", { d: "M9 21v-8h6v8" })),
+        inbox: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "M4 4h16l2 13v4H2v-4z" }),
+            react_1.default.createElement("path", { d: "M2 15h6l2 3h4l2-3h6" })),
+        library: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }),
+            react_1.default.createElement("path", { d: "m4 17 5-6 4 3 3-4 5 7" }),
+            react_1.default.createElement("circle", { cx: "8", cy: "7", r: "1" })),
+        graph: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("rect", { x: "2", y: "8", width: "6", height: "6", rx: "1" }),
+            react_1.default.createElement("rect", { x: "16", y: "2", width: "6", height: "6", rx: "1" }),
+            react_1.default.createElement("rect", { x: "16", y: "16", width: "6", height: "6", rx: "1" }),
+            react_1.default.createElement("path", { d: "m8 11 8-6M8 11l8 8" })),
+        outline: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "M5 4v16M5 7h14M5 13h14M5 19h14" }),
+            react_1.default.createElement("circle", { cx: "5", cy: "7", r: "1" }),
+            react_1.default.createElement("circle", { cx: "5", cy: "13", r: "1" })),
+        guide: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "M3 4h7l2 2 2-2h7v16h-7l-2 1-2-1H3zM12 6v15" })),
+        edit: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "m4 16 12-12 4 4L8 20l-5 1zM13 7l4 4" })),
+        frames: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("rect", { x: "2", y: "5", width: "14", height: "14", rx: "1" }),
+            react_1.default.createElement("path", { d: "M19 3h3v18h-3M2 15l4-4 4 4 3-2 3 4" })),
+        export: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "M12 3v12m-5-5 5 5 5-5M3 17v4h18v-4" })),
+        settings: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "M3 6h18M3 12h18M3 18h18" }),
+            react_1.default.createElement("circle", { cx: "8", cy: "6", r: "2" }),
+            react_1.default.createElement("circle", { cx: "16", cy: "12", r: "2" }),
+            react_1.default.createElement("circle", { cx: "10", cy: "18", r: "2" })),
+        automation: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "m9 4-6 8 6 8M15 4l6 8-6 8M14 3l-4 18" })),
+        plus: react_1.default.createElement("path", { d: "M12 4v16M4 12h16" }),
+        close: react_1.default.createElement("path", { d: "m6 6 12 12M18 6 6 18" }),
+        chevron: react_1.default.createElement("path", { d: "m9 5 7 7-7 7" }),
+        search: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("circle", { cx: "10", cy: "10", r: "6" }),
+            react_1.default.createElement("path", { d: "m15 15 6 6" })),
+        check: react_1.default.createElement("path", { d: "m4 12 5 5L20 6" }),
+        warning: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("circle", { cx: "12", cy: "12", r: "9" }),
+            react_1.default.createElement("path", { d: "M12 7v6m0 4h.01" })),
+        stop: react_1.default.createElement("rect", { x: "5", y: "5", width: "14", height: "14", rx: "2" }),
+        arrow: react_1.default.createElement("path", { d: "M3 12h18m-7-7 7 7-7 7" }),
+        refresh: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("path", { d: "M20 8a8 8 0 1 0 1 7M20 3v5h-5" })),
+        menu: react_1.default.createElement("path", { d: "M3 5h18M3 12h18M3 19h18" }),
+    };
+    return react_1.default.createElement("svg", { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.5", strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": "true" }, paths[name] || paths.grid);
+}
+function Empty({ title, children, action }) { return react_1.default.createElement("div", { className: "empty" },
+    react_1.default.createElement("span", { className: "empty-mark" },
+        react_1.default.createElement(Icon, { name: "outline", size: 28 })),
+    react_1.default.createElement("h3", null, title),
+    react_1.default.createElement("p", null, children),
+    action); }
+function PageHeading({ eyebrow, title, description, actions }) { return react_1.default.createElement("header", { className: "page-heading" },
+    react_1.default.createElement("div", null,
+        react_1.default.createElement("p", { className: "eyebrow" }, eyebrow),
+        react_1.default.createElement("h1", null, title),
+        description && react_1.default.createElement("p", { className: "lede" }, description)),
+    actions && react_1.default.createElement("div", { className: "heading-actions" }, actions)); }
+function Badge({ kind, children }) { return react_1.default.createElement("span", { className: `badge ${kind || ''}` }, children); }
+function ErrorNotice({ error, children }) { return react_1.default.createElement("div", { className: "notice error", role: "alert" },
+    react_1.default.createElement("strong", null, "We couldn\u2019t complete that."),
+    react_1.default.createElement("p", null, error),
+    children); }
+function Modal({ title, children, onClose, wide = false, returnFocusSelector }) {
+    const dialog = (0, react_1.useRef)(null);
+    const closeRef = (0, react_1.useRef)(onClose);
+    closeRef.current = onClose;
+    // Capture the opener during render: React may already have applied an input's
+    // autoFocus prop by the time this component's passive effect runs.
+    const opener = (0, react_1.useRef)(document.activeElement instanceof HTMLElement ? document.activeElement : null);
+    (0, react_1.useEffect)(() => {
+        const el = dialog.current;
+        const visible = (node) => node.getClientRects().length > 0 && getComputedStyle(node).visibility !== 'hidden' && !node.closest('[inert]');
+        const focusable = () => Array.from(el?.querySelectorAll('button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),a[href],[tabindex="0"]') || []).filter(visible);
+        const active = document.activeElement instanceof HTMLElement && el?.contains(document.activeElement) ? document.activeElement : null;
+        const requested = el?.querySelector('[autofocus]');
+        // Preserve React's native autoFocus result if it focused an element even when
+        // the renderer did not leave an [autofocus] attribute in the DOM.
+        (requested && visible(requested) ? requested : active && active !== el ? active : focusable()[0] || el)?.focus({ preventScroll: true });
+        const handler = (event) => { if (event.key === 'Escape') {
+            event.preventDefault();
+            closeRef.current();
+        } if (event.key === 'Tab') {
+            const items = focusable();
+            const first = items[0], last = items[items.length - 1];
+            if (!items.length) {
+                event.preventDefault();
+                el?.focus();
+            }
+            else if (event.shiftKey && (document.activeElement === first || !el?.contains(document.activeElement))) {
+                event.preventDefault();
+                last?.focus();
+            }
+            else if (!event.shiftKey && (document.activeElement === last || !el?.contains(document.activeElement))) {
+                event.preventDefault();
+                first?.focus();
+            }
+        } };
+        el?.addEventListener('keydown', handler);
+        return () => { el?.removeEventListener('keydown', handler); const saved = opener.current; const target = saved?.isConnected ? saved : returnFocusSelector ? document.querySelector(returnFocusSelector) : null; if (target?.isConnected && !target.matches(':disabled') && !target.closest('[inert]') && visible(target))
+            target.focus({ preventScroll: true }); };
+    }, []);
+    return react_1.default.createElement("div", { className: "modal-backdrop", onMouseDown: (e) => { if (e.target === e.currentTarget)
+            onClose(); } },
+        react_1.default.createElement("div", { ref: dialog, className: `modal ${wide ? 'wide' : ''}`, role: "dialog", "aria-modal": "true", "aria-labelledby": "modal-title", tabIndex: -1 },
+            react_1.default.createElement("div", { className: "modal-heading" },
+                react_1.default.createElement("h2", { id: "modal-title" }, title),
+                react_1.default.createElement("button", { className: "icon-button", onClick: onClose, "aria-label": "Close dialog" },
+                    react_1.default.createElement(Icon, { name: "close" }))),
+            children));
+}
+function Validation({ issues }) { if (!issues.length)
+    return react_1.default.createElement("p", { className: "success-line" },
+        react_1.default.createElement(Icon, { name: "check" }),
+        " All selected images are available."); return react_1.default.createElement("div", { className: "validation" },
+    react_1.default.createElement("h3", null,
+        "Production checks ",
+        react_1.default.createElement("span", { className: "count" }, issues.length)),
+    issues.map((i, n) => react_1.default.createElement("div", { key: `${i.code}-${n}`, className: `check-row ${i.severity}` },
+        react_1.default.createElement(Badge, null, (0, utils_1.human)(i.severity)),
+        react_1.default.createElement("span", null, i.message)))); }
+function ContextView({ value }) { return react_1.default.createElement("div", { className: "context-view" },
+    react_1.default.createElement("div", { className: "scope-chain" }, value.chain.map((c, i) => react_1.default.createElement("span", { key: c.id },
+        i > 0 && ' / ',
+        (0, utils_1.displayTitle)(c.title)))),
+    Object.entries(value.scalars).map(([key, entry]) => react_1.default.createElement("div", { className: "context-value", key: key },
+        react_1.default.createElement("span", { className: "eyebrow" }, (0, utils_1.human)(key)),
+        react_1.default.createElement("strong", null, entry.label || entry.value),
+        react_1.default.createElement("small", null,
+            (0, utils_1.sourceLabel)(entry.source.kind),
+            " \u00B7 ",
+            (0, utils_1.displayTitle)(entry.source.title)))),
+    Object.entries(value.blocks).map(([key, entries]) => react_1.default.createElement("section", { className: "direction-block", key: key },
+        react_1.default.createElement("h4", null, (0, utils_1.human)(key)),
+        entries.map((e, i) => react_1.default.createElement("div", { key: e.block_id || `${e.source.id}-${i}` },
+            react_1.default.createElement("p", { className: "prose" }, e.text),
+            react_1.default.createElement("small", null,
+                (0, utils_1.sourceLabel)(e.source.kind),
+                " \u00B7 ",
+                (0, utils_1.displayTitle)(e.source.title)))))),
+    !Object.keys(value.blocks).length && !Object.keys(value.scalars).length && react_1.default.createElement("p", { className: "muted" }, "No direction has been added yet. Add a note here or at a higher story level."),
+    value.history.filter(h => h.operation !== 'append').map((h, i) => react_1.default.createElement("p", { className: "context-rule", key: `${h.key}-${i}` },
+        react_1.default.createElement(Badge, null, (0, utils_1.operationLabel)(h.operation)),
+        " ",
+        (0, utils_1.human)(h.key),
+        " \u00B7 ",
+        (0, utils_1.displayTitle)(h.source.title),
+        h.removed_sources.length ? ` · ${h.removed_sources.length} earlier ${h.removed_sources.length === 1 ? 'note was changed' : 'notes were changed'}` : ''))); }
+function ExportLinks({ project, result }) { return react_1.default.createElement("div", { className: "export-result" },
+    react_1.default.createElement("p", { className: "success-line" },
+        react_1.default.createElement(Icon, { name: "check" }),
+        " Export saved in your project folder."),
+    react_1.default.createElement("code", null, result.path),
+    react_1.default.createElement("div", { className: "button-row" },
+        result.archive && react_1.default.createElement("a", { className: "button primary", href: (0, api_1.exportUrl)(project, result.archive, true) },
+            "Download project package (.zip) ",
+            react_1.default.createElement(Icon, { name: "export" })),
+        result.view && react_1.default.createElement("a", { className: "button", href: (0, api_1.exportUrl)(project, result.view), target: "_blank", rel: "noreferrer" },
+            "Open board ",
+            react_1.default.createElement(Icon, { name: "arrow" }))),
+    react_1.default.createElement("details", null,
+        react_1.default.createElement("summary", null, "Individual files"),
+        react_1.default.createElement("div", { className: "file-links" }, result.files?.filter(p => !p.endsWith('.zip')).map(path => react_1.default.createElement("a", { key: path, href: (0, api_1.exportUrl)(project, path, true) }, path.split('/').pop())))),
+    result.validation && react_1.default.createElement(Validation, { issues: result.validation })); }
+
+},
+"components/ShotIntent":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ShotIntent = ShotIntent;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const draftCache = new Map();
+const pendingDrafts = new Set();
+const draftListeners = new Map();
+const dirtyDraftOwners = new Set();
+const acceptedRecordEpochs = new Map();
+function acceptedRecordEpoch(key) { return acceptedRecordEpochs.get(key) || 0; }
+function noteAcceptedRecordWrite(key) { acceptedRecordEpochs.set(key, acceptedRecordEpoch(key) + 1); }
+function guardUnsavedUnload(event) { if (!dirtyDraftOwners.size && !pendingDrafts.size)
+    return; event.preventDefault(); event.returnValue = ''; }
+function updateUnloadGuard() { if (typeof window === 'undefined')
+    return; if (dirtyDraftOwners.size || pendingDrafts.size)
+    window.addEventListener('beforeunload', guardUnsavedUnload);
+else
+    window.removeEventListener('beforeunload', guardUnsavedUnload); }
+function setDraftDirty(key, dirty) { if (dirty)
+    dirtyDraftOwners.add(key);
+else
+    dirtyDraftOwners.delete(key); updateUnloadGuard(); }
+function notifyDraft(key, event, origin) { for (const listener of draftListeners.get(key) || [])
+    listener(event, origin); }
+function storeDraft(key, entry, origin) { const previous = draftCache.get(key); const accepted = { ...entry, validation: Object.prototype.hasOwnProperty.call(entry, 'validation') ? entry.validation ?? null : previous?.validation ?? null, recoveryBaseRecord: Object.prototype.hasOwnProperty.call(entry, 'recoveryBaseRecord') ? entry.recoveryBaseRecord ?? null : previous?.recoveryBaseRecord ?? null }; draftCache.set(key, accepted); setDraftDirty(key, JSON.stringify(accepted.baseRecord?.contract || emptyBody()) !== JSON.stringify(accepted.body)); notifyDraft(key, { entry: accepted, pending: pendingDrafts.has(key) }, origin); }
+function setDraftPending(key, pending, origin) { if (pending)
+    pendingDrafts.add(key);
+else
+    pendingDrafts.delete(key); updateUnloadGuard(); notifyDraft(key, { pending }, origin); }
+const emptyBody = () => ({ schema: 'storyboarder.observation-contract/v1', source_pins: [], script_intents: [], requirements: [], references: [], continuity: [], notes: '' });
+const copy = (value) => JSON.parse(JSON.stringify(value));
+async function showAndValidateRecord(projectId, initial, active = () => true) {
+    let record = initial;
+    for (let attempt = 0; attempt < 2; attempt++) {
+        if (!active())
+            return { record, validation: null, unstable: false, stopped: true };
+        const validation = await (0, api_1.runCommand)(projectId, 'observation.validate', { contract_id: record.id, version_id: record.selected_version_id });
+        if (!active())
+            return { record, validation: null, unstable: false, stopped: true };
+        const tupleMatches = validation.revision === record.revision && validation.version_id === record.selected_version_id;
+        if (tupleMatches)
+            return { record, validation, unstable: false, stopped: false };
+        if (attempt === 1)
+            return { record, validation: null, unstable: true, stopped: false };
+        record = await (0, api_1.runCommand)(projectId, 'observation.show', { contract_id: record.id });
+        if (!active())
+            return { record, validation: null, unstable: false, stopped: true };
+    }
+    return { record, validation: null, unstable: true, stopped: false };
+}
+function recordValidation(record) { return { ...record.validation, revision: record.revision, version_id: record.selected_version_id }; }
+function listItem(record, shotTitle) { return { id: record.id, shot_id: record.shot_id, current_version_id: record.current_version_id, revision: record.revision, shot_title: shotTitle, version_number: record.version.number }; }
+function stableId() { const bytes = new Uint8Array(16); crypto.getRandomValues(bytes); bytes[6] = (bytes[6] & 15) | 64; bytes[8] = (bytes[8] & 63) | 128; const hex = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join(''); return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`; }
+function sourceScope(row) { return row.inherited ? 'scene-context' : 'direct-element'; }
+function sourceName(row, details) { const kind = details?.nodeType || row.node_type; const title = details?.nodeTitle || row.title; return `${row.inherited ? 'Scene context' : 'Direct shot link'} · ${kind === 'scene' ? 'Scene node' : kind} · ${title || 'Untitled source'}`; }
+function readablePath(path) { return path.replace(/^\//, '').split('/').map(part => part.replace(/_id$/, ' ID').replace(/_/g, ' ')).join(' · '); }
+function displayValue(value) { if (value && typeof value === 'object')
+    return JSON.stringify(value); if (value === undefined)
+    return 'Not present'; return String(value); }
+function contractBodyChanges(before, after) {
+    const changes = [];
+    const stableArrayKey = (value) => { if (!value || typeof value !== 'object' || Array.isArray(value))
+        return null; const row = value; const key = typeof row.id === 'string' ? row.id : typeof row.edge_id === 'string' ? row.edge_id : null; return key ? `${typeof row.id === 'string' ? 'id' : 'edge_id'}=${key}` : null; };
+    const visit = (left, right, path) => {
+        if (Object.is(left, right))
+            return;
+        if (Array.isArray(left) && Array.isArray(right)) {
+            const leftKeys = left.map(stableArrayKey), rightKeys = right.map(stableArrayKey);
+            if (leftKeys.every(Boolean) && rightKeys.every(Boolean)) {
+                const leftByKey = new Map(left.map((value, index) => [leftKeys[index], value]));
+                const rightByKey = new Map(right.map((value, index) => [rightKeys[index], value]));
+                for (const key of Array.from(new Set([...leftByKey.keys(), ...rightByKey.keys()])).sort())
+                    visit(leftByKey.get(key), rightByKey.get(key), `${path}/${key}`);
+            }
+            else {
+                for (let index = 0; index < Math.max(left.length, right.length); index++)
+                    visit(left[index], right[index], `${path}/${index}`);
+            }
+            return;
+        }
+        if (left && right && typeof left === 'object' && typeof right === 'object' && !Array.isArray(left) && !Array.isArray(right)) {
+            const leftRow = left, rightRow = right;
+            for (const key of Array.from(new Set([...Object.keys(leftRow), ...Object.keys(rightRow)])).sort())
+                visit(leftRow[key], rightRow[key], `${path}/${key}`);
+            return;
+        }
+        changes.push({ path: path || '/contract', before: left, after: right });
+    };
+    visit(before, after, '/contract');
+    return changes;
+}
+function ShotIntent({ projectId, shot }) {
+    const ownerKey = `${projectId}:${shot.id}`;
+    const instance = (0, react_1.useRef)({});
+    const [sources, setSources] = (0, react_1.useState)([]), [sourceDetails, setSourceDetails] = (0, react_1.useState)({});
+    const [items, setItems] = (0, react_1.useState)([]), [selectedContract, setSelectedContract] = (0, react_1.useState)('');
+    const [saved, setSaved] = (0, react_1.useState)(null), [latest, setLatest] = (0, react_1.useState)(null), [draft, setDraft] = (0, react_1.useState)(emptyBody);
+    const [validation, setValidation] = (0, react_1.useState)(null), [remoteDiff, setRemoteDiff] = (0, react_1.useState)(null), [historyDiff, setHistoryDiff] = (0, react_1.useState)(null), [recoveryBaseRecord, setRecoveryBaseRecord] = (0, react_1.useState)(null);
+    const [review, setReview] = (0, react_1.useState)(null), [reviewGeneration, setReviewGeneration] = (0, react_1.useState)(-1), [retargetPreview, setRetargetPreview] = (0, react_1.useState)(null);
+    const [loading, setLoading] = (0, react_1.useState)(true), [refreshing, setRefreshing] = (0, react_1.useState)(false), [busy, setBusy] = (0, react_1.useState)(false), [ownerPending, setOwnerPending] = (0, react_1.useState)(pendingDrafts.has(ownerKey)), [error, setError] = (0, react_1.useState)(''), [sourceError, setSourceError] = (0, react_1.useState)(''), [notice, setNotice] = (0, react_1.useState)(''), [ready, setReady] = (0, react_1.useState)(false), [conflicted, setConflicted] = (0, react_1.useState)(false), [rebaseNeedsReview, setRebaseNeedsReview] = (0, react_1.useState)(false);
+    const editGeneration = (0, react_1.useRef)(0), loadSequence = (0, react_1.useRef)(0), initialShotRevision = (0, react_1.useRef)(shot.revision), [latestShotRevision, setLatestShotRevision] = (0, react_1.useState)(shot.revision);
+    const dirty = !!saved ? JSON.stringify(saved.contract) !== JSON.stringify(draft) : JSON.stringify(emptyBody()) !== JSON.stringify(draft);
+    async function hydrateSources(rows, active) {
+        if (active())
+            setSources(rows);
+        const documents = Array.from(new Set(rows.map(row => row.document_id)));
+        const documentDetails = {};
+        await Promise.all(documents.map(async (documentId) => {
+            const [documentResult, versionsResult] = await Promise.allSettled([
+                (0, api_1.runCommand)(projectId, 'document.show', { id: documentId }),
+                (0, api_1.runCommand)(projectId, 'document.versions', { document_id: documentId, limit: 100, offset: 0 }),
+            ]);
+            documentDetails[documentId] = { document: documentResult.status === 'fulfilled' ? documentResult.value : null, versions: versionsResult.status === 'fulfilled' ? versionsResult.value?.items || [] : [], failed: documentResult.status === 'rejected' || versionsResult.status === 'rejected' };
+        }));
+        const next = {};
+        await Promise.all(rows.map(async (row) => {
+            const nodeResult = await Promise.allSettled([(0, api_1.runCommand)(projectId, 'document.node', { id: row.node_id })]);
+            const node = nodeResult[0].status === 'fulfilled' ? nodeResult[0].value : null;
+            const parent = documentDetails[row.document_id];
+            const version = parent?.versions.find((entry) => entry.id === row.version_id);
+            next[row.edge_id] = { documentTitle: parent?.document?.title, versionNumber: version?.number, versionLabel: version?.label || row.version_label, nodeTitle: node?.title || row.title, nodeType: node?.node_type || row.node_type, currentVersionId: parent?.document?.current_version_id || row.current_version_id, contentSha256: node?.content_sha256 || row.content_sha256,
+                error: parent?.failed || nodeResult[0].status === 'rejected' ? 'Some exact source details could not be loaded.' : '' };
+        }));
+        if (active())
+            setSourceDetails(old => ({ ...old, ...next }));
+        if (documents.length && active())
+            setSourceError('');
+    }
+    async function initialLoad() {
+        const sequence = ++loadSequence.current, acceptedEpoch = acceptedRecordEpoch(ownerKey);
+        const stillCurrent = () => loadSequence.current === sequence && acceptedRecordEpoch(ownerKey) === acceptedEpoch;
+        const stopStaleLoad = () => { if (loadSequence.current === sequence) {
+            setReady(true);
+            setLoading(false);
+        } };
+        const cachedAtStart = draftCache.get(ownerKey);
+        editGeneration.current = cachedAtStart?.generation || 0;
+        initialShotRevision.current = cachedAtStart?.shotRevision ?? shot.revision;
+        setLatestShotRevision(shot.revision);
+        setOwnerPending(pendingDrafts.has(ownerKey));
+        setRecoveryBaseRecord(cachedAtStart?.recoveryBaseRecord || null);
+        setLoading(true);
+        setReady(false);
+        setError('');
+        setSourceError('');
+        setNotice('');
+        setSaved(null);
+        setLatest(null);
+        setValidation(null);
+        setDraft(copy(cachedAtStart?.body || emptyBody()));
+        setItems([]);
+        setSelectedContract('');
+        setReview(null);
+        setRemoteDiff(null);
+        setHistoryDiff(null);
+        setConflicted(false);
+        setRebaseNeedsReview(false);
+        const [sourceResult, listResult] = await Promise.allSettled([
+            (0, api_1.runCommand)(projectId, 'shot.sources', { id: shot.id }),
+            (0, api_1.runCommand)(projectId, 'observation.list', { shot_id: shot.id, limit: 100, offset: 0 }),
+        ]);
+        if (!stillCurrent()) {
+            stopStaleLoad();
+            return;
+        }
+        if (sourceResult.status === 'fulfilled')
+            void hydrateSources(sourceResult.value.items || [], () => loadSequence.current === sequence);
+        else
+            setSourceError(messageOf(sourceResult.reason));
+        if (listResult.status === 'rejected') {
+            setError(messageOf(listResult.reason));
+            setLoading(false);
+            return;
+        }
+        const rows = listResult.value.items || [];
+        setItems(rows);
+        setReady(true);
+        const cached = draftCache.get(ownerKey);
+        const first = rows.find(item => item.id === cached?.baseRecord?.id) || rows[0];
+        if (!first) {
+            const cached = draftCache.get(ownerKey);
+            setSaved(null);
+            setLatest(null);
+            setSelectedContract('');
+            setDraft(copy(cached?.body || emptyBody()));
+            setValidation(null);
+            setConflicted(false);
+            setRecoveryBaseRecord(null);
+            setLoading(false);
+            if (cached)
+                storeDraft(ownerKey, { ...cached, body: copy(cached.body), baseRecord: null, latestRecord: null, validation: null, recoveryBaseRecord: null }, instance.current);
+            return;
+        }
+        setSelectedContract(first.id);
+        try {
+            const shown = await (0, api_1.runCommand)(projectId, 'observation.show', { contract_id: first.id });
+            if (!stillCurrent())
+                return;
+            const read = await showAndValidateRecord(projectId, shown, stillCurrent);
+            if (read.stopped || !stillCurrent())
+                return;
+            const record = read.record, checked = read.validation;
+            const acceptedItem = listItem(record, shot.title);
+            setItems(old => old.some(item => item.id === record.id) ? old.map(item => item.id === record.id ? acceptedItem : item) : [acceptedItem, ...old]);
+            setSelectedContract(record.id);
+            const cached = draftCache.get(ownerKey);
+            if (cached) {
+                const base = cached.baseRecord;
+                const pendingOwnCreate = !cached.baseRecord && pendingDrafts.has(ownerKey);
+                const hasExternal = (!cached.baseRecord && !pendingOwnCreate) || !!cached.baseRecord && (cached.baseRecord.revision !== record.revision || cached.baseRecord.current_version_id !== record.current_version_id);
+                const conflict = hasExternal || cached.conflicted || read.unstable;
+                setSaved(base);
+                setLatest(record);
+                setDraft(copy(cached.body));
+                setValidation(checked);
+                setConflicted(conflict);
+                let difference = null;
+                if (cached.baseRecord && hasExternal) {
+                    try {
+                        difference = await (0, api_1.runCommand)(projectId, 'observation.diff', { contract_id: record.id, before_version_id: cached.baseRecord.current_version_id, after_version_id: record.current_version_id });
+                    }
+                    catch (reason) {
+                        if (stillCurrent())
+                            setError(messageOf(reason));
+                    }
+                }
+                if (!stillCurrent())
+                    return;
+                setRemoteDiff(difference);
+                storeDraft(ownerKey, { ...cached, baseRecord: base, latestRecord: record, conflicted: conflict, validation: checked }, instance.current);
+                if (read.unstable)
+                    setNotice('The saved contract changed while validation was running. No mismatched validation is shown; your local draft and exact pins are retained. Refresh status before saving.');
+            }
+            else {
+                setSaved(record);
+                setLatest(record);
+                setDraft(copy(record.contract));
+                setValidation(checked);
+                setConflicted(read.unstable);
+                storeDraft(ownerKey, { body: copy(record.contract), baseRecord: record, latestRecord: record, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted: read.unstable, validation: checked }, instance.current);
+                if (read.unstable)
+                    setNotice('The saved contract changed while validation was running. No mismatched validation is shown. Refresh status before saving.');
+            }
+        }
+        catch (reason) {
+            if (stillCurrent())
+                setError(messageOf(reason));
+        }
+        finally {
+            if (loadSequence.current === sequence)
+                setLoading(false);
+        }
+    }
+    (0, react_1.useEffect)(() => {
+        let listeners = draftListeners.get(ownerKey);
+        if (!listeners) {
+            listeners = new Set();
+            draftListeners.set(ownerKey, listeners);
+        }
+        const listener = (event, origin) => { if (origin === instance.current)
+            return; setOwnerPending(event.pending); if (event.entry) {
+            editGeneration.current = event.entry.generation;
+            initialShotRevision.current = event.entry.shotRevision;
+            setDraft(copy(event.entry.body));
+            setSaved(event.entry.baseRecord);
+            setLatest(event.entry.latestRecord);
+            setConflicted(event.entry.conflicted);
+            setValidation(event.entry.validation || null);
+            setRecoveryBaseRecord(event.entry.recoveryBaseRecord || null);
+            const record = event.entry.latestRecord || event.entry.baseRecord;
+            if (record) {
+                const item = listItem(record, shot.title);
+                setItems(old => old.some(row => row.id === record.id) ? old.map(row => row.id === record.id ? item : row) : [item, ...old]);
+                setSelectedContract(record.id);
+            }
+        } };
+        listeners.add(listener);
+        setOwnerPending(pendingDrafts.has(ownerKey));
+        void initialLoad();
+        return () => { listeners?.delete(listener); if (!listeners?.size)
+            draftListeners.delete(ownerKey); loadSequence.current += 1; };
+    }, [projectId, shot.id]);
+    function changeDraft(next) { editGeneration.current += 1; setDraft(next); storeDraft(ownerKey, { body: copy(next), baseRecord: saved, latestRecord: latest, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted, validation }, instance.current); setReview(null); setReviewGeneration(-1); setHistoryDiff(null); setNotice(''); }
+    function patchDraft(update) { changeDraft(update(draft)); }
+    function patchIntent(id, update) { patchDraft(body => ({ ...body, script_intents: body.script_intents.map(item => item.id === id ? update(item) : item) })); }
+    function patchRequirement(id, update) { patchDraft(body => ({ ...body, requirements: body.requirements.map(item => item.id === id ? update(item) : item) })); }
+    function addIntent() { if (!draft.source_pins.length) {
+        setNotice('Select an exact linked screenplay source before adding its purpose.');
+        return;
+    } const pin = draft.source_pins[0]; patchDraft(body => ({ ...body, script_intents: [...body.script_intents, { id: stableId(), source_edge_id: pin.edge_id, source_scope: pin.source_scope, purpose: '', communication: '', basis: 'unknown' }] })); }
+    function addRequirement() { patchDraft(body => ({ ...body, requirements: [...body.requirements, { id: stableId(), priority: 'must', basis: 'unknown', source_edge_ids: draft.source_pins.slice(0, 1).map(pin => pin.edge_id), statement: '', topic: null }] })); }
+    function togglePin(row, selected) {
+        const edge = row.edge_id;
+        if (!selected) {
+            const used = draft.script_intents.some(item => item.source_edge_id === edge) || draft.requirements.some(item => item.source_edge_ids.includes(edge));
+            if (used) {
+                setNotice('Remove or retarget the purpose and requirements that use this source before unpinning it.');
+                return;
+            }
+        }
+        patchDraft(body => ({ ...body, source_pins: selected ? [...body.source_pins, { edge_id: edge, source_scope: sourceScope(row) }] : body.source_pins.filter(pin => pin.edge_id !== edge) }));
+    }
+    function previewRetarget(oldEdgeId, newEdgeId) { const target = sourceByEdge.get(newEdgeId); if (!target || target.stale || oldEdgeId === newEdgeId)
+        return; setRetargetPreview({ oldEdgeId, newEdgeId }); }
+    function confirmRetarget() { if (!retargetPreview)
+        return; const { oldEdgeId, newEdgeId } = retargetPreview; const target = sourceByEdge.get(newEdgeId); if (!target || target.stale)
+        return; const scope = sourceScope(target); patchDraft(body => ({ ...body, source_pins: body.source_pins.some(pin => pin.edge_id === newEdgeId) ? body.source_pins.filter(pin => pin.edge_id !== oldEdgeId) : body.source_pins.map(pin => pin.edge_id === oldEdgeId ? { edge_id: newEdgeId, source_scope: scope } : pin), script_intents: body.script_intents.map(item => item.source_edge_id === oldEdgeId ? { ...item, source_edge_id: newEdgeId, source_scope: scope } : item), requirements: body.requirements.map(item => ({ ...item, source_edge_ids: Array.from(new Set(item.source_edge_ids.map(edge => edge === oldEdgeId ? newEdgeId : edge))) })) })); setRetargetPreview(null); }
+    async function refreshStatus(fromConflict = false) {
+        const sequence = ++loadSequence.current;
+        setRefreshing(true);
+        setError('');
+        setNotice(fromConflict ? 'The write conflicted. Refreshing the saved record while keeping your draft…' : 'Refreshing saved status and exact linked sources…');
+        try {
+            const [sourceRows, list, projectState] = await Promise.all([
+                (0, api_1.runCommand)(projectId, 'shot.sources', { id: shot.id }),
+                (0, api_1.runCommand)(projectId, 'observation.list', { shot_id: shot.id, limit: 100, offset: 0 }),
+                (0, api_1.api)((0, api_1.projectPath)(projectId, '/state')),
+            ]);
+            const rows = sourceRows.items || [];
+            if (loadSequence.current !== sequence)
+                return;
+            setSources(rows);
+            void hydrateSources(rows, () => loadSequence.current === sequence);
+            setItems(list.items || []);
+            const refreshedShot = projectState.entities.find(entity => entity.id === shot.id);
+            const observedShotRevision = refreshedShot?.revision ?? shot.revision;
+            setLatestShotRevision(observedShotRevision);
+            const candidate = (list.items || []).find(item => item.id === selectedContract) || (list.items || [])[0];
+            if (!candidate) {
+                if (loadSequence.current !== sequence)
+                    return;
+                const cached = draftCache.get(ownerKey);
+                const hasConflict = !!saved || observedShotRevision !== initialShotRevision.current;
+                setLatest(null);
+                setValidation(null);
+                setRemoteDiff(null);
+                setConflicted(hasConflict);
+                setRecoveryBaseRecord(null);
+                storeDraft(ownerKey, { body: copy(cached?.body || draft), baseRecord: cached ? cached.baseRecord : saved, latestRecord: null, shotRevision: cached?.shotRevision ?? initialShotRevision.current, generation: cached?.generation ?? editGeneration.current, conflicted: hasConflict, validation: null, recoveryBaseRecord: null }, instance.current);
+                setNotice(saved ? 'The saved contract is no longer listed. Your draft and exact pins remain here.' : 'Linked sources refreshed. Your selected exact pins were left unchanged.');
+                return;
+            }
+            const shown = await (0, api_1.runCommand)(projectId, 'observation.show', { contract_id: candidate.id });
+            const read = await showAndValidateRecord(projectId, shown, () => loadSequence.current === sequence);
+            if (read.stopped || loadSequence.current !== sequence)
+                return;
+            const record = read.record, checked = read.validation;
+            const acceptedItem = listItem(record, shot.title);
+            setItems(old => old.some(item => item.id === record.id) ? old.map(item => item.id === record.id ? acceptedItem : item) : [acceptedItem, ...old]);
+            setLatest(record);
+            setValidation(checked);
+            setSelectedContract(record.id);
+            const hasExternalChange = read.unstable || !saved || saved.revision !== record.revision || saved.current_version_id !== record.current_version_id;
+            setConflicted(hasExternalChange);
+            if (read.unstable) {
+                setRemoteDiff(null);
+                setNotice('The latest saved header could not be matched to a validation result after one retry. Your draft and exact source pins are retained; validation is not checked. Refresh status to try again.');
+            }
+            else if (hasExternalChange) {
+                if (saved) {
+                    const difference = await (0, api_1.runCommand)(projectId, 'observation.diff', { contract_id: candidate.id, before_version_id: saved.current_version_id, after_version_id: record.current_version_id });
+                    if (loadSequence.current !== sequence)
+                        return;
+                    setRemoteDiff(difference);
+                }
+                setNotice(saved ? 'A newer saved revision is available. Your editor draft and exact source pins were kept unchanged. Compare it or explicitly load it.' : 'A contract now exists for this shot. Your create draft and exact pins are retained; compare the saved record before choosing how to continue.');
+            }
+            else {
+                setRemoteDiff(null);
+                setNotice(fromConflict ? 'The current saved revision is loaded for comparison. Your draft is unchanged.' : 'Status refreshed. Your draft and exact source pins were unchanged.');
+            }
+            const cached = draftCache.get(ownerKey);
+            storeDraft(ownerKey, { body: copy(cached?.body || draft), baseRecord: cached ? cached.baseRecord : saved, latestRecord: record, shotRevision: cached?.shotRevision ?? initialShotRevision.current, generation: cached?.generation ?? editGeneration.current, conflicted: hasExternalChange, validation: checked }, instance.current);
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+        }
+        finally {
+            setRefreshing(false);
+        }
+    }
+    function loadLatestIntoDraft() {
+        if (!latest)
+            return;
+        setSaved(latest);
+        setDraft(copy(latest.contract));
+        setValidation(validation);
+        setConflicted(false);
+        setRemoteDiff(null);
+        setReview(null);
+        setRecoveryBaseRecord(null);
+        editGeneration.current += 1;
+        storeDraft(ownerKey, { body: copy(latest.contract), baseRecord: latest, latestRecord: latest, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted: false, validation, recoveryBaseRecord: null }, instance.current);
+        setNotice(`Draft replaced with saved contract revision ${latest.revision}.`);
+        setError('');
+    }
+    function keepDraftOnExistingContract() {
+        if (!latest || saved || latest.shot_id !== shot.id || !validation || validation.revision !== latest.revision || validation.version_id !== latest.selected_version_id || busy || ownerPending)
+            return;
+        const record = latest;
+        setSelectedContract(record.id);
+        setSaved(record);
+        setLatest(record);
+        setValidation(validation);
+        setConflicted(false);
+        setRemoteDiff(null);
+        setReview(null);
+        setRecoveryBaseRecord(record);
+        storeDraft(ownerKey, { body: copy(draft), baseRecord: record, latestRecord: record, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted: false, validation, recoveryBaseRecord: record }, instance.current);
+        setNotice(JSON.stringify(record.contract) === JSON.stringify(draft) ? `Your draft already matches contract ${record.id}, revision ${record.revision}. It is saved; no second contract or revision is needed.` : `Your draft and exact pins are preserved on contract ${record.id}, revision ${record.revision}. Compare the saved values below. Save draft will create a new revision on this contract, not a second contract.`);
+        setError('');
+    }
+    function useLatestShotRevision() { initialShotRevision.current = latestShotRevision; setConflicted(false); setRecoveryBaseRecord(null); storeDraft(ownerKey, { body: copy(draft), baseRecord: saved, latestRecord: latest, shotRevision: latestShotRevision, generation: editGeneration.current, conflicted: false, validation, recoveryBaseRecord: null }, instance.current); setNotice(`Create will use the refreshed shot revision ${latestShotRevision}. Your draft and exact pins are unchanged.`); setError(''); }
+    async function loadContract(id) {
+        if (id === selectedContract || !id)
+            return;
+        if (dirty && !window.confirm('Discard this local shot intent draft and open the selected contract?'))
+            return;
+        setLoading(true);
+        setError('');
+        setNotice('');
+        setReview(null);
+        setRemoteDiff(null);
+        setConflicted(false);
+        setRecoveryBaseRecord(null);
+        try {
+            const shown = await (0, api_1.runCommand)(projectId, 'observation.show', { contract_id: id });
+            const read = await showAndValidateRecord(projectId, shown);
+            const record = read.record;
+            const acceptedItem = listItem(record, shot.title);
+            setItems(old => old.some(item => item.id === record.id) ? old.map(item => item.id === record.id ? acceptedItem : item) : [acceptedItem, ...old]);
+            setSaved(record);
+            setLatest(record);
+            setDraft(copy(record.contract));
+            setValidation(read.validation);
+            setConflicted(read.unstable);
+            setSelectedContract(id);
+            editGeneration.current += 1;
+            storeDraft(ownerKey, { body: copy(record.contract), baseRecord: record, latestRecord: record, shotRevision: initialShotRevision.current, generation: editGeneration.current, conflicted: read.unstable, validation: read.validation, recoveryBaseRecord: null }, instance.current);
+            if (read.unstable)
+                setNotice('The latest saved header could not be matched to a validation result after one retry. No validation status is shown. Refresh status before saving.');
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+        }
+        finally {
+            setLoading(false);
+        }
+    }
+    async function submit(operation) {
+        if (busy || pendingDrafts.has(ownerKey))
+            return;
+        const generation = editGeneration.current, body = copy(draft), shotRevision = initialShotRevision.current;
+        setBusy(true);
+        setOwnerPending(true);
+        setDraftPending(ownerKey, true, instance.current);
+        setError('');
+        setNotice('');
+        try {
+            let record;
+            if (operation === 'create')
+                record = await (0, api_1.runCommand)(projectId, 'observation.create', { shot_id: shot.id, expected_shot_revision: initialShotRevision.current, contract: body });
+            else if (operation === 'rebase') {
+                if (!review || reviewGeneration !== generation)
+                    throw new Error('Review this exact draft again before rebasing.');
+                record = await (0, api_1.runCommand)(projectId, 'observation.rebase', { contract_id: saved.id, revision: review.revision, contract: body, expected_basis_sha256: review.expected_basis_sha256 });
+            }
+            else
+                record = await (0, api_1.runCommand)(projectId, 'observation.revise', { contract_id: saved.id, revision: saved.revision, contract: body });
+            noteAcceptedRecordWrite(ownerKey);
+            const acceptedItem = listItem(record, shot.title);
+            setItems(old => old.some(item => item.id === record.id) ? old.map(item => item.id === record.id ? acceptedItem : item) : [acceptedItem, ...old]);
+            const accepted = recordValidation(record);
+            setSelectedContract(record.id);
+            setSaved(record);
+            setLatest(record);
+            setValidation(accepted);
+            setConflicted(false);
+            setRemoteDiff(null);
+            setReview(null);
+            setReviewGeneration(-1);
+            setRecoveryBaseRecord(null);
+            const cached = draftCache.get(ownerKey);
+            const newer = cached && cached.generation !== generation;
+            const nextBody = newer ? copy(cached.body) : copy(record.contract);
+            const nextGeneration = newer ? cached.generation : generation;
+            editGeneration.current = nextGeneration;
+            setDraft(nextBody);
+            storeDraft(ownerKey, { body: nextBody, baseRecord: record, latestRecord: record, shotRevision, generation: nextGeneration, conflicted: false, validation: accepted, recoveryBaseRecord: null }, instance.current);
+            if (!newer) {
+                setNotice(`Shot intent saved as contract revision ${record.revision}.`);
+            }
+            else
+                setNotice('The submitted version was saved. Newer edits remain in the editor.');
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+            if (reason?.status === 409 || reason?.code === 'contract_rebase_required') {
+                setReview(null);
+                setReviewGeneration(-1);
+                setConflicted(true);
+                const cached = draftCache.get(ownerKey);
+                storeDraft(ownerKey, { body: copy(cached?.body || draft), baseRecord: saved, latestRecord: latest, shotRevision: initialShotRevision.current, generation: cached?.generation ?? generation, conflicted: true }, instance.current);
+                if (operation === 'rebase' || reason?.code === 'contract_rebase_required')
+                    setRebaseNeedsReview(true);
+                await refreshStatus(true);
+            }
+        }
+        finally {
+            setBusy(false);
+            setOwnerPending(false);
+            setDraftPending(ownerKey, false, instance.current);
+        }
+    }
+    async function reviewRebase() {
+        if (!saved || busy)
+            return;
+        const generation = editGeneration.current;
+        setError('');
+        setNotice('Reviewing the exact proposed contract against the current saved basis…');
+        setReview(null);
+        try {
+            const result = await (0, api_1.runCommand)(projectId, 'observation.rebase-preview', { contract_id: saved.id, contract: copy(draft) });
+            if (editGeneration.current !== generation) {
+                setNotice('The proposed contract changed during review. Review the current draft again.');
+                return;
+            }
+            setReview(result);
+            setReviewGeneration(generation);
+            setRebaseNeedsReview(false);
+            setNotice('Review complete. Confirm the rebase only if these exact changes and source pins are intended.');
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+        }
+    }
+    async function compareVersion(versionId) {
+        if (!saved)
+            return;
+        try {
+            const result = await (0, api_1.runCommand)(projectId, 'observation.diff', { contract_id: saved.id, before_version_id: versionId, after_version_id: saved.current_version_id });
+            setHistoryDiff(result);
+        }
+        catch (reason) {
+            setError(messageOf(reason));
+        }
+    }
+    const sourceByEdge = new Map(sources.map(row => [row.edge_id, row]));
+    const validationStatus = validation?.status || 'not checked';
+    const validationRevision = validation?.revision ?? latest?.revision ?? saved?.revision;
+    const draftNeedsValidationDisclaimer = dirty || conflicted;
+    const validationLabel = draftNeedsValidationDisclaimer ? `Saved revision ${validationRevision} validation: ${validationStatus}` : `Current saved revision ${validationRevision}: ${validationStatus}`;
+    const validationScope = draftNeedsValidationDisclaimer ? `This status covers saved revision ${validationRevision} only; the current local draft has not been checked.` : 'This status covers the current saved contract revision.';
+    const latestCanBeRecoveryBase = !!latest && latest.shot_id === shot.id && !!validation && validation.revision === latest.revision && validation.version_id === latest.selected_version_id;
+    const recoveryBaseline = recoveryBaseRecord && saved?.id === recoveryBaseRecord.id ? recoveryBaseRecord : null;
+    const missingSourcePins = draft.source_pins.filter(pin => !sourceByEdge.has(pin.edge_id) || !!validation?.source_pins?.find(item => item.edge_id === pin.edge_id && item.stale));
+    const canSubmit = ready && !busy && !ownerPending && !loading && !refreshing && !!draft.script_intents.length && draft.source_pins.length > 0;
+    return react_1.default.createElement("section", { className: "shot-intent-panel", "aria-label": "Shot intent contract" },
+        react_1.default.createElement("div", { className: "shot-intent-heading" },
+            react_1.default.createElement("div", null,
+                react_1.default.createElement("h3", null, "Shot intent"),
+                react_1.default.createElement("p", { className: "muted" }, "Record what the screenplay asks this shot to communicate. Pins name exact source links; validation does not judge rendered images."),
+                react_1.default.createElement("p", { className: "shot-intent-draft-scope" }, "Unsaved edits stay in this open app session and follow this shot across tabs and shots. Create, Save draft, or confirm rebase to store them. Reloading or closing the app will prompt while edits remain unsaved.")),
+            react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: loading || refreshing || busy || ownerPending }, "Refresh status")),
+        ownerPending && react_1.default.createElement("p", { role: "status" }, "A save for this shot is still in progress. Its draft is preserved and editing is paused until it finishes."),
+        react_1.default.createElement("label", { className: "field" },
+            react_1.default.createElement("span", null, "Observation contract"),
+            react_1.default.createElement("select", { "aria-label": "Observation contract", value: selectedContract, onChange: (event) => void loadContract(event.target.value), disabled: loading || busy || ownerPending || items.length < 2 },
+                !items.length && react_1.default.createElement("option", { value: "" }, "New contract for this shot"),
+                items.map(item => react_1.default.createElement("option", { key: item.id, value: item.id },
+                    "Revision ",
+                    item.revision,
+                    " \u00B7 ",
+                    item.id))),
+            react_1.default.createElement("small", null,
+                "Selected shot: ",
+                shot.title,
+                " \u00B7 latest shot revision ",
+                latestShotRevision,
+                !saved ? ` · create will use revision ${initialShotRevision.current}` : ` · contract ${saved.id} · header revision ${saved.revision}`)),
+        loading && react_1.default.createElement("p", { role: "status" }, "Loading exact sources and saved contract\u2026"),
+        error && react_1.default.createElement("div", { role: "alert", className: "notice error" },
+            react_1.default.createElement("strong", null, "Shot intent could not be updated."),
+            react_1.default.createElement("p", null, error),
+            react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: refreshing || busy || ownerPending }, "Retry refresh")),
+        sourceError && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "Linked source details are unavailable."),
+            react_1.default.createElement("p", null, sourceError),
+            react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: refreshing || busy }, "Retry source refresh")),
+        notice && react_1.default.createElement("p", { role: "status", className: "shot-intent-status" }, notice),
+        rebaseNeedsReview && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "The reviewed basis changed."),
+            react_1.default.createElement("p", null, "Your draft, exact pins, and previous header CAS are retained. The prior review token is invalid. Review the current proposal again before any rebase."),
+            react_1.default.createElement("button", { type: "button", onClick: () => void reviewRebase(), disabled: busy || loading }, "Review this draft again")),
+        conflicted && !latest && !saved && latestShotRevision !== initialShotRevision.current && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "The selected shot revision changed."),
+            react_1.default.createElement("p", null,
+                "Create still uses shot revision ",
+                initialShotRevision.current,
+                "; the latest saved shot revision is ",
+                latestShotRevision,
+                ". Your local draft and exact pins are retained."),
+            react_1.default.createElement("button", { type: "button", onClick: useLatestShotRevision, disabled: busy },
+                "Use shot revision ",
+                latestShotRevision,
+                " for create")),
+        conflicted && latest && !saved && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "A contract already exists for this shot."),
+            react_1.default.createElement("p", null,
+                "The first-create request conflicted with saved contract ",
+                latest.id,
+                " at revision ",
+                latest.revision,
+                ". Your entered content and exact pins are retained. Review the comparison, then explicitly choose this existing contract as the draft base or load its saved content."),
+            react_1.default.createElement(DiffView, { title: "Saved contract vs retained create draft", changes: contractBodyChanges(latest.contract, draft), ariaLabel: "Retained draft comparison" }),
+            react_1.default.createElement("div", { className: "button-row" },
+                react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: refreshing || busy || ownerPending }, "Refresh comparison"),
+                react_1.default.createElement("button", { type: "button", onClick: loadLatestIntoDraft, disabled: busy || ownerPending },
+                    "Discard draft and load revision ",
+                    latest.revision),
+                react_1.default.createElement("button", { type: "button", className: "primary", onClick: keepDraftOnExistingContract, disabled: !latestCanBeRecoveryBase || busy || ownerPending }, "Use existing contract and keep my draft"))),
+        saved && react_1.default.createElement("div", { className: `notice ${validationStatus === 'consistent' ? '' : 'warning'}` },
+            react_1.default.createElement("strong", null, validationLabel),
+            react_1.default.createElement("p", null, validationScope),
+            react_1.default.createElement("p", null, validation?.findings?.length ? `${validation.findings.length} finding${validation.findings.length === 1 ? '' : 's'} · authored basis ${validation.basis_current ? 'current' : 'changed'}` : 'Deterministic source, identity, and authored-basis checks.'),
+            react_1.default.createElement("div", { className: "shot-intent-meta" },
+                react_1.default.createElement("span", null,
+                    "Contract ID ",
+                    react_1.default.createElement("code", null, saved.id)),
+                react_1.default.createElement("span", null,
+                    "Checked header revision ",
+                    react_1.default.createElement("code", null, validation?.revision ?? 'Not checked')),
+                react_1.default.createElement("span", null,
+                    "Checked version ",
+                    react_1.default.createElement("code", null, validation?.version_id || 'Not checked')),
+                react_1.default.createElement("span", null,
+                    "Editor CAS revision ",
+                    react_1.default.createElement("code", null, saved.revision)),
+                react_1.default.createElement("span", null,
+                    "Draft base version ",
+                    react_1.default.createElement("code", null, saved.current_version_id)))),
+        conflicted && latest && saved && (latest.revision !== saved.revision || latest.current_version_id !== saved.current_version_id) && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "A newer saved revision is available."),
+            react_1.default.createElement("p", null,
+                "The editor still uses header revision ",
+                saved.revision,
+                "; latest is revision ",
+                latest.revision,
+                ". Your local draft and exact pins are retained."),
+            react_1.default.createElement("div", { className: "button-row" },
+                react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: refreshing || busy || ownerPending }, "Refresh comparison"),
+                react_1.default.createElement("button", { type: "button", onClick: loadLatestIntoDraft, disabled: busy || ownerPending },
+                    "Discard draft and load revision ",
+                    latest.revision))),
+        conflicted && latest && saved && latest.revision === saved.revision && latest.current_version_id === saved.current_version_id && !validation && react_1.default.createElement("div", { role: "alert", className: "notice warning" },
+            react_1.default.createElement("strong", null, "The saved header could not be matched to validation."),
+            react_1.default.createElement("p", null,
+                "No validation status is shown. Your local draft, exact pins, and editor CAS revision ",
+                saved.revision,
+                " remain unchanged."),
+            react_1.default.createElement("button", { type: "button", onClick: () => void refreshStatus(), disabled: refreshing || busy || ownerPending }, "Retry status refresh")),
+        recoveryBaseline && react_1.default.createElement(DiffView, { title: "Saved contract vs retained create draft", changes: contractBodyChanges(recoveryBaseline.contract, draft), ariaLabel: "Retained draft comparison" }),
+        remoteDiff && react_1.default.createElement(DiffView, { title: "Saved revision changes", changes: remoteDiff.changes.map(change => ({ path: change.path, before: change.before, after: change.after })) }),
+        ready && !loading && react_1.default.createElement("fieldset", { className: "shot-intent-fields", disabled: busy || ownerPending },
+            react_1.default.createElement("section", { className: "shot-intent-section" },
+                react_1.default.createElement("div", { className: "shot-intent-section-heading" },
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("h4", null, "Exact screenplay links"),
+                        react_1.default.createElement("p", null, "Select active links already connected to this shot or its scene. Refresh reports changes without replacing these pins."))),
+                !sources.length ? react_1.default.createElement("p", { className: "muted" }, "No screenplay source links are connected to this shot yet. Add a link in the source-document workflow, then refresh.") : sources.map(row => {
+                    const checked = draft.source_pins.some(pin => pin.edge_id === row.edge_id);
+                    const detail = sourceDetails[row.edge_id];
+                    const validationPin = validation?.source_pins?.find(pin => pin.edge_id === row.edge_id);
+                    const stale = row.stale || !!validationPin?.stale;
+                    const stalePins = draft.source_pins.filter(pin => { const previous = sourceByEdge.get(pin.edge_id); const pinned = saved?.source_pins?.find(item => item.edge_id === pin.edge_id); return pin.edge_id !== row.edge_id && (!previous || previous.stale || !!validation?.source_pins?.find(item => item.edge_id === pin.edge_id)?.stale || !!pinned && pinned.source_version_id !== previous.version_id); });
+                    return react_1.default.createElement("div", { className: "shot-source-row", key: row.edge_id },
+                        react_1.default.createElement("label", { className: "shot-source-option" },
+                            react_1.default.createElement("input", { type: "checkbox", checked: checked, onChange: (event) => togglePin(row, event.target.checked) }),
+                            react_1.default.createElement("span", null,
+                                react_1.default.createElement("strong", null, sourceName(row, detail)),
+                                react_1.default.createElement("small", null,
+                                    detail?.documentTitle || 'Screenplay',
+                                    " \u00B7 ",
+                                    detail?.versionLabel || row.version_label,
+                                    detail?.versionNumber ? ` (version ${detail.versionNumber})` : '',
+                                    stale ? ' · source version is stale' : ''),
+                                react_1.default.createElement("small", null,
+                                    "Edge ",
+                                    react_1.default.createElement("code", null, row.edge_id)),
+                                react_1.default.createElement("small", null,
+                                    "Version ",
+                                    react_1.default.createElement("code", null, row.version_id),
+                                    " \u00B7 node ",
+                                    react_1.default.createElement("code", null, row.node_id)),
+                                react_1.default.createElement("small", null,
+                                    "Source SHA-256 ",
+                                    react_1.default.createElement("code", null, detail?.contentSha256 || row.content_sha256 || 'Unavailable')),
+                                detail?.error && react_1.default.createElement("small", { className: "warning-text" }, detail.error))),
+                        stalePins.length > 0 && !checked && !stale && react_1.default.createElement("div", { className: "shot-retarget-shortcuts" }, stalePins.map(pin => { const oldRow = sourceByEdge.get(pin.edge_id); const oldName = oldRow ? sourceName(oldRow, sourceDetails[pin.edge_id]) : `Saved source ${pin.edge_id}`; return react_1.default.createElement("button", { type: "button", key: pin.edge_id, onClick: () => previewRetarget(pin.edge_id, row.edge_id) },
+                            "Preview retarget from ",
+                            oldName,
+                            " to ",
+                            sourceName(row, detail)); })));
+                }),
+                !!draft.source_pins.length && missingSourcePins.map(pin => react_1.default.createElement("div", { className: "shot-source-stale", key: pin.edge_id },
+                    react_1.default.createElement("strong", null, "Saved exact pin is unavailable or stale"),
+                    react_1.default.createElement("small", null,
+                        "Edge ",
+                        react_1.default.createElement("code", null, pin.edge_id),
+                        " \u00B7 scope ",
+                        pin.source_scope === 'scene-context' ? 'Scene context' : 'Direct shot link'),
+                    react_1.default.createElement("small", null, "This pin remains in the draft until you explicitly choose a new source during rebase."))),
+                !!draft.source_pins.length && react_1.default.createElement("section", { className: "shot-pin-comparison", "aria-label": "Saved and current exact pin details" },
+                    react_1.default.createElement("h5", null, "Saved and current exact pins"),
+                    draft.source_pins.map(pin => { const current = sourceByEdge.get(pin.edge_id); const detail = sourceDetails[pin.edge_id]; const previous = saved?.source_pins?.find(item => item.edge_id === pin.edge_id); return react_1.default.createElement("div", { className: "shot-pin-comparison-row", key: pin.edge_id },
+                        react_1.default.createElement("strong", null, current ? sourceName(current, detail) : `Saved exact source ${pin.edge_id}`),
+                        react_1.default.createElement("dl", null,
+                            react_1.default.createElement("div", null,
+                                react_1.default.createElement("dt", null, "Scope"),
+                                react_1.default.createElement("dd", null, pin.source_scope === 'scene-context' ? 'Scene context' : 'Direct shot link')),
+                            react_1.default.createElement("div", null,
+                                react_1.default.createElement("dt", null, "Saved pin"),
+                                react_1.default.createElement("dd", null, previous ? react_1.default.createElement(react_1.default.Fragment, null,
+                                    "Version ",
+                                    react_1.default.createElement("code", null, previous.source_version_id),
+                                    " \u00B7 node ",
+                                    react_1.default.createElement("code", null, previous.node_id),
+                                    " \u00B7 source SHA-256 ",
+                                    react_1.default.createElement("code", null, previous.source_sha256 || 'Unavailable'),
+                                    previous.scope_sha256 && react_1.default.createElement(react_1.default.Fragment, null,
+                                        " \u00B7 scope SHA-256 ",
+                                        react_1.default.createElement("code", null, previous.scope_sha256))) : 'Not saved yet')),
+                            react_1.default.createElement("div", null,
+                                react_1.default.createElement("dt", null, "Current linked source"),
+                                react_1.default.createElement("dd", null, current ? react_1.default.createElement(react_1.default.Fragment, null,
+                                    "Version ",
+                                    react_1.default.createElement("code", null, current.version_id),
+                                    " \u00B7 node ",
+                                    react_1.default.createElement("code", null, current.node_id),
+                                    " \u00B7 source SHA-256 ",
+                                    react_1.default.createElement("code", null, detail?.contentSha256 || current.content_sha256 || 'Unavailable'),
+                                    (current.stale || previous && previous.source_version_id !== current.version_id) && ' · differs from the saved pin') : 'Unavailable; saved pin retained in this draft')))); })),
+                retargetPreview && react_1.default.createElement(RetargetReview, { preview: retargetPreview, body: draft, saved: saved, rows: sourceByEdge, details: sourceDetails, onCancel: () => setRetargetPreview(null), onConfirm: confirmRetarget, disabled: busy || ownerPending })),
+            react_1.default.createElement("section", { className: "shot-intent-section" },
+                react_1.default.createElement("div", { className: "shot-intent-section-heading" },
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("h4", null, "Purpose and communication"),
+                        react_1.default.createElement("p", null, "Keep each purpose attached to one exact source edge.")),
+                    react_1.default.createElement("button", { type: "button", onClick: addIntent, disabled: !draft.source_pins.length }, "Add purpose")),
+                draft.script_intents.map(intent => react_1.default.createElement("article", { className: "shot-intent-card", key: intent.id, "data-intent-id": intent.id },
+                    react_1.default.createElement("div", { className: "shot-intent-card-heading" },
+                        react_1.default.createElement("strong", null,
+                            "Purpose ",
+                            react_1.default.createElement("small", null,
+                                "Stable ID ",
+                                react_1.default.createElement("code", null, intent.id))),
+                        react_1.default.createElement("button", { type: "button", className: "text-button", "aria-label": `Remove purpose ${intent.purpose || intent.id}`, onClick: () => patchDraft(body => ({ ...body, script_intents: body.script_intents.filter(item => item.id !== intent.id) })) }, "Remove")),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Exact source link"),
+                        react_1.default.createElement("select", { "aria-label": `Source for purpose ${intent.id}`, value: intent.source_edge_id, onChange: (event) => { const row = sourceByEdge.get(event.target.value); if (row)
+                                patchIntent(intent.id, value => ({ ...value, source_edge_id: row.edge_id, source_scope: sourceScope(row) })); } }, draft.source_pins.map(pin => { const row = sourceByEdge.get(pin.edge_id); return react_1.default.createElement("option", { key: pin.edge_id, value: pin.edge_id }, row ? sourceName(row, sourceDetails[row.edge_id]) : `${pin.source_scope} · saved pin ${pin.edge_id}`); }))),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Purpose"),
+                        react_1.default.createElement("input", { "aria-label": `Purpose ${intent.id}`, value: intent.purpose, maxLength: 120, onChange: (event) => patchIntent(intent.id, value => ({ ...value, purpose: event.target.value })), placeholder: "e.g. establish the handoff" })),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Communication"),
+                        react_1.default.createElement("textarea", { "aria-label": `Communication ${intent.id}`, value: intent.communication, maxLength: 4000, rows: 3, onChange: (event) => patchIntent(intent.id, value => ({ ...value, communication: event.target.value })), placeholder: "What should the audience understand from this source?" })),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Basis"),
+                        react_1.default.createElement("select", { "aria-label": `Purpose basis ${intent.id}`, value: intent.basis, onChange: (event) => patchIntent(intent.id, value => ({ ...value, basis: event.target.value })) },
+                            react_1.default.createElement("option", { value: "direct" }, "Direct"),
+                            react_1.default.createElement("option", { value: "interpreted" }, "Interpreted"),
+                            react_1.default.createElement("option", { value: "unknown" }, "Unknown"))))),
+                !draft.script_intents.length && react_1.default.createElement("p", { className: "muted" }, "No purpose statements yet.")),
+            react_1.default.createElement("section", { className: "shot-intent-section" },
+                react_1.default.createElement("div", { className: "shot-intent-section-heading" },
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("h4", null, "Source-specific requirements"),
+                        react_1.default.createElement("p", null, "Requirements keep their stable IDs and point to one or more selected exact links.")),
+                    react_1.default.createElement("button", { type: "button", onClick: addRequirement }, "Add requirement")),
+                draft.requirements.map(item => react_1.default.createElement("article", { className: "shot-intent-card", key: item.id, "data-requirement-id": item.id },
+                    react_1.default.createElement("div", { className: "shot-intent-card-heading" },
+                        react_1.default.createElement("strong", null,
+                            "Requirement ",
+                            react_1.default.createElement("small", null,
+                                "Stable ID ",
+                                react_1.default.createElement("code", null, item.id))),
+                        react_1.default.createElement("button", { type: "button", className: "text-button", "aria-label": `Remove requirement ${item.id}`, onClick: () => patchDraft(body => ({ ...body, requirements: body.requirements.filter(row => row.id !== item.id) })) }, "Remove")),
+                    react_1.default.createElement("div", { className: "shot-intent-grid" },
+                        react_1.default.createElement("label", { className: "field" },
+                            react_1.default.createElement("span", null, "Priority"),
+                            react_1.default.createElement("select", { "aria-label": `Priority ${item.id}`, value: item.priority, onChange: (event) => { const priority = event.target.value; patchRequirement(item.id, value => priority === 'unknown' ? { ...value, priority, topic: value.statement || value.topic || '', statement: null } : { ...value, priority, statement: value.topic || value.statement || '', topic: null }); } },
+                                react_1.default.createElement("option", { value: "must" }, "Must"),
+                                react_1.default.createElement("option", { value: "prefer" }, "Prefer"),
+                                react_1.default.createElement("option", { value: "unknown" }, "Unknown"))),
+                        react_1.default.createElement("label", { className: "field" },
+                            react_1.default.createElement("span", null, "Basis"),
+                            react_1.default.createElement("select", { "aria-label": `Requirement basis ${item.id}`, value: item.basis, onChange: (event) => patchRequirement(item.id, value => ({ ...value, basis: event.target.value })) },
+                                react_1.default.createElement("option", { value: "direct" }, "Direct"),
+                                react_1.default.createElement("option", { value: "interpreted" }, "Interpreted"),
+                                react_1.default.createElement("option", { value: "unknown" }, "Unknown")))),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, item.priority === 'unknown' ? 'Topic' : 'Requirement statement'),
+                        react_1.default.createElement("textarea", { "aria-label": `${item.priority === 'unknown' ? 'Topic' : 'Requirement statement'} ${item.id}`, rows: 3, maxLength: 4000, value: item.priority === 'unknown' ? item.topic || '' : item.statement || '', onChange: (event) => patchRequirement(item.id, value => item.priority === 'unknown' ? { ...value, topic: event.target.value, statement: null } : { ...value, statement: event.target.value, topic: null }) })),
+                    react_1.default.createElement("fieldset", { className: "shot-edge-select" },
+                        react_1.default.createElement("legend", null, "Exact source links"),
+                        draft.source_pins.map(pin => { const row = sourceByEdge.get(pin.edge_id); return react_1.default.createElement("label", { key: pin.edge_id },
+                            react_1.default.createElement("input", { type: "checkbox", checked: item.source_edge_ids.includes(pin.edge_id), onChange: (event) => patchRequirement(item.id, value => ({ ...value, source_edge_ids: event.target.checked ? [...value.source_edge_ids, pin.edge_id] : value.source_edge_ids.filter(edge => edge !== pin.edge_id) })) }),
+                            react_1.default.createElement("span", null, row ? sourceName(row, sourceDetails[row.edge_id]) : `Saved exact pin · ${pin.edge_id}`)); }),
+                        !draft.source_pins.length && react_1.default.createElement("small", null, "Select an exact screenplay link above.")))),
+                !draft.requirements.length && react_1.default.createElement("p", { className: "muted" }, "No source-specific requirements yet.")),
+            saved && react_1.default.createElement("section", { className: "shot-intent-section" },
+                react_1.default.createElement("h4", null, "Saved contract history"),
+                react_1.default.createElement("p", null, "Each revision is immutable. Comparing history does not change the editor."),
+                react_1.default.createElement("div", { className: "shot-history" }, saved.history.map(version => react_1.default.createElement("div", { className: "shot-history-row", key: version.id },
+                    react_1.default.createElement("span", null,
+                        react_1.default.createElement("strong", null,
+                            "Revision ",
+                            version.number),
+                        react_1.default.createElement("small", null,
+                            version.operation,
+                            " \u00B7 ",
+                            new Date(version.created_at).toLocaleString()),
+                        react_1.default.createElement("small", null,
+                            "Version ",
+                            react_1.default.createElement("code", null, version.id))),
+                    react_1.default.createElement("button", { type: "button", onClick: () => void compareVersion(version.id), disabled: version.id === saved.current_version_id }, "Compare")))))),
+        historyDiff && react_1.default.createElement(DiffView, { title: "Contract version comparison", changes: historyDiff.changes.map(change => ({ path: change.path, before: change.before, after: change.after })) }),
+        review && react_1.default.createElement("section", { className: "shot-intent-review", "aria-label": "Rebase review" },
+            react_1.default.createElement("h4", null, "Reviewed basis changes"),
+            react_1.default.createElement("p", null,
+                "Saved basis ",
+                react_1.default.createElement("code", null, review.saved_basis_sha256),
+                " \u00B7 current basis ",
+                react_1.default.createElement("code", null, review.current_basis_sha256)),
+            react_1.default.createElement(DiffView, { title: review.basis_changed ? 'The saved authored basis changed' : 'The current basis matches the saved basis', changes: review.changes.map(change => ({ path: change.path, before: change.saved_value, after: change.current_value })) }),
+            review.changes_truncated && react_1.default.createElement("p", { role: "status" }, "Additional basis differences were omitted by the service."),
+            react_1.default.createElement("p", null,
+                "Review token ",
+                react_1.default.createElement("code", null, review.expected_basis_sha256),
+                " \u00B7 contract revision ",
+                review.revision),
+            react_1.default.createElement("button", { type: "button", className: "primary", onClick: () => void submit('rebase'), disabled: !canSubmit || reviewGeneration !== editGeneration.current }, "Confirm reviewed rebase")),
+        ready && !loading && react_1.default.createElement("div", { className: "button-row shot-intent-actions" }, !saved ? react_1.default.createElement("button", { type: "button", className: "primary", onClick: () => void submit('create'), disabled: !canSubmit || conflicted }, "Create observation contract") : react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("button", { type: "button", className: "primary", onClick: () => void submit('revise'), disabled: !canSubmit || !dirty || conflicted }, "Save draft"),
+            react_1.default.createElement("button", { type: "button", onClick: () => void reviewRebase(), disabled: busy || ownerPending || loading }, "Review rebase"))),
+        saved && react_1.default.createElement("div", { className: "shot-intent-cas" },
+            react_1.default.createElement("small", null,
+                "Shot revision used for contract creation: ",
+                react_1.default.createElement("code", null, initialShotRevision.current)),
+            react_1.default.createElement("small", null,
+                "Contract header CAS revision for edit: ",
+                react_1.default.createElement("code", null, saved.revision)),
+            react_1.default.createElement("small", null,
+                "Exact source pins in draft: ",
+                draft.source_pins.length,
+                " \u00B7 linked sources now available: ",
+                sources.length)));
+}
+function DiffView({ title, changes, ariaLabel }) {
+    return react_1.default.createElement("section", { className: "shot-intent-diff", role: ariaLabel ? 'region' : undefined, "aria-label": ariaLabel },
+        react_1.default.createElement("h4", null, title),
+        !changes.length ? react_1.default.createElement("p", null, "No field changes.") : changes.map((change, index) => react_1.default.createElement("div", { className: "shot-intent-diff-row", key: `${change.path}-${index}` },
+            react_1.default.createElement("strong", null, readablePath(change.path)),
+            react_1.default.createElement("dl", null,
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("dt", null, "Saved"),
+                    react_1.default.createElement("dd", null, displayValue(change.before))),
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("dt", null, "Current or proposed"),
+                    react_1.default.createElement("dd", null, displayValue(change.after)))))));
+}
+function RetargetReview({ preview, body, saved, rows, details, onCancel, onConfirm, disabled }) {
+    const oldPin = body.source_pins.find(pin => pin.edge_id === preview.oldEdgeId), oldRow = rows.get(preview.oldEdgeId), nextRow = rows.get(preview.newEdgeId);
+    if (!oldPin || !nextRow)
+        return null;
+    const oldSaved = saved?.source_pins.find(item => item.edge_id === preview.oldEdgeId), oldDetail = details[preview.oldEdgeId], nextDetail = details[nextRow.edge_id];
+    return react_1.default.createElement("section", { className: "shot-retarget-preview", "aria-label": "Retarget preview", role: "group" },
+        react_1.default.createElement("h5", null, "Retarget preview"),
+        react_1.default.createElement("p", null, "This explicit draft edit changes the source edge used by linked purposes and requirements. Nothing changes until you choose Retarget draft pin."),
+        react_1.default.createElement("div", null,
+            react_1.default.createElement("strong", null, "Saved/local source"),
+            react_1.default.createElement("small", null,
+                oldRow ? sourceName(oldRow, oldDetail) : `Saved source ${preview.oldEdgeId}`,
+                " \u00B7 ",
+                oldPin.source_scope === 'scene-context' ? 'Scene context' : 'Direct shot link'),
+            react_1.default.createElement("small", null,
+                "Version ",
+                react_1.default.createElement("code", null, oldSaved?.source_version_id || oldRow?.version_id || 'Unavailable'),
+                " \u00B7 node ",
+                react_1.default.createElement("code", null, oldSaved?.node_id || oldRow?.node_id || 'Unavailable'),
+                " \u00B7 source SHA-256 ",
+                react_1.default.createElement("code", null, oldSaved?.source_sha256 || oldDetail?.contentSha256 || 'Unavailable'))),
+        react_1.default.createElement("div", null,
+            react_1.default.createElement("strong", null, "Proposed current source"),
+            react_1.default.createElement("small", null,
+                sourceName(nextRow, nextDetail),
+                " \u00B7 ",
+                sourceScope(nextRow) === 'scene-context' ? 'Scene context' : 'Direct shot link'),
+            react_1.default.createElement("small", null,
+                "Version ",
+                react_1.default.createElement("code", null, nextRow.version_id),
+                " \u00B7 node ",
+                react_1.default.createElement("code", null, nextRow.node_id),
+                " \u00B7 source SHA-256 ",
+                react_1.default.createElement("code", null, nextDetail?.contentSha256 || nextRow.content_sha256 || 'Unavailable'))),
+        react_1.default.createElement("div", { className: "button-row" },
+            react_1.default.createElement("button", { type: "button", onClick: onCancel }, "Cancel"),
+            react_1.default.createElement("button", { type: "button", className: "primary", onClick: onConfirm, disabled: disabled }, "Retarget draft pin")));
+}
+function messageOf(reason) { const value = reason; return value?.message || 'The request could not be completed. Your draft remains in the editor.'; }
+
+},
+"main":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+const react_1 = __importStar(require("./react"));
+const App_1 = require("./App");
+class Boundary extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this.state = { error: null };
+    }
+    static getDerivedStateFromError(error) { return { error }; }
+    render() { if (this.state.error)
+        return react_1.default.createElement("main", { className: "fatal-error" },
+            react_1.default.createElement("h1", null, "Your project couldn\u2019t open."),
+            react_1.default.createElement("p", null, "Your work is still saved on this computer. Refresh the app, or check the launch terminal if the problem continues."),
+            react_1.default.createElement("button", { onClick: () => location.reload() }, "Refresh app")); return this.props.children; }
+}
+const root = document.getElementById('root');
+if (!root)
+    throw new Error('Storyboarder root element is missing.');
+(0, react_1.createRoot)(root).render(react_1.default.createElement(Boundary, null,
+    react_1.default.createElement(App_1.App, null)));
+
+},
+"pages/OutlinePage":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OutlinePage = OutlinePage;
+const react_1 = __importStar(require("../react"));
+const utils_1 = require("../utils");
+const Primitives_1 = require("../components/Primitives");
+function shotTitle(entity) {
+    const number = String(entity.fields.number || '');
+    return number && entity.title.startsWith(number)
+        ? entity.title.slice(number.length).replace(/^\s*[·—:-]\s*/, '') || entity.title
+        : entity.title;
+}
+function outlineTitle(entity) {
+    if (entity.kind === 'shot')
+        return shotTitle(entity);
+    return (0, utils_1.displayTitle)(entity.title.replace(/^\d{2}\s*[·—:-]\s*/, '') || entity.title);
+}
+function shotAction(entity) {
+    const action = String(entity.fields.action || entity.description || 'No action added yet.');
+    const title = shotTitle(entity);
+    return action.endsWith(` — ${title}`) ? action.slice(0, -title.length - 3) : action;
+}
+function repeatsShotSummaries(entity, shots) {
+    const lines = String(entity.fields.summary || '').split(/\n+/).map(line => line.trim()).filter(Boolean);
+    return shots.length > 0 && lines.length === shots.length && lines.every((line, index) => {
+        const title = shotTitle(shots[index]);
+        return line.toLowerCase().startsWith(`${title.toLowerCase()}:`);
+    });
+}
+function framingParts(entity) {
+    const framing = String(entity.fields.framing || '');
+    const split = framing.indexOf(' — ');
+    return split < 0 ? { label: framing, detail: '' } : { label: framing.slice(0, split), detail: framing.slice(split + 3) };
+}
+function OutlinePage(p) {
+    const [query, setQuery] = (0, react_1.useState)('');
+    const [collapsed, setCollapsed] = (0, react_1.useState)([]);
+    const records = (0, utils_1.activeEntities)(p.state).filter(e => ['sequence', 'scene', 'shot'].includes(e.kind));
+    const byId = new Map(records.map(e => [e.id, e]));
+    const childrenByParent = new Map();
+    for (const record of records) {
+        if (!record.parent_id)
+            continue;
+        const siblings = childrenByParent.get(record.parent_id) || [];
+        siblings.push(record);
+        childrenByParent.set(record.parent_id, siblings);
+    }
+    for (const siblings of childrenByParent.values())
+        siblings.sort((a, b) => a.position - b.position);
+    const visibleIds = new Set(records.filter(e => [
+        e.title, e.fields.action || '', e.fields.summary || '', e.fields.number || '', e.fields.framing || '',
+    ].join(' ').toLowerCase().includes(query.toLowerCase())).map(e => e.id));
+    for (const id of [...visibleIds]) {
+        let current = byId.get(id);
+        while (current?.parent_id) {
+            visibleIds.add(current.parent_id);
+            current = byId.get(current.parent_id);
+        }
+    }
+    const children = (id) => (childrenByParent.get(id) || []).filter(e => visibleIds.has(e.id));
+    const sequenceShotCounts = new Map();
+    for (const shot of records.filter(e => e.kind === 'shot')) {
+        const scene = byId.get(shot.parent_id || '');
+        if (scene?.parent_id)
+            sequenceShotCounts.set(scene.parent_id, (sequenceShotCounts.get(scene.parent_id) || 0) + 1);
+    }
+    const totals = {
+        sequences: records.filter(e => e.kind === 'sequence').length,
+        scenes: records.filter(e => e.kind === 'scene').length,
+        shots: records.filter(e => e.kind === 'shot').length,
+    };
+    const render = (entity) => {
+        const nested = children(entity.id);
+        const isCollapsed = collapsed.includes(entity.id);
+        const sceneCount = nested.filter(e => e.kind === 'scene').length;
+        const shotCount = entity.kind === 'sequence'
+            ? sequenceShotCounts.get(entity.id) || 0
+            : nested.filter(e => e.kind === 'shot').length;
+        const sceneShots = (childrenByParent.get(entity.id) || []).filter(child => child.kind === 'shot');
+        const rawSummary = entity.kind === 'shot'
+            ? shotAction(entity)
+            : entity.kind === 'scene'
+                ? String(entity.fields.summary || entity.description || '')
+                : String(entity.fields.arc || entity.description || 'Add a short story direction.');
+        const summary = entity.kind === 'scene' && (repeatsShotSummaries(entity, sceneShots) || /^Grouped from source scene\b/.test(rawSummary)) ? '' : rawSummary;
+        const frame = entity.kind === 'shot' ? framingParts(entity) : null;
+        const number = String(entity.fields.number || String(entity.position + 1).padStart(2, '0'));
+        const title = outlineTitle(entity);
+        return react_1.default.createElement("div", { key: entity.id, className: `story-node ${entity.kind}` },
+            react_1.default.createElement("div", { className: `story-row ${p.selected === entity.id ? 'is-selected' : ''}` },
+                entity.kind === 'shot'
+                    ? react_1.default.createElement("span", { className: "shot-order" }, number)
+                    : react_1.default.createElement("button", { className: "collapse-button", "aria-label": `${isCollapsed ? 'Expand' : 'Collapse'} ${entity.title}`, "aria-expanded": !isCollapsed, onClick: () => setCollapsed(value => isCollapsed ? value.filter(id => id !== entity.id) : [...value, entity.id]) }, isCollapsed ? '+' : '−'),
+                react_1.default.createElement("div", { className: "story-main" },
+                    react_1.default.createElement("div", { className: "story-heading-line" },
+                        react_1.default.createElement("span", { className: "eyebrow" },
+                            (0, utils_1.human)(entity.kind),
+                            " \u00B7 ",
+                            String(entity.position + 1).padStart(2, '0')),
+                        entity.kind === 'sequence' && react_1.default.createElement("span", { className: "story-count" },
+                            sceneCount,
+                            " scenes \u00B7 ",
+                            shotCount,
+                            " shots"),
+                        entity.kind === 'scene' && react_1.default.createElement("span", { className: "story-count" },
+                            shotCount,
+                            " ",
+                            shotCount === 1 ? 'shot' : 'shots')),
+                    react_1.default.createElement("button", { className: "title-button", onClick: () => p.select(entity.id) }, title),
+                    summary && react_1.default.createElement("p", null, summary),
+                    frame && react_1.default.createElement("div", { className: "shot-meta-strip" },
+                        frame.label && react_1.default.createElement("span", { className: "shot-meta-kind" }, frame.label),
+                        entity.fields.duration != null && react_1.default.createElement("span", null,
+                            Number(entity.fields.duration),
+                            " sec"),
+                        entity.fields.time && react_1.default.createElement("span", null, String(entity.fields.time)))),
+                react_1.default.createElement("div", { className: "row-actions" },
+                    entity.kind !== 'shot' && react_1.default.createElement("button", { onClick: () => p.action(entity.kind === 'sequence' ? 'scene.create' : 'shot.create', { parent_id: entity.id }) },
+                        react_1.default.createElement(Primitives_1.Icon, { name: "plus", size: 14 }),
+                        entity.kind === 'sequence' ? 'Scene' : 'Shot'),
+                    react_1.default.createElement("button", { onClick: () => p.action(entity.kind + '.update', (0, utils_1.commandDefaults)(entity)) }, "Edit"),
+                    react_1.default.createElement("button", { onClick: () => p.action('story.move', (0, utils_1.commandDefaults)(entity)) }, "Move / reorder"))),
+            !isCollapsed && nested.length > 0 && react_1.default.createElement("div", { className: `story-children children-${entity.kind} ${entity.kind === 'scene' && shotCount === 1 ? 'single-shot' : ''}` }, nested.map(render)));
+    };
+    const sequences = children(p.state.project.id).filter(e => e.kind === 'sequence');
+    return react_1.default.createElement(react_1.default.Fragment, null,
+        react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Story outline", title: "Build the story, scene by scene.", description: "Organize scenes and shots into sequences, then rearrange them as the story changes.", actions: react_1.default.createElement("button", { className: "primary", onClick: () => p.action('sequence.create') },
+                react_1.default.createElement(Primitives_1.Icon, { name: "plus" }),
+                "New sequence") }),
+        react_1.default.createElement("div", { className: "outline-toolbar" },
+            react_1.default.createElement("div", { className: "outline-totals", "aria-label": "Story outline items" },
+                react_1.default.createElement("span", null,
+                    react_1.default.createElement("strong", null, totals.sequences),
+                    " sequences"),
+                react_1.default.createElement("i", null),
+                react_1.default.createElement("span", null,
+                    react_1.default.createElement("strong", null, totals.scenes),
+                    " scenes"),
+                react_1.default.createElement("i", null),
+                react_1.default.createElement("span", null,
+                    react_1.default.createElement("strong", null, totals.shots),
+                    " shots")),
+            react_1.default.createElement("div", { className: "list-toolbar" },
+                react_1.default.createElement("label", { className: "search" },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
+                    react_1.default.createElement("input", { "aria-label": "Search story outline", value: query, onChange: (e) => setQuery(e.target.value), placeholder: "Find a scene or shot\u2026" })),
+                react_1.default.createElement("button", { onClick: () => setCollapsed([]) }, "Expand all"),
+                react_1.default.createElement("button", { onClick: () => p.go('canvas') }, "Open story canvas"))),
+        react_1.default.createElement("div", { className: "story-outline" }, sequences.map(render)),
+        !records.length && react_1.default.createElement(Primitives_1.Empty, { title: "Start with a sequence", action: react_1.default.createElement("button", { onClick: () => p.action('sequence.create') }, "Create a sequence") }, "Add scenes and shots to shape the story. Reorder them here whenever the story changes."));
+}
+
+},
+"pages/Pages":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.OutlinePage = void 0;
+exports.WorkspacePage = WorkspacePage;
+exports.OverviewPage = OverviewPage;
+exports.UploadControl = UploadControl;
+exports.IntakePage = IntakePage;
+exports.LibraryPage = LibraryPage;
+exports.ScopeSelect = ScopeSelect;
+exports.GuidePage = GuidePage;
+exports.EditorPage = EditorPage;
+exports.FramesPage = FramesPage;
+exports.CompositionPage = CompositionPage;
+exports.SettingsPage = SettingsPage;
+exports.AutomationPage = AutomationPage;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const utils_1 = require("../utils");
+const Primitives_1 = require("../components/Primitives");
+function recordButtons(p, e) { return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement("button", { onClick: () => p.select(e.id) }, "Details"),
+    react_1.default.createElement("button", { onClick: () => p.action(e.kind + '.update', (0, utils_1.commandDefaults)(e)) }, "Edit")); }
+function WorkspacePage({ session, projects, onOpen, onRefresh }) {
+    const [creating, setCreating] = (0, react_1.useState)(false), [title, setTitle] = (0, react_1.useState)(''), [slug, setSlug] = (0, react_1.useState)(''), [search, setSearch] = (0, react_1.useState)(''), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false);
+    async function create(e) { e.preventDefault(); setBusy(true); setError(''); try {
+        const p = await (0, api_1.api)('/projects', 'POST', { title, ...(slug ? { slug } : {}) });
+        await onRefresh();
+        await onOpen(p.id);
+        setCreating(false);
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } }
+    return react_1.default.createElement(react_1.default.Fragment, null,
+        react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Local production desk", title: "Your work, in one place.", description: "Each project keeps its story, images, and exports together on this computer.", actions: session.can_create ? react_1.default.createElement("button", { className: "primary", onClick: () => setCreating(true) },
+                react_1.default.createElement(Primitives_1.Icon, { name: "plus" }),
+                "New project") : react_1.default.createElement(Primitives_1.Badge, null, "Project folder") }),
+        react_1.default.createElement("div", { className: "workspace-intro" },
+            react_1.default.createElement("span", { className: "eyebrow" }, "Projects folder"),
+            react_1.default.createElement("code", null, session.workspace || 'Current project folder'),
+            react_1.default.createElement("p", null, "Your story, reference images, and exports stay together in each project folder.")),
+        react_1.default.createElement("div", { className: "list-toolbar" },
+            react_1.default.createElement("label", { className: "search" },
+                react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
+                react_1.default.createElement("input", { "aria-label": "Find a project", placeholder: "Find a project\u2026", value: search, onChange: (e) => setSearch(e.target.value) })),
+            react_1.default.createElement("button", { onClick: onRefresh },
+                react_1.default.createElement(Primitives_1.Icon, { name: "refresh" }),
+                "Refresh projects")),
+        react_1.default.createElement("div", { className: "project-list" }, projects.filter(p => p.title.toLowerCase().includes(search.toLowerCase())).map((p, i) => react_1.default.createElement("button", { className: "project-row", key: p.id, disabled: !p.available, onClick: () => onOpen(p.id) },
+            react_1.default.createElement("span", { className: "project-number" }, String(i + 1).padStart(2, '0')),
+            react_1.default.createElement("div", null,
+                react_1.default.createElement("h2", null, (0, utils_1.displayTitle)(p.title)),
+                react_1.default.createElement("p", null, p.description || 'A story waiting to take shape.'),
+                react_1.default.createElement("small", null, p.path)),
+            react_1.default.createElement("span", { className: "project-stats" },
+                p.counts?.scene || 0,
+                " scenes",
+                react_1.default.createElement("br", null),
+                p.counts?.asset || 0,
+                " library items"),
+            react_1.default.createElement("span", { className: "project-status" },
+                p.recent ? react_1.default.createElement(Primitives_1.Badge, null, "Recent") : p.available ? react_1.default.createElement(Primitives_1.Badge, null, "Local") : react_1.default.createElement(Primitives_1.Badge, null, "Unavailable"),
+                react_1.default.createElement(Primitives_1.Icon, { name: "arrow" }))))),
+        !projects.length && react_1.default.createElement(Primitives_1.Empty, { title: "Start with an empty folder", action: session.can_create ? react_1.default.createElement("button", { className: "primary", onClick: () => setCreating(true) }, "Create your first project") : undefined }, "Create a project in this workspace. References, sequences, shots, and exports will all live together."),
+        react_1.default.createElement("p", { className: "footnote" },
+            "To open a project outside this workspace, launch ",
+            react_1.default.createElement("code", null, "storyboarder ui --project /path/to/project"),
+            " from your terminal."),
+        creating && react_1.default.createElement(Primitives_1.Modal, { title: "Create a project", onClose: () => setCreating(false) },
+            react_1.default.createElement("form", { onSubmit: create },
+                react_1.default.createElement("div", { className: "modal-body form-stack" },
+                    error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Project title"),
+                        react_1.default.createElement("input", { autoFocus: true, value: title, onChange: (e) => { setTitle(e.target.value); setSlug(e.target.value.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')); }, required: true, maxLength: 200 })),
+                    react_1.default.createElement("label", { className: "field" },
+                        react_1.default.createElement("span", null, "Folder name"),
+                        react_1.default.createElement("input", { value: slug, onChange: (e) => setSlug(e.target.value), pattern: "[a-z0-9]+(?:-[a-z0-9]+)*", required: true }),
+                        react_1.default.createElement("small", null, "Created inside this workspace folder."))),
+                react_1.default.createElement("div", { className: "modal-footer" },
+                    react_1.default.createElement("button", { type: "button", onClick: () => setCreating(false) }, "Cancel"),
+                    react_1.default.createElement("button", { className: "primary", disabled: busy }, busy ? 'Creating…' : 'Create project')))));
+}
+function OverviewPage(p) { const { state } = p; const [health, setHealth] = (0, react_1.useState)(null); (0, react_1.useEffect)(() => { (0, api_1.runCommand)(state.project.id, 'project.doctor').then(setHealth).catch(() => setHealth(null)); }, [state]); const seq = (0, utils_1.activeEntities)(state, 'sequence'); return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Project overview", title: (0, utils_1.displayTitle)(state.project.title), description: String(state.project.fields.premise || state.project.description || 'Give the story a shape. Gather references, build the outline, and make each shot intentional.'), actions: react_1.default.createElement("button", { onClick: () => p.action('project.update', (0, utils_1.commandDefaults)(state.project)) }, "Edit project details") }),
+    react_1.default.createElement("div", { className: "metrics" }, [['Scenes', 'scene'], ['Shots', 'shot'], ['Reference items', 'asset'], ['Awaiting review', 'intake']].map(([label, key]) => react_1.default.createElement("button", { key: key, onClick: () => p.go(key === 'asset' ? 'library' : key === 'intake' ? 'intake' : 'outline') },
+        react_1.default.createElement("strong", null, state.project.counts[key] || 0),
+        react_1.default.createElement("span", null, label),
+        react_1.default.createElement(Primitives_1.Icon, { name: "arrow", size: 16 })))),
+    react_1.default.createElement("div", { className: "overview-columns" },
+        react_1.default.createElement("section", null,
+            react_1.default.createElement("div", { className: "section-heading" },
+                react_1.default.createElement("h2", null, "The story so far"),
+                react_1.default.createElement("button", { onClick: () => p.action('sequence.create') }, "New sequence")),
+            seq.length ? seq.map(s => react_1.default.createElement("div", { className: "outline-summary", key: s.id },
+                react_1.default.createElement("span", { className: "order-number" }, String(s.position + 1).padStart(2, '0')),
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("button", { className: "title-button", onClick: () => p.select(s.id) }, (0, utils_1.displayTitle)(s.title)),
+                    react_1.default.createElement("p", null, s.fields.arc || s.description || 'Add a short description for this sequence.'),
+                    react_1.default.createElement("small", null,
+                        state.entities.filter(e => !e.archived && e.parent_id === s.id).length,
+                        " scenes")),
+                react_1.default.createElement("button", { onClick: () => p.action('scene.create', { parent_id: s.id }) }, "Add scene"))) : react_1.default.createElement(Primitives_1.Empty, { title: "Begin with a sequence", action: react_1.default.createElement("button", { onClick: () => p.action('sequence.create') }, "Create a sequence") }, "A sequence holds scenes. Each scene holds the shots that carry it."),
+            react_1.default.createElement("div", { className: "section-heading" },
+                react_1.default.createElement("h2", null, "Story direction"),
+                react_1.default.createElement("button", { className: "text-button", onClick: () => p.go('guide') }, "Open guide \u2192")),
+            react_1.default.createElement("p", { className: "prose" }, state.project.fields.visual_style || 'Set the visual style, production notes, and story direction in the Story guide.')),
+        react_1.default.createElement("aside", { className: "overview-notes" },
+            react_1.default.createElement("h2", null, "At the desk"),
+            health && react_1.default.createElement("div", { className: `health-summary ${health.healthy ? 'healthy' : 'warning'}` },
+                react_1.default.createElement(Primitives_1.Icon, { name: health.healthy ? 'check' : 'settings' }),
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("strong", null, health.healthy ? 'Project files are in order' : 'Project needs attention'),
+                    react_1.default.createElement("p", null, health.issues.length ? `${health.issues.length} ${health.issues.length === 1 ? 'item needs' : 'items need'} review.` : 'Project files and reference images passed the current check.'),
+                    react_1.default.createElement("button", { className: "text-button", onClick: () => p.go('settings') }, "View health report \u2192"))),
+            react_1.default.createElement("h3", null, "Recent changes"),
+            react_1.default.createElement("ol", { className: "event-list" }, state.events.slice(0, 10).map(e => react_1.default.createElement("li", { key: e.id },
+                react_1.default.createElement("span", null, p.meta.commands.find(c => c.name === e.action)?.label || (0, utils_1.human)(e.action.replaceAll('.', ' '))),
+                react_1.default.createElement("small", null, (0, utils_1.niceDate)(e.created_at))))),
+            react_1.default.createElement("div", { className: "notice" }, "Your project is saved on this computer. Back up its folder regularly to keep a second copy.")))); }
+function UploadControl({ project, shot, done }) { const [recursive, setRecursive] = (0, react_1.useState)(false), [status, setStatus] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false), [failures, setFailures] = (0, react_1.useState)([]); async function upload(files) { if (!files)
+    return; setBusy(true); setFailures([]); const eligible = Array.from(files).filter(f => recursive || !f.webkitRelativePath || f.webkitRelativePath.split('/').length <= 2); const errors = []; let accepted = 0; for (let i = 0; i < eligible.length; i++) {
+    const file = eligible[i];
+    setStatus(`Importing ${i + 1} of ${eligible.length}: ${file.name}`);
+    try {
+        const data = new FormData();
+        data.append('file', file);
+        data.append('original_path', file.webkitRelativePath || file.name);
+        if (shot)
+            data.append('shot_id', shot);
+        await (0, api_1.api)((0, api_1.projectPath)(project, '/upload'), 'POST', data);
+        accepted++;
+    }
+    catch (e) {
+        errors.push(`${file.name}: ${e.message}`);
+    }
+} setStatus(`${accepted} image${accepted === 1 ? '' : 's'} added to intake; ${errors.length} couldn’t be imported${files.length !== eligible.length ? `; ${files.length - eligible.length} image${files.length - eligible.length === 1 ? '' : 's'} in subfolders skipped` : ''}.`); setFailures(errors); setBusy(false); await done(); } return react_1.default.createElement("div", { className: "upload-control" },
+    react_1.default.createElement("div", { className: "button-row" },
+        react_1.default.createElement("label", { className: `button ${busy ? 'disabled' : ''}` },
+            react_1.default.createElement(Primitives_1.Icon, { name: "plus" }),
+            shot ? 'Attach frame image' : 'Import images',
+            react_1.default.createElement("input", { type: "file", accept: ".jpg,.jpeg,.png,.webp,.tif,.tiff,.bmp", multiple: true, hidden: true, disabled: busy, onChange: (e) => { upload(e.target.files); e.target.value = ''; } })),
+        !shot && react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("label", { className: `button ${busy ? 'disabled' : ''}` },
+                "Import folder",
+                react_1.default.createElement("input", { type: "file", webkitdirectory: "", multiple: true, hidden: true, disabled: busy, onChange: (e) => { upload(e.target.files); e.target.value = ''; } })),
+            react_1.default.createElement("label", { className: "inline-check" },
+                react_1.default.createElement("input", { type: "checkbox", checked: recursive, onChange: (e) => setRecursive(e.target.checked) }),
+                "Include subfolders"))),
+    react_1.default.createElement("small", null, "JPEG, PNG, WebP, TIFF, BMP \u00B7 single images \u00B7 up to 50 MiB / 50 megapixels each."),
+    status && react_1.default.createElement("p", { role: "status" }, status),
+    failures.length > 0 && react_1.default.createElement("details", { open: true },
+        react_1.default.createElement("summary", null,
+            failures.length,
+            " files not imported"),
+        failures.map((f, i) => react_1.default.createElement("p", { className: "warning-text", key: i }, f)))); }
+function IntakePage(p) { const [filter, setFilter] = (0, react_1.useState)('pending'), [query, setQuery] = (0, react_1.useState)(''), [checked, setChecked] = (0, react_1.useState)([]), [bulk, setBulk] = (0, react_1.useState)(''), [bulkTags, setBulkTags] = (0, react_1.useState)(''), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false); const items = p.state.intake.filter(i => (!filter || i.state === filter) && i.original_name.toLowerCase().includes(query.toLowerCase())).sort((a, b) => a.media_id.localeCompare(b.media_id)); async function acceptBulk() { setBusy(true); try {
+    for (const id of checked) {
+        const item = p.state.intake.find(i => i.id === id);
+        if (item && item.state === 'pending')
+            await (0, api_1.runCommand)(p.state.project.id, 'intake.accept', { id, revision: item.revision, ...(bulk ? { asset_id: bulk } : {}), tags: bulkTags.split(',').map(s => s.trim()).filter(Boolean) });
+    }
+    setChecked([]);
+    await p.refresh();
+    p.notify('Selected images added to the library.');
+}
+catch (e) {
+    setError(e.message);
+    await p.refresh();
+}
+finally {
+    setBusy(false);
+} } return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Image intake", title: "Give every image a place.", description: "Review imported images, group identical copies, and add useful images to your library." }),
+    react_1.default.createElement(UploadControl, { project: p.state.project.id, done: p.refresh }),
+    react_1.default.createElement("div", { className: "list-toolbar" },
+        react_1.default.createElement("label", { className: "search" },
+            react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
+            react_1.default.createElement("input", { value: query, onChange: (e) => setQuery(e.target.value), placeholder: "Find imported files\u2026", "aria-label": "Search intake" })),
+        react_1.default.createElement("select", { "aria-label": "Imported image status", value: filter, onChange: (e) => { setFilter(e.target.value); setChecked([]); } }, ['pending', 'accepted', 'discarded', ''].map(s => react_1.default.createElement("option", { key: s, value: s }, s ? (0, utils_1.human)(s) : 'All statuses')))),
+    error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+    " ",
+    checked.length > 0 && react_1.default.createElement("div", { className: "bulk-bar" },
+        react_1.default.createElement("strong", null,
+            checked.length,
+            " selected"),
+        react_1.default.createElement("select", { "aria-label": "Add selected images to", value: bulk, onChange: (e) => setBulk(e.target.value) },
+            react_1.default.createElement("option", { value: "" }, "Add to a library item"),
+            (0, utils_1.activeEntities)(p.state, 'asset').map(a => react_1.default.createElement("option", { key: a.id, value: a.id }, (0, utils_1.displayTitle)(a.title)))),
+        react_1.default.createElement("input", { "aria-label": "Bulk tags", value: bulkTags, onChange: (e) => setBulkTags(e.target.value), placeholder: "Tags, comma-separated" }),
+        react_1.default.createElement("button", { onClick: acceptBulk, disabled: busy }, "Add selected"),
+        react_1.default.createElement("button", { onClick: () => setChecked([]) }, "Clear selection")),
+    react_1.default.createElement("div", { className: "intake-list" }, items.map(item => { const m = p.state.media.find(m => m.id === item.media_id); const duplicates = p.state.intake.filter(i => i.media_id === item.media_id).length; return react_1.default.createElement("article", { className: "intake-row", key: item.id },
+        react_1.default.createElement("input", { type: "checkbox", "aria-label": `Select ${item.original_name}`, checked: checked.includes(item.id), disabled: item.state !== 'pending', onChange: () => setChecked(v => v.includes(item.id) ? v.filter(id => id !== item.id) : [...v, item.id]) }),
+        react_1.default.createElement("a", { href: (0, api_1.originalUrl)(p.state.project.id, m.id), target: "_blank", rel: "noreferrer" },
+            react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(p.state.project.id, m.id, 160), alt: item.original_name })),
+        react_1.default.createElement("div", { className: "intake-info" },
+            react_1.default.createElement("h3", null, item.original_name),
+            react_1.default.createElement("p", null,
+                m.width,
+                " \u00D7 ",
+                m.height,
+                " \u00B7 ",
+                m.format,
+                " \u00B7 ",
+                (m.size / 1024 / 1024).toFixed(1),
+                " MiB"),
+            react_1.default.createElement("small", { title: item.original_path }, item.original_path),
+            react_1.default.createElement("div", { className: "tags" },
+                react_1.default.createElement(Primitives_1.Badge, null, (0, utils_1.human)(item.state)),
+                duplicates > 1 && react_1.default.createElement(Primitives_1.Badge, { kind: "warning" },
+                    "Identical image \u00B7 ",
+                    duplicates,
+                    " imports"),
+                m.tags.map(t => react_1.default.createElement("span", { key: t, className: "tag" }, t)))),
+        react_1.default.createElement("div", { className: "row-actions" },
+            item.state === 'pending' && react_1.default.createElement(react_1.default.Fragment, null,
+                react_1.default.createElement("button", { onClick: () => p.action('intake.accept', (0, utils_1.commandDefaults)(item)) }, "Add to library"),
+                react_1.default.createElement("button", { onClick: () => p.action('intake.accept', { ...(0, utils_1.commandDefaults)(item), create_title: item.original_name.replace(/\.[^.]+$/, '') }) }, "Create item from image"),
+                react_1.default.createElement("button", { onClick: () => p.action('intake.discard', (0, utils_1.commandDefaults)(item)) }, "Remove from intake\u2026")),
+            react_1.default.createElement("button", { onClick: () => p.action('media.tags', (0, utils_1.commandDefaults)(m)) }, "Tag image"))); })),
+    !items.length && react_1.default.createElement(Primitives_1.Empty, { title: filter === 'pending' ? 'Intake is clear' : 'No matching intake items' }, "Import individual images or a folder. Identical images are grouped, and each import remains available to review.")); }
+function LibraryPage(p) { const [query, setQuery] = (0, react_1.useState)(''), [type, setType] = (0, react_1.useState)(''), [tag, setTag] = (0, react_1.useState)(''), [page, setPage] = (0, react_1.useState)(0); const records = (0, utils_1.activeEntities)(p.state, 'asset').filter(e => (!type || e.fields.type === type) && (!tag || e.tags.includes(tag)) && [e.title, e.description, ...e.aliases].join(' ').toLowerCase().includes(query.toLowerCase())); const visible = records.slice(page * 48, (page + 1) * 48); (0, react_1.useEffect)(() => setPage(0), [query, type, tag]); return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Reference library", title: "The people, places, and things.", description: "Keep each character, location, or prop in one place with its reference images. Choose the specific image you want for each shot.", actions: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("button", { onClick: () => p.go('intake') }, "Import references"),
+            react_1.default.createElement("button", { className: "primary", onClick: () => p.action('asset.create') },
+                react_1.default.createElement(Primitives_1.Icon, { name: "plus" }),
+                "New library item")) }),
+    react_1.default.createElement("div", { className: "list-toolbar" },
+        react_1.default.createElement("label", { className: "search" },
+            react_1.default.createElement(Primitives_1.Icon, { name: "search" }),
+            react_1.default.createElement("input", { "aria-label": "Search the library", value: query, onChange: (e) => setQuery(e.target.value), placeholder: "Search names, aliases, descriptions\u2026" })),
+        react_1.default.createElement("select", { "aria-label": "Filter by item type", value: type, onChange: (e) => setType(e.target.value) },
+            react_1.default.createElement("option", { value: "" }, "All types"),
+            ['character', 'location', 'prop', 'reference'].map(t => react_1.default.createElement("option", { key: t }, t))),
+        react_1.default.createElement("select", { "aria-label": "Filter by tag", value: tag, onChange: (e) => setTag(e.target.value) },
+            react_1.default.createElement("option", { value: "" }, "All tags"),
+            [...new Set(p.state.entities.flatMap(e => e.tags))].sort().map(t => react_1.default.createElement("option", { key: t }, t))),
+        react_1.default.createElement("span", { className: "muted" },
+            records.length,
+            " items")),
+    react_1.default.createElement("div", { className: "asset-grid" }, visible.map(a => { const members = p.state.asset_media.filter(m => m.asset_id === a.id), primary = members.find(m => m.is_primary) || members[0]; return react_1.default.createElement("article", { className: `asset-card ${p.selected === a.id ? 'is-selected' : ''}`, key: a.id },
+        react_1.default.createElement("button", { className: "asset-preview", onClick: () => p.select(a.id), "aria-label": `View ${a.title}` }, primary ? react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(p.state.project.id, primary.media_id), alt: a.title, loading: "lazy" }) : react_1.default.createElement("span", { className: "media-placeholder" },
+            react_1.default.createElement(Primitives_1.Icon, { name: "library", size: 32 }),
+            "No image yet")),
+        react_1.default.createElement("div", { className: "asset-meta" },
+            react_1.default.createElement(Primitives_1.Badge, { kind: (0, utils_1.kindLabel)(a) }, (0, utils_1.kindLabel)(a)),
+            react_1.default.createElement("small", null,
+                members.length,
+                " images")),
+        react_1.default.createElement("button", { className: "title-button", onClick: () => p.select(a.id) }, a.title),
+        react_1.default.createElement("p", null, a.description || 'No description yet.'),
+        react_1.default.createElement("div", { className: "tags" }, a.tags.slice(0, 5).map(t => react_1.default.createElement("span", { className: "tag", key: t }, t))),
+        react_1.default.createElement("div", { className: "button-row" },
+            react_1.default.createElement("button", { onClick: () => p.action('asset.update', (0, utils_1.commandDefaults)(a)) }, "Edit"),
+            react_1.default.createElement("button", { onClick: () => p.action('asset.attach', { asset_id: a.id }) }, "Attach image"))); })),
+    !records.length && react_1.default.createElement(Primitives_1.Empty, { title: "Build your reference library", action: react_1.default.createElement("button", { onClick: () => p.action('asset.create') }, "Create a library item") }, "Start with a character, location, prop, or other reference. Add images whenever you have them."),
+    records.length > 48 && react_1.default.createElement("div", { className: "pagination" },
+        react_1.default.createElement("button", { disabled: page === 0, onClick: () => setPage(page - 1) }, "Previous"),
+        react_1.default.createElement("span", null,
+            "Page ",
+            page + 1,
+            " of ",
+            Math.ceil(records.length / 48)),
+        react_1.default.createElement("button", { disabled: (page + 1) * 48 >= records.length, onClick: () => setPage(page + 1) }, "Next"))); }
+var OutlinePage_1 = require("./OutlinePage");
+Object.defineProperty(exports, "OutlinePage", { enumerable: true, get: function () { return OutlinePage_1.OutlinePage; } });
+function ScopeSelect({ state, value, onChange, label = 'Applies to', shotsOnly = false }) { const choices = (0, utils_1.activeEntities)(state).filter(e => shotsOnly ? e.kind === 'shot' : e.kind !== 'asset').sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)); return react_1.default.createElement("label", { className: "field scope-select" },
+    react_1.default.createElement("span", null, label),
+    react_1.default.createElement("select", { "aria-label": label, value: value, onChange: (e) => onChange(e.target.value) },
+        !choices.some(e => e.id === value) && react_1.default.createElement("option", { value: "" }, "Choose\u2026"),
+        choices.map(e => react_1.default.createElement("option", { key: e.id, value: e.id },
+            (0, utils_1.human)(e.kind),
+            " \u00B7 ",
+            (0, utils_1.displayTitle)(e.title))))); }
+function GuidePage(p) { const [scope, setScope] = (0, react_1.useState)(p.selected && p.state.entities.find(e => e.id === p.selected)?.kind !== 'asset' ? p.selected : p.state.project.id), [context, setContext] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''); const record = p.state.entities.find(e => e.id === scope) || p.state.project; (0, react_1.useEffect)(() => { let alive = true; (0, api_1.runCommand)(p.state.project.id, 'context.resolve', { owner_id: scope }).then(r => alive && setContext(r)).catch(e => alive && setError(e.message)); return () => { alive = false; }; }, [scope, p.state]); const blocks = p.state.context_blocks.filter(b => b.owner_id === scope); return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Story guide", title: "A guide for every part of the story.", description: "Set direction for the whole project, then add notes for a sequence, scene, or shot when needed.", actions: react_1.default.createElement("button", { onClick: () => p.action(record.kind + '.update', (0, utils_1.commandDefaults)(record)) },
+            "Edit ",
+            record.kind === 'project' ? 'project' : (0, utils_1.human)(record.kind).toLowerCase(),
+            " direction") }),
+    react_1.default.createElement(ScopeSelect, { state: p.state, value: scope, onChange: setScope }),
+    error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+    react_1.default.createElement("div", { className: "guide-columns" },
+        react_1.default.createElement("section", null,
+            react_1.default.createElement("div", { className: "section-heading" },
+                react_1.default.createElement("h2", null, "Direction at this level"),
+                react_1.default.createElement("button", { onClick: () => p.action('context.put', { owner_id: scope }) }, "Add direction note")),
+            Object.entries(record.fields).filter(([k, v]) => v !== '' && v != null).map(([key, value]) => react_1.default.createElement("section", { className: "detail-field", key: key },
+                react_1.default.createElement("h3", null, (0, utils_1.human)(key)),
+                react_1.default.createElement("p", { className: "prose" }, key === 'location_id' ? (0, utils_1.displayTitle)(p.state.entities.find(e => e.id === value)?.title || String(value)) : String(value)))),
+            blocks.map(b => react_1.default.createElement("section", { className: "authored-block", key: b.id },
+                react_1.default.createElement("div", { className: "section-heading" },
+                    react_1.default.createElement("h3", null, (0, utils_1.human)(b.key)),
+                    b.operation !== 'append' && react_1.default.createElement(Primitives_1.Badge, null, (0, utils_1.operationLabel)(b.operation))),
+                react_1.default.createElement("p", { className: "prose" }, b.text || 'Direction from above is hidden here.'),
+                react_1.default.createElement("div", { className: "button-row" },
+                    react_1.default.createElement("button", { onClick: () => p.action('context.put', (0, utils_1.commandDefaults)(b)) }, "Edit direction note"),
+                    react_1.default.createElement("button", { onClick: () => p.action('context.remove', (0, utils_1.commandDefaults)(b)) }, "Remove\u2026")))),
+            !blocks.length && react_1.default.createElement("p", { className: "muted" }, "No direction notes here yet. Notes from the project and story above still apply.")),
+        react_1.default.createElement("section", { className: "resolved-panel" },
+            react_1.default.createElement("h2", null, "Direction in effect"),
+            context ? react_1.default.createElement(react_1.default.Fragment, null,
+                react_1.default.createElement(Primitives_1.ContextView, { value: context }),
+                Object.keys(context.blocks).length > 0 && react_1.default.createElement("div", { className: "optout-list" },
+                    react_1.default.createElement("h3", null, "Direction hidden here"),
+                    Object.keys(context.blocks).filter(key => !blocks.some(b => b.key === key)).map(key => react_1.default.createElement("button", { key: key, onClick: () => p.action('context.put', { owner_id: scope, key, operation: 'exclude', content: '' }) },
+                        "Turn off \u201C",
+                        (0, utils_1.human)(key),
+                        "\u201D here\u2026")))) : react_1.default.createElement("p", null, "Loading story direction\u2026")))); }
+function EditorPage(p) { const [scope, setScope] = (0, react_1.useState)(p.selected && ['scene', 'shot'].includes(p.state.entities.find(e => e.id === p.selected)?.kind || '') ? p.selected : (0, utils_1.activeEntities)(p.state, 'shot')[0]?.id || (0, utils_1.activeEntities)(p.state, 'scene')[0]?.id || ''); const record = p.state.entities.find(e => e.id === scope); const [composition, setComposition] = (0, react_1.useState)(null); (0, react_1.useEffect)(() => { if (scope)
+    (0, api_1.runCommand)(p.state.project.id, 'composition.preview', { owner_id: scope }).then(setComposition).catch(() => setComposition(null)); }, [scope, p.state]); return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Scene & shot editor", title: "Shape the scene and shot.", description: "Add action, dialogue, camera notes, continuity, and image references to every scene and shot.", actions: react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("button", { onClick: () => p.action('scene.create') }, "New scene"),
+            react_1.default.createElement("button", { onClick: () => p.action('shot.create') }, "New shot")) }),
+    react_1.default.createElement("label", { className: "field scope-select" },
+        react_1.default.createElement("span", null, "Scene or shot"),
+        react_1.default.createElement("select", { value: scope, onChange: (e) => setScope(e.target.value) },
+            react_1.default.createElement("option", { value: "" }, "Choose a scene or shot"),
+            (0, utils_1.activeEntities)(p.state).filter(e => ['scene', 'shot'].includes(e.kind)).map(e => react_1.default.createElement("option", { key: e.id, value: e.id },
+                (0, utils_1.human)(e.kind),
+                " \u00B7 ",
+                (0, utils_1.displayTitle)(e.title))))),
+    record ? react_1.default.createElement(react_1.default.Fragment, null,
+        react_1.default.createElement("div", { className: "editor-document" },
+            react_1.default.createElement("div", { className: "section-heading" },
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement(Primitives_1.Badge, null, (0, utils_1.human)(record.kind)),
+                    react_1.default.createElement("h2", null, (0, utils_1.displayTitle)(record.title))),
+                react_1.default.createElement("button", { className: "primary", onClick: () => p.action(record.kind + '.update', (0, utils_1.commandDefaults)(record)) }, "Edit details")),
+            react_1.default.createElement("p", { className: "prose" }, record.description),
+            react_1.default.createElement("div", { className: "authored-fields" }, Object.entries(record.fields).map(([key, value]) => react_1.default.createElement("section", { key: key },
+                react_1.default.createElement("h3", null, (0, utils_1.human)(key)),
+                react_1.default.createElement("p", { className: `prose ${value == null || value === '' ? 'muted' : ''}` }, value == null || value === '' ? 'Not set' : key === 'location_id' ? (0, utils_1.displayTitle)(p.state.entities.find(e => e.id === value)?.title || String(value)) : String(value))))),
+            record.kind === 'shot' && react_1.default.createElement(react_1.default.Fragment, null,
+                react_1.default.createElement("div", { className: "section-heading" },
+                    react_1.default.createElement("h2", null, "References in this shot"),
+                    react_1.default.createElement("button", { onClick: () => p.action('assignment.create', { shot_id: record.id }) }, "Add a reference")),
+                react_1.default.createElement("div", { className: "reference-grid" }, p.state.assignments.filter(a => a.shot_id === record.id).map(a => react_1.default.createElement("article", { key: a.id },
+                    a.media_id ? react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(p.state.project.id, a.media_id), alt: `${(0, utils_1.human)(a.role)} reference` }) : react_1.default.createElement("div", { className: "media-placeholder" }, "No specific image selected"),
+                    react_1.default.createElement("h3", null, (0, utils_1.displayTitle)(p.state.entities.find(e => e.id === a.asset_id)?.title || 'Library item')),
+                    react_1.default.createElement(Primitives_1.Badge, null, (0, utils_1.human)(a.role)),
+                    react_1.default.createElement("p", null, a.media_id ? p.state.media.find(m => m.id === a.media_id)?.original_name : 'No specific image selected. Choose an image if this shot needs one.'),
+                    react_1.default.createElement("div", { className: "button-row" },
+                        react_1.default.createElement("button", { onClick: () => p.action('assignment.update', { ...(0, utils_1.commandDefaults)(a), asset_id: a.asset_id }) }, "Change reference"),
+                        react_1.default.createElement("button", { onClick: () => p.action('assignment.remove', (0, utils_1.commandDefaults)(a)) }, "Remove\u2026"))))))),
+        composition && react_1.default.createElement("details", { className: "context-preview" },
+            react_1.default.createElement("summary", null, "Direction and production checks"),
+            react_1.default.createElement(Primitives_1.ContextView, { value: composition.context }),
+            react_1.default.createElement(Primitives_1.Validation, { issues: composition.validation }))) : react_1.default.createElement(Primitives_1.Empty, { title: "Select a scene or shot" }, "Create a sequence in the outline first, then build its scenes and shots.")); }
+function FramesPage(p) { const [shot, setShot] = (0, react_1.useState)(p.selected && p.state.entities.find(e => e.id === p.selected)?.kind === 'shot' ? p.selected : (0, utils_1.activeEntities)(p.state, 'shot')[0]?.id || ''), [compare, setCompare] = (0, react_1.useState)([]), [archived, setArchived] = (0, react_1.useState)(false); (0, react_1.useEffect)(() => { setCompare([]); }, [shot]); const frames = p.state.frames.filter(f => f.shot_id === shot && (archived || f.state !== 'archived')).sort((a, b) => b.version - a.version); const visible = compare.length >= 2 ? frames.filter(f => compare.includes(f.id)) : frames; return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Storyboard frames", title: "Compare storyboard images", description: "Add storyboard images for a shot, compare versions, then select or approve the one you want to use.", actions: shot ? react_1.default.createElement("button", { onClick: () => p.action('frame.attach', { shot_id: shot }) }, "Add storyboard image") : undefined }),
+    react_1.default.createElement(ScopeSelect, { state: p.state, value: shot, onChange: setShot, label: "Shot", shotsOnly: true }),
+    shot ? react_1.default.createElement(react_1.default.Fragment, null,
+        react_1.default.createElement(UploadControl, { project: p.state.project.id, shot: shot, done: p.refresh }),
+        react_1.default.createElement("div", { className: "list-toolbar" },
+            react_1.default.createElement("label", { className: "inline-check" },
+                react_1.default.createElement("input", { type: "checkbox", checked: archived, onChange: (e) => setArchived(e.target.checked) }),
+                "Include archived images"),
+            compare.length > 0 && react_1.default.createElement("button", { onClick: () => setCompare([]) },
+                "Clear comparison (",
+                compare.length,
+                ")"),
+            react_1.default.createElement("small", null, "Choose two or more \u201CCompare\u201D checkboxes for a side-by-side review.")),
+        react_1.default.createElement("div", { className: `frames-grid ${compare.length ? 'comparison' : ''}` }, visible.map(f => react_1.default.createElement("article", { className: `frame-card ${f.state}`, key: f.id },
+            react_1.default.createElement("a", { href: (0, api_1.originalUrl)(p.state.project.id, f.media_id), target: "_blank", rel: "noreferrer" },
+                react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(p.state.project.id, f.media_id, 960), alt: `Storyboard image ${f.version}` })),
+            react_1.default.createElement("div", { className: "frame-caption" },
+                react_1.default.createElement("h3", null,
+                    "Image ",
+                    f.version),
+                react_1.default.createElement(Primitives_1.Badge, { kind: f.state }, (0, utils_1.human)(f.state))),
+            react_1.default.createElement("p", { className: "prose" }, f.notes || 'No notes for this image.'),
+            react_1.default.createElement("small", null, p.state.media.find(m => m.id === f.media_id)?.original_name),
+            react_1.default.createElement("div", { className: "button-row" }, ['draft', 'selected', 'approved', 'archived'].filter(s => s !== f.state).map(status => react_1.default.createElement("button", { key: status, onClick: () => p.action('frame.state', { id: f.id, revision: f.revision, state: status }) }, status === 'selected' ? 'Select' : status === 'approved' ? 'Approve' : status === 'archived' ? 'Archive…' : 'Return to draft'))),
+            react_1.default.createElement("label", { className: "inline-check" },
+                react_1.default.createElement("input", { type: "checkbox", checked: compare.includes(f.id), onChange: () => setCompare(v => v.includes(f.id) ? v.filter(id => id !== f.id) : [...v, f.id]) }),
+                "Compare v",
+                f.version),
+            Object.keys(f.provenance || {}).length > 0 && react_1.default.createElement("details", null,
+                react_1.default.createElement("summary", null, "Technical details"),
+                react_1.default.createElement("pre", null, JSON.stringify(f.provenance, null, 2)))))),
+        !frames.length && react_1.default.createElement(Primitives_1.Empty, { title: "No storyboard images yet" }, "Add an image for this shot. Reference images remain in the library, separate from storyboard images.")) : react_1.default.createElement(Primitives_1.Empty, { title: "Choose a shot" }, "Create a shot in the outline before adding a storyboard image.")); }
+function CompositionPage(p) { const [scope, setScope] = (0, react_1.useState)(p.selected && p.state.entities.find(e => e.id === p.selected)?.kind !== 'asset' ? p.selected : (0, utils_1.activeEntities)(p.state, 'scene')[0]?.id || p.state.project.id), [document, setDocument] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false), [approved, setApproved] = (0, react_1.useState)(false); (0, react_1.useEffect)(() => { let alive = true; setError(''); (0, api_1.runCommand)(p.state.project.id, 'composition.preview', { owner_id: scope }).then(r => alive && setDocument(r)).catch(e => alive && setError(e.message)); return () => { alive = false; }; }, [scope, p.state]); async function exportTo(format) { setBusy(true); try {
+    const r = await (0, api_1.runCommand)(p.state.project.id, format === 'bundle' ? 'export.bundle' : 'export.board', { owner_id: scope, ...(format === 'bundle' ? { include_media: true } : { format, approved_only: approved }) });
+    p.setResult(r);
+    p.notify('Project package created.');
+}
+catch (e) {
+    setError(e.message);
+}
+finally {
+    setBusy(false);
+} } return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Boards & exports", title: "Turn the outline into a board.", description: "Review the story direction and chosen images, then create a board or a package to share." }),
+    react_1.default.createElement("div", { className: "composition-toolbar" },
+        react_1.default.createElement(ScopeSelect, { state: p.state, value: scope, onChange: setScope }),
+        react_1.default.createElement("label", { className: "inline-check" },
+            react_1.default.createElement("input", { type: "checkbox", checked: approved, onChange: (e) => setApproved(e.target.checked) }),
+            "Use only approved storyboard frames"),
+        react_1.default.createElement("div", { className: "button-row" },
+            react_1.default.createElement("button", { className: "primary", disabled: busy || !document?.valid, onClick: () => exportTo('bundle') }, "Download project package"),
+            react_1.default.createElement("button", { disabled: busy || !document?.valid, onClick: () => exportTo('all') }, "Export HTML + PDF + PNG")),
+        busy && react_1.default.createElement("p", { role: "status" }, "Preparing your files\u2026")),
+    error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+    " ",
+    p.result && react_1.default.createElement(Primitives_1.ExportLinks, { project: p.state.project.id, result: p.result }),
+    " ",
+    document && react_1.default.createElement(react_1.default.Fragment, null,
+        react_1.default.createElement(Primitives_1.Validation, { issues: document.validation }),
+        react_1.default.createElement("details", { className: "context-preview" },
+            react_1.default.createElement("summary", null, "Story direction"),
+            react_1.default.createElement(Primitives_1.ContextView, { value: document.context })),
+        react_1.default.createElement("div", { className: "presentation-board" },
+            react_1.default.createElement("header", null,
+                react_1.default.createElement("span", { className: "eyebrow" },
+                    "Storyboard / ",
+                    (0, utils_1.displayTitle)(p.state.project.title)),
+                react_1.default.createElement("h2", null, (0, utils_1.displayTitle)(document.owner.title)),
+                react_1.default.createElement("p", null,
+                    document.scenes.reduce((n, s) => n + s.shots.length, 0),
+                    " shots \u00B7 references and storyboard images")),
+            document.scenes.map(scene => react_1.default.createElement("section", { key: scene.id, className: "board-scene" },
+                react_1.default.createElement("div", { className: "section-heading" },
+                    react_1.default.createElement("h3", null,
+                        (0, utils_1.displayTitle)(scene.sequence.title),
+                        " / ",
+                        (0, utils_1.displayTitle)(scene.title)),
+                    react_1.default.createElement("button", { onClick: () => p.select(scene.id) }, "Scene details")),
+                react_1.default.createElement("div", { className: "board-panels" }, scene.shots.map(shot => { const preferred = shot.frames.find(f => f.state === 'approved') || (!approved ? shot.frames.find(f => f.state === 'selected') : null); const image = preferred?.media_id || shot.assignments.find(a => a.media_id)?.media_id; return react_1.default.createElement("article", { className: "board-panel", key: shot.id },
+                    react_1.default.createElement("div", { className: "board-image" },
+                        image ? react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(p.state.project.id, image, 960), alt: `${(0, utils_1.displayTitle)(shot.title)}: ${preferred ? 'storyboard frame' : 'source reference'}` }) : react_1.default.createElement("span", null, "No storyboard image yet"),
+                        react_1.default.createElement("span", null, preferred ? `${(0, utils_1.human)(preferred.state)} storyboard image · ${preferred.version}` : image ? 'Reference image' : 'No storyboard image yet')),
+                    react_1.default.createElement("div", { className: "board-shot-title" },
+                        react_1.default.createElement("span", null, shot.fields.number || String(shot.position + 1).padStart(2, '0')),
+                        react_1.default.createElement("h4", null, (0, utils_1.displayTitle)(shot.title))),
+                    react_1.default.createElement("p", { className: "board-framing" },
+                        shot.context.scalars.framing?.value || 'Framing not set',
+                        shot.fields.duration != null ? ` · ${shot.fields.duration}s` : ''),
+                    react_1.default.createElement("p", { className: "prose" }, shot.fields.action || 'No action added yet.'),
+                    shot.fields.dialogue && react_1.default.createElement("blockquote", null, shot.fields.dialogue),
+                    shot.fields.camera && react_1.default.createElement("p", null,
+                        react_1.default.createElement("strong", null, "Camera"),
+                        " \u00B7 ",
+                        shot.fields.camera),
+                    react_1.default.createElement("div", { className: "board-reference-strip" }, shot.assignments.filter(a => a.media_id).map(a => react_1.default.createElement("a", { key: a.id, href: (0, api_1.originalUrl)(p.state.project.id, a.media_id), target: "_blank", rel: "noreferrer" },
+                        react_1.default.createElement("img", { src: (0, api_1.mediaUrl)(p.state.project.id, a.media_id, 160), alt: `${a.asset?.title}: ${(0, utils_1.human)(a.role).toLowerCase()} reference` }),
+                        react_1.default.createElement("small", null, (0, utils_1.human)(a.role))))),
+                    react_1.default.createElement("div", { className: "button-row" },
+                        react_1.default.createElement("button", { onClick: () => p.action('shot.update', (0, utils_1.commandDefaults)(shot)) }, "Edit shot"),
+                        react_1.default.createElement("button", { onClick: () => p.action('context.resolve', { owner_id: shot.id }) }, "View story direction"))); })),
+                !scene.shots.length && react_1.default.createElement("p", { className: "muted" }, "No shots in this scene yet."))),
+            !document.scenes.length && react_1.default.createElement(Primitives_1.Empty, { title: "Start your storyboard with a scene" }, "Create a sequence, then add scenes and shots in the Story outline.")))); }
+function SettingsPage(p) { const [health, setHealth] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''), [busy, setBusy] = (0, react_1.useState)(false), [backup, setBackup] = (0, react_1.useState)(null), [restoreSlug, setRestoreSlug] = (0, react_1.useState)('restored-project'), [restoreFile, setRestoreFile] = (0, react_1.useState)(null), [confirmed, setConfirmed] = (0, react_1.useState)(false); async function check(hashes = false) { setBusy(true); try {
+    setHealth(await (0, api_1.runCommand)(p.state.project.id, 'project.doctor', { hashes }));
+    setError('');
+}
+catch (e) {
+    setError(e.message);
+}
+finally {
+    setBusy(false);
+} } (0, react_1.useEffect)(() => { check(false); }, [p.state.project.id]); async function makeBackup() { setBusy(true); try {
+    setBackup(await (0, api_1.runCommand)(p.state.project.id, 'project.backup'));
+    p.notify('Project backup created.');
+}
+catch (e) {
+    setError(e.message);
+}
+finally {
+    setBusy(false);
+} } async function restore(e) { e.preventDefault(); if (!restoreFile)
+    return; setBusy(true); try {
+    const form = new FormData();
+    form.append('file', restoreFile);
+    form.append('slug', restoreSlug);
+    const r = await (0, api_1.api)('/restore', 'POST', form);
+    p.notify(`Project restored. Open the new copy from Workspace.`);
+    await p.refresh();
+}
+catch (e) {
+    setError(e.message);
+}
+finally {
+    setBusy(false);
+} } return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Project care", title: "Keep the work dependable.", description: "Check project files, rebuild image previews, and make a backup you can restore later.", actions: react_1.default.createElement("button", { onClick: () => p.action('project.update', (0, utils_1.commandDefaults)(p.state.project)) }, "Edit project details") }),
+    error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+    react_1.default.createElement("div", { className: "settings-grid" },
+        react_1.default.createElement("section", null,
+            react_1.default.createElement("h2", null, "Project folder"),
+            react_1.default.createElement("p", null,
+                "Saved on this computer at ",
+                react_1.default.createElement("code", null, p.state.project.path),
+                "."),
+            react_1.default.createElement("details", null,
+                react_1.default.createElement("summary", null, "Technical details"),
+                react_1.default.createElement("dl", { className: "key-values" },
+                    react_1.default.createElement("dt", null, "Project index"),
+                    react_1.default.createElement("dd", null,
+                        react_1.default.createElement("code", null, ".storyboarder/storyboard.sqlite3")),
+                    react_1.default.createElement("dt", null, "App version"),
+                    react_1.default.createElement("dd", null, "1 / v1"),
+                    react_1.default.createElement("dt", null, "Project format"),
+                    react_1.default.createElement("dd", null, p.session.schema_version))),
+            react_1.default.createElement("div", { className: "section-heading" },
+                react_1.default.createElement("h2", null, "Project health"),
+                react_1.default.createElement("div", { className: "button-row" },
+                    react_1.default.createElement("button", { disabled: busy, onClick: () => check(false) }, "Check project files"),
+                    react_1.default.createElement("button", { disabled: busy, onClick: () => check(true) }, "Check image contents"))),
+            health && react_1.default.createElement(react_1.default.Fragment, null,
+                react_1.default.createElement("p", { className: health.healthy ? 'success-line' : 'warning-text' },
+                    health.healthy ? '✓ Healthy' : '! Attention needed',
+                    " \u00B7 ",
+                    health.media_checked,
+                    " media files checked"),
+                react_1.default.createElement(Primitives_1.Validation, { issues: health.issues }),
+                react_1.default.createElement("details", null,
+                    react_1.default.createElement("summary", null, "Technical details \u00B7 project updates"),
+                    react_1.default.createElement("pre", null, JSON.stringify(health.migrations, null, 2)))),
+            react_1.default.createElement("div", { className: "section-heading" },
+                react_1.default.createElement("h2", null, "Image previews")),
+            react_1.default.createElement("p", null, "Previews can be rebuilt from the original images. Clearing them does not remove images from your project."),
+            react_1.default.createElement("div", { className: "button-row" },
+                react_1.default.createElement("button", { onClick: () => p.action('cache.rebuild') }, "Rebuild image previews"),
+                react_1.default.createElement("button", { onClick: () => p.action('cache.clear') }, "Clear image previews"))),
+        react_1.default.createElement("section", null,
+            react_1.default.createElement("h2", null, "Back up the whole project"),
+            react_1.default.createElement("p", null, "Create a copy of the project, including its story and reference images, so you can restore it later."),
+            react_1.default.createElement("button", { className: "primary", disabled: busy, onClick: makeBackup }, "Create project backup"),
+            backup && react_1.default.createElement("div", { className: "notice" },
+                react_1.default.createElement("p", null,
+                    "Project backup created \u00B7 ",
+                    (backup.size / 1024 / 1024).toFixed(1),
+                    " MB"),
+                react_1.default.createElement("code", null, backup.path),
+                (backup.path || backup.archive) && react_1.default.createElement("a", { className: "button", href: (0, api_1.exportUrl)(p.state.project.id, backup.path || backup.archive, true) }, "Download backup")),
+            react_1.default.createElement("h2", null, "Restore a project copy"),
+            p.session.can_create ? react_1.default.createElement("form", { className: "form-stack", onSubmit: restore },
+                react_1.default.createElement("p", null, "The original project is never overwritten. The backup is validated before the restored folder becomes available."),
+                react_1.default.createElement("label", { className: "field" },
+                    react_1.default.createElement("span", null, "Project backup file (up to 1 GiB)"),
+                    react_1.default.createElement("input", { type: "file", accept: ".zip", required: true, onChange: (e) => setRestoreFile(e.target.files?.[0] || null) })),
+                react_1.default.createElement("label", { className: "field" },
+                    react_1.default.createElement("span", null, "New project folder name"),
+                    react_1.default.createElement("input", { required: true, pattern: "[a-z0-9]+(?:-[a-z0-9]+)*", value: restoreSlug, onChange: (e) => setRestoreSlug(e.target.value) })),
+                react_1.default.createElement("label", { className: "inline-check" },
+                    react_1.default.createElement("input", { type: "checkbox", checked: confirmed, onChange: (e) => setConfirmed(e.target.checked), required: true }),
+                    "Restore into a new project folder."),
+                react_1.default.createElement("button", { disabled: busy || !confirmed || !restoreFile }, "Validate and restore backup")) : react_1.default.createElement("p", null, "To restore a standalone project, use the Storyboarder command line and choose a new, empty destination folder."),
+            react_1.default.createElement("h2", null, "Archived items"),
+            p.state.entities.filter(e => e.archived).map(e => react_1.default.createElement("div", { className: "archive-row", key: e.id },
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("strong", null, e.title),
+                    react_1.default.createElement("small", null, (0, utils_1.kindLabel)(e))),
+                react_1.default.createElement("button", { onClick: () => p.action('entity.restore', (0, utils_1.commandDefaults)(e)) }, "Restore item"),
+                react_1.default.createElement("button", { onClick: () => p.select(e.id) }, "Details"))),
+            !p.state.entities.some(e => e.archived) && react_1.default.createElement("p", { className: "muted" }, "No archived items.")))); }
+function AutomationPage(p) { const [selected, setSelected] = (0, react_1.useState)(null), [preview, setPreview] = (0, react_1.useState)(null), [error, setError] = (0, react_1.useState)(''); (0, react_1.useEffect)(() => { let alive = true; if (selected)
+    (0, api_1.api)((0, api_1.projectPath)(p.state.project.id, `/jobs/${selected}/preview`)).then(r => alive && setPreview(r)).catch(e => alive && setError(e.message)); return () => { alive = false; }; }, [selected, p.state]); const job = selected ? p.state.jobs.find(j => j.id === selected) : null; return react_1.default.createElement(react_1.default.Fragment, null,
+    react_1.default.createElement(Primitives_1.PageHeading, { eyebrow: "Image tools", title: "Create images with your tools.", description: "Choose story details and reference images, then review the results before adding them to your project.", actions: react_1.default.createElement("button", { className: "primary", onClick: () => p.action('job.create'), disabled: !p.meta.scripts.length }, "Prepare image request") }),
+    react_1.default.createElement("div", { className: "notice warning" },
+        react_1.default.createElement("strong", null, "Only run tools you trust."),
+        " A tool runs on this computer and may access files available to your account. Review the tool before running it."),
+    react_1.default.createElement("section", null,
+        react_1.default.createElement("h2", null, "Available image tools"),
+        p.meta.scripts.length ? react_1.default.createElement("div", { className: "script-list" }, p.meta.scripts.map(s => react_1.default.createElement("div", { className: "script-row", key: s.name },
+            react_1.default.createElement("strong", null, s.name),
+            react_1.default.createElement("p", null, s.description || 'No description provided.'),
+            react_1.default.createElement("small", null,
+                "Maximum run time ",
+                s.timeout,
+                " seconds")))) : react_1.default.createElement("div", { className: "empty compact" },
+            react_1.default.createElement("h3", null, "No image tools available"),
+            react_1.default.createElement("p", null, "Add a trusted image tool to use it here. You can create and organize the rest of your project without one."),
+            react_1.default.createElement("details", null,
+                react_1.default.createElement("summary", null, "Advanced setup"),
+                react_1.default.createElement("p", null, "Connect a compatible image tool by registering its command with the Storyboarder CLI."),
+                react_1.default.createElement("code", null, "storyboarder script register sample --command '[\"/path/to/python\", \"/path/to/image_tool.py\"]'")))),
+    react_1.default.createElement("div", { className: "automation-columns" },
+        react_1.default.createElement("section", null,
+            react_1.default.createElement("h2", null, "Recent activity"),
+            p.state.jobs.map(j => react_1.default.createElement("button", { key: j.id, className: `job-row ${j.id === selected ? 'is-selected' : ''}`, onClick: () => setSelected(j.id) },
+                react_1.default.createElement("div", null,
+                    react_1.default.createElement("strong", null, j.title),
+                    react_1.default.createElement("small", null,
+                        j.script,
+                        " \u00B7 ",
+                        (0, utils_1.human)(j.target))),
+                react_1.default.createElement(Primitives_1.Badge, { kind: j.status }, j.approved ? 'Added to project' : j.status === 'succeeded' ? 'Ready for review' : (0, utils_1.human)(j.status)))),
+            !p.state.jobs.length && react_1.default.createElement("p", { className: "muted" }, "Nothing to review yet. Prepare an image request to get started.")),
+        react_1.default.createElement("section", null, job && preview ? react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("div", { className: "section-heading" },
+                react_1.default.createElement("h2", null, job.title),
+                react_1.default.createElement(Primitives_1.Badge, null, (0, utils_1.human)(job.status))),
+            react_1.default.createElement("div", { className: "button-row" },
+                job.status === 'queued' && react_1.default.createElement("button", { className: "primary", onClick: () => p.action('job.run', (0, utils_1.commandDefaults)(job)) }, "Run tool\u2026"),
+                ['queued', 'running'].includes(job.status) && react_1.default.createElement("button", { onClick: () => p.action('job.cancel', (0, utils_1.commandDefaults)(job)) }, "Cancel\u2026"),
+                ['failed', 'cancelled'].includes(job.status) && react_1.default.createElement("button", { onClick: () => p.action('job.retry', (0, utils_1.commandDefaults)(job)) }, "Run again\u2026"),
+                job.status === 'succeeded' && !job.approved && react_1.default.createElement("button", { className: "primary", onClick: () => p.action('job.approve', (0, utils_1.commandDefaults)(job)) }, "Add reviewed images to project\u2026")),
+            error && react_1.default.createElement(Primitives_1.ErrorNotice, { error: error }),
+            react_1.default.createElement("div", { className: "generated-output-grid" }, (preview.outputs || preview.result?.outputs || job.result?.outputs || []).map((o, index) => react_1.default.createElement("article", { key: o.key },
+                react_1.default.createElement("img", { src: (0, api_1.jobImageUrl)(p.state.project.id, job.id, o.key), alt: o.title ? `Image result ${o.title}` : `Image result ${index + 1}` }),
+                react_1.default.createElement("h3", null, o.title || `Image ${index + 1}`),
+                react_1.default.createElement("p", null, o.notes),
+                react_1.default.createElement("small", null,
+                    o.width,
+                    " \u00D7 ",
+                    o.height)))),
+            react_1.default.createElement("details", null,
+                react_1.default.createElement("summary", null, "Technical details \u00B7 run log"),
+                react_1.default.createElement("pre", null, typeof preview.logs === 'string' ? preview.logs : JSON.stringify(preview.logs || preview.log || {}, null, 2))),
+            react_1.default.createElement("details", null,
+                react_1.default.createElement("summary", null, "Technical details \u00B7 tool inputs"),
+                react_1.default.createElement("pre", null, JSON.stringify(job.request, null, 2))),
+            react_1.default.createElement("details", null,
+                react_1.default.createElement("summary", null, "Technical details \u00B7 tool results"),
+                react_1.default.createElement("pre", null, JSON.stringify(job.result, null, 2)))) : react_1.default.createElement(Primitives_1.Empty, { title: "Choose an image request" }, "Review its images and notes before adding the results to the project.")))); }
+
+},
+"production/ProductionWorkspace":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.ProductionBoundary = void 0;
+exports.ProductionWorkspace = ProductionWorkspace;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const Primitives_1 = require("../components/Primitives");
+const Stage_1 = require("./Stage");
+const model_1 = require("./model");
+const SPATIAL = ['scene', 'location', 'action', 'shot', 'camera_setup', 'lighting_setup'];
+const emptySnapshot = { checkpoint: 0, records: [], pinned_versions: [], total: 0, next_offset: null, snapshot_sha256: '' };
+const errorText = (e) => { const message = e instanceof Error ? e.message : 'The operation could not be completed.'; return message + (e instanceof api_1.ApiError && Array.isArray(e.details?.issues) ? ' ' + e.details.issues.slice(0, 8).map((i) => `${i.loc?.join('.') || '/'}: ${i.msg}`).join(' · ') : ''); };
+/** An isolated render failure must not clear locally retained production drafts. */
+class ProductionBoundary extends react_1.default.Component {
+    constructor() {
+        super(...arguments);
+        this.state = { error: '' };
+    }
+    static getDerivedStateFromError(error) { return { error: error.message }; }
+    render() { return this.state.error ? react_1.default.createElement("section", { className: "pd-fatal", role: "alert" },
+        react_1.default.createElement("h2", null, "The production workspace could not render."),
+        react_1.default.createElement("p", null, "Your saved data and browser drafts were not changed."),
+        react_1.default.createElement("pre", null, this.state.error),
+        react_1.default.createElement("button", { onClick: () => location.reload() }, "Reload workspace")) : this.props.children; }
+}
+exports.ProductionBoundary = ProductionBoundary;
+function ProductionWorkspace(props) {
+    const project = props.state.project.id;
+    const [snapshot, setSnapshot] = (0, react_1.useState)(emptySnapshot), [report, setReport] = (0, react_1.useState)(null), [loading, setLoading] = (0, react_1.useState)(true), [busy, setBusy] = (0, react_1.useState)(false), [error, setError] = (0, react_1.useState)(''), [storageError, setStorageError] = (0, react_1.useState)('');
+    const [view, setView] = (0, react_1.useState)('Spatial'), [activeId, setActiveId] = (0, react_1.useState)(''), [historyVersion, setHistoryVersion] = (0, react_1.useState)(null), [sceneFilter, setSceneFilter] = (0, react_1.useState)(''), [kindFilter, setKindFilter] = (0, react_1.useState)(''), [search, setSearch] = (0, react_1.useState)('');
+    const [draft, setDraft] = (0, react_1.useState)(null), [rawMode, setRawMode] = (0, react_1.useState)(false), [saveSelected, setSaveSelected] = (0, react_1.useState)(false), [preview, setPreview] = (0, react_1.useState)(null), [conflicts, setConflicts] = (0, react_1.useState)([]), [uncertain, setUncertain] = (0, react_1.useState)(false);
+    const [sample, setSample] = (0, react_1.useState)(null), [sampleLoading, setSampleLoading] = (0, react_1.useState)(false), [sampleError, setSampleError] = (0, react_1.useState)(''), [frame, setFrame] = (0, react_1.useState)(0), [objectId, setObjectId] = (0, react_1.useState)(''), [draftPose, setDraftPose] = (0, react_1.useState)(null), [compareVersion, setCompareVersion] = (0, react_1.useState)(null), [compareSample, setCompareSample] = (0, react_1.useState)(null);
+    const [history, setHistory] = (0, react_1.useState)([]), [detail, setDetail] = (0, react_1.useState)(null), [diff, setDiff] = (0, react_1.useState)(null), [changes, setChanges] = (0, react_1.useState)(false), [jsonModal, setJsonModal] = (0, react_1.useState)(null), [createKind, setCreateKind] = (0, react_1.useState)('scene'), [createOpen, setCreateOpen] = (0, react_1.useState)(false), [batchText, setBatchText] = (0, react_1.useState)(''), [batchOpen, setBatchOpen] = (0, react_1.useState)(false), [navigate, setNavigate] = (0, react_1.useState)(null), [panelTime, setPanelTime] = (0, react_1.useState)(0), [playing, setPlaying] = (0, react_1.useState)(false);
+    const [importOpen, setImportOpen] = (0, react_1.useState)(false), [scriptFile, setScriptFile] = (0, react_1.useState)(null), [scriptFormat, setScriptFormat] = (0, react_1.useState)('fountain'), [identityMap, setIdentityMap] = (0, react_1.useState)('{}');
+    const snapshotRef = (0, react_1.useRef)(snapshot);
+    snapshotRef.current = snapshot;
+    const draftRef = (0, react_1.useRef)(draft);
+    draftRef.current = draft;
+    const pendingSelection = (0, react_1.useRef)(null);
+    const loadEpoch = (0, react_1.useRef)(0), sampleEpoch = (0, react_1.useRef)(0), mounted = (0, react_1.useRef)(true), writeLock = (0, react_1.useRef)(false), pollLock = (0, react_1.useRef)(false), abortLoad = (0, react_1.useRef)(null);
+    const records = snapshot.records, byId = (0, react_1.useMemo)(() => new Map(records.map(r => [r.id, r])), [records]), versions = (0, react_1.useMemo)(() => (0, model_1.indexVersions)(snapshot), [snapshot]);
+    const active = historyVersion !== null ? (detail && detail.id === activeId && detail.version === historyVersion ? detail : versions.get((0, model_1.refKey)({ id: activeId, version: historyVersion })) || null) : byId.get(activeId) || null;
+    const working = (0, react_1.useMemo)(() => { if (draft && draft.id === activeId) {
+        try {
+            return JSON.parse(draft.raw);
+        }
+        catch {
+            return null;
+        }
+    } return active?.data || null; }, [draft, activeId, active]);
+    const dirty = (0, model_1.isDirty)(draft), proposal = active && !active.is_selected;
+    const draftStale = !!draft && (draft.checkpoint !== snapshot.checkpoint || byId.get(draft.id)?.revision !== draft.base_revision && draft.base_revision !== 0);
+    const currentReport = report?.checkpoint === snapshot.checkpoint ? report : null;
+    const scenes = records.filter(r => r.kind === 'scene'), shots = records.filter(r => r.kind === 'shot');
+    const visible = records.filter(r => (!kindFilter || r.kind === kindFilter) && (!sceneFilter || r.id === sceneFilter || r.data.scene?.id === sceneFilter || r.kind === 'panel' && versions.get((0, model_1.refKey)(r.data.shot))?.data.scene?.id === sceneFilter) && (!search || `${r.data.title} ${r.data.label} ${r.kind} ${r.data.shot_type || ''} ${r.data.purpose || ''}`.toLocaleLowerCase().includes(search.toLocaleLowerCase()))).sort((a, b) => (a.data.orders.narrative ?? Number.MAX_SAFE_INTEGER) - (b.data.orders.narrative ?? Number.MAX_SAFE_INTEGER) || a.data.title.localeCompare(b.data.title));
+    const findingCount = (id) => currentReport?.issues.filter(i => i.record_id === id && i.status === 'open' && i.severity !== 'info').length || 0;
+    const resolve = (ref) => ref && versions.get((0, model_1.refKey)(ref));
+    const sourceScene = active?.kind === 'scene' ? active : resolve(active?.data.scene) || resolve(resolve(active?.data.shot)?.data.scene);
+    const sourceAction = active?.kind === 'action' ? active : resolve(active?.data.action) || resolve(resolve(active?.data.shot)?.data.action);
+    const script = active?.kind === 'script' ? active : resolve(sourceScene?.data.fragments?.[0]?.script) || records.find(r => r.kind === 'script') || null;
+    const load = (0, react_1.useCallback)(async () => {
+        const epoch = ++loadEpoch.current;
+        abortLoad.current?.abort();
+        const controller = new AbortController();
+        abortLoad.current = controller;
+        setLoading(true);
+        setError('');
+        try {
+            const first = await (0, api_1.runCommand)(project, 'production.snapshot', { closure: true, limit: 500, offset: 0 }, controller.signal);
+            let data = first;
+            while (data.next_offset !== null) {
+                const next = await (0, api_1.runCommand)(project, 'production.snapshot', { closure: true, limit: 500, offset: data.next_offset }, controller.signal);
+                if (next.checkpoint !== first.checkpoint)
+                    throw new Error('Production changed during the read. Refresh again for a consistent snapshot.');
+                data = { ...data, records: [...data.records, ...next.records], pinned_versions: [...data.pinned_versions, ...next.pinned_versions], next_offset: next.next_offset };
+            }
+            const nextReport = await (0, api_1.runCommand)(project, 'production.report', {}, controller.signal);
+            if (!mounted.current || epoch !== loadEpoch.current)
+                return;
+            setSnapshot(data);
+            setReport(nextReport.checkpoint === data.checkpoint ? nextReport : null);
+            setChanges(nextReport.checkpoint !== data.checkpoint);
+            setActiveId(id => id && data.records.some(r => r.id === id) ? id : (data.records.find(r => r.kind === 'shot') || data.records.find(r => r.kind === 'scene') || data.records[0])?.id || '');
+        }
+        catch (e) {
+            if (e.name !== 'AbortError' && mounted.current && epoch === loadEpoch.current)
+                setError(errorText(e));
+        }
+        finally {
+            if (mounted.current && epoch === loadEpoch.current)
+                setLoading(false);
+        }
+    }, [project]);
+    (0, react_1.useEffect)(() => { mounted.current = true; void load(); return () => { mounted.current = false; abortLoad.current?.abort(); loadEpoch.current++; sampleEpoch.current++; }; }, [load]);
+    (0, react_1.useEffect)(() => { const t = setInterval(async () => { if (document.hidden || pollLock.current || writeLock.current || !snapshotRef.current.total)
+        return; pollLock.current = true; try {
+        const result = await (0, api_1.runCommand)(project, 'production.changes', { since: snapshotRef.current.checkpoint, limit: 1 });
+        if (mounted.current && result.checkpoint !== snapshotRef.current.checkpoint)
+            setChanges(true);
+    }
+    catch { }
+    finally {
+        pollLock.current = false;
+    } }, 10000); return () => clearInterval(t); }, [project]);
+    (0, react_1.useEffect)(() => { const requested = pendingSelection.current?.id === activeId ? pendingSelection.current : null; pendingSelection.current = null; const stored = activeId ? (0, model_1.getDraft)(project, activeId) : { draft: null, error: '' }; setDraft(stored.draft); draftRef.current = stored.draft; setStorageError(stored.error); setConflicts([]); setHistoryVersion(requested?.version ?? null); setDetail(null); setCompareVersion(null); setCompareSample(null); setDiff(null); setObjectId(requested?.objectId || ''); setFrame(requested?.frame || 0); setDraftPose(requested?.pose || null); setSaveSelected(false); setSample(null); setHistory([]); }, [project, activeId]);
+    (0, react_1.useEffect)(() => { if (!draft)
+        return; const timer = setTimeout(() => { const message = (0, model_1.storeDraft)(draft); setStorageError(message); }, 300); return () => clearTimeout(timer); }, [draft]);
+    (0, react_1.useEffect)(() => { const before = (e) => { if ((0, model_1.isDirty)(draftRef.current)) {
+        if (draftRef.current)
+            (0, model_1.storeDraft)(draftRef.current);
+        e.preventDefault();
+        e.returnValue = '';
+    } }; window.addEventListener('beforeunload', before); return () => window.removeEventListener('beforeunload', before); }, []);
+    (0, react_1.useEffect)(() => props.registerNavigationGuard?.(commit => { if (!(0, model_1.isDirty)(draftRef.current))
+        return true; if (draftRef.current)
+        setStorageError((0, model_1.storeDraft)(draftRef.current)); setNavigate(() => commit); return false; }), [props.registerNavigationGuard]);
+    function select(id, version) { if (draftRef.current)
+        setStorageError((0, model_1.storeDraft)(draftRef.current)); if (id !== activeId)
+        pendingSelection.current = { id, version: version ?? null, frame: 0, objectId: '', pose: null }; if (id !== activeId || (version ?? byId.get(id)?.version) !== active?.version || frame !== 0)
+        setSample(null); setActiveId(id); setHistoryVersion(version ?? null); setFrame(0); setDraftPose(null); }
+    (0, react_1.useEffect)(() => { if (!activeId)
+        return; const controller = new AbortController(); (0, api_1.runCommand)(project, 'production.history', { id: activeId, limit: 100 }, controller.signal).then(r => { if (!controller.signal.aborted)
+        setHistory(r.items); }).catch(e => { if (e.name !== 'AbortError')
+        setError(errorText(e)); }); return () => controller.abort(); }, [project, activeId, snapshot.checkpoint]);
+    (0, react_1.useEffect)(() => { if (!activeId || historyVersion === null)
+        return; const controller = new AbortController(); (0, api_1.runCommand)(project, 'production.show', { id: activeId, version: historyVersion }, controller.signal).then(r => { if (!controller.signal.aborted)
+        setDetail(r); }).catch(e => { if (e.name !== 'AbortError')
+        setError(errorText(e)); }); return () => controller.abort(); }, [project, activeId, historyVersion]);
+    const evaluatedRecord = active && SPATIAL.includes(active.kind) ? active : active?.kind === 'panel' ? resolve(active.data.shot) : null;
+    const evalVersion = evaluatedRecord?.version, evalId = evaluatedRecord?.id;
+    (0, react_1.useEffect)(() => { const epoch = ++sampleEpoch.current; if (!evalId || !evalVersion) {
+        setSample(null);
+        setSampleLoading(false);
+        return;
+    } const controller = new AbortController(); setSampleLoading(true); setSampleError(''); const timer = setTimeout(() => { (0, api_1.runCommand)(project, 'production.evaluate', { id: evalId, version: evalVersion, frame }, controller.signal).then(r => { if (mounted.current && epoch === sampleEpoch.current) {
+        setSample(r);
+        setSampleLoading(false);
+    } }).catch(e => { if (e.name !== 'AbortError' && epoch === sampleEpoch.current) {
+        setSampleError(errorText(e));
+        setSample(null);
+        setSampleLoading(false);
+    } }); }, 70); return () => { clearTimeout(timer); controller.abort(); }; }, [project, evalId, evalVersion, frame, snapshot.checkpoint]);
+    (0, react_1.useEffect)(() => { if (compareVersion === null || !evalId) {
+        setCompareSample(null);
+        return;
+    } const controller = new AbortController(); (0, api_1.runCommand)(project, 'production.evaluate', { id: evalId, version: compareVersion, frame }, controller.signal).then(r => { if (!controller.signal.aborted)
+        setCompareSample(r); }).catch(e => { if (e.name !== 'AbortError')
+        setError('Alternative preview: ' + errorText(e)); }); return () => controller.abort(); }, [project, evalId, compareVersion, frame]);
+    function updateRaw(raw) { if (writeLock.current || !active && !draft)
+        return; const base = draft || (0, model_1.newDraft)(project, active, snapshot.checkpoint); const next = { ...base, raw, operation_id: (0, model_1.uid)(), updated_at: new Date().toISOString() }; setDraft(next); draftRef.current = next; setConflicts([]); }
+    function field(key, value) { if (!working)
+        return; updateRaw((0, model_1.pretty)({ ...working, [key]: value })); }
+    async function guarded(work) { if (writeLock.current)
+        return; writeLock.current = true; setBusy(true); setError(''); try {
+        return await work();
+    }
+    catch (e) {
+        setError(errorText(e));
+        return undefined;
+    }
+    finally {
+        writeLock.current = false;
+        if (mounted.current)
+            setBusy(false);
+    } }
+    async function prepare(title, batch, draftId) { return guarded(async () => { const result = await (0, api_1.runCommand)(project, 'production.preview', { batch }); setPreview({ title, batch: { ...batch, preview_sha256: result.preview_sha256 }, result, draftId }); setUncertain(false); }); }
+    async function save() { try {
+        if (!draft)
+            return;
+        await prepare(saveSelected ? 'Select revised plan' : 'Save proposed alternative', (0, model_1.makeBatch)(draft, saveSelected), draft.id);
+    }
+    catch (e) {
+        setError(errorText(e));
+    } }
+    async function applyPreview() { if (!preview)
+        return; await guarded(async () => { try {
+        const result = await (0, api_1.runCommand)(project, 'production.apply', { batch: preview.batch });
+        if (preview.draftId) {
+            setStorageError((0, model_1.clearDraft)(project, preview.draftId));
+            if (draft?.id === preview.draftId) {
+                setDraft(null);
+                draftRef.current = null;
+            }
+        }
+        setPreview(null);
+        setUncertain(false);
+        setDraftPose(null);
+        setHistoryVersion(null);
+        setDetail(null);
+        props.notify(`Production checkpoint ${result.checkpoint} saved${result.replayed ? ' (safe retry)' : ''}.`);
+        await load();
+    }
+    catch (e) {
+        if (e instanceof api_1.ApiError && ['connection', 'timeout'].includes(e.code))
+            setUncertain(true);
+        throw e;
+    } }); }
+    function rebase() { if (!draft)
+        return; const latest = byId.get(draft.id); if (!latest) {
+        setError('This record is no longer active. Export the draft; it was not discarded.');
+        return;
+    } try {
+        const result = (0, model_1.mergeDraft)(draft.base, JSON.parse(draft.raw), latest.data);
+        setConflicts(result.conflicts);
+        if (result.conflicts.length) {
+            setError('Both versions changed the fields listed below. Your draft is intact. Resolve them against the current record before replacing the draft base.');
+            return;
+        }
+        const next = { ...(0, model_1.newDraft)(project, latest, snapshot.checkpoint), raw: (0, model_1.pretty)(result.value) };
+        setDraft(next);
+        draftRef.current = next;
+        setError('');
+        props.notify('Non-conflicting fields rebased. Preview the change before saving.');
+    }
+    catch (e) {
+        setError(errorText(e));
+    } }
+    function discard() { if (!draft)
+        return; setStorageError((0, model_1.clearDraft)(project, draft.id)); setDraft(null); draftRef.current = null; setDraftPose(null); setConflicts([]); }
+    async function selectVersion(version) { if (!active)
+        return; await prepare('Select exact saved version', { expected_checkpoint: snapshot.checkpoint, operation_id: (0, model_1.uid)(), operations: [{ op: 'select', id: active.id, expected_revision: byId.get(active.id).revision, version }] }); }
+    async function createRecord() { const data = (0, model_1.starter)(createKind, records); const id = (0, model_1.uid)(), next = { format: 'production-draft/v1', project, id, base_revision: 0, base_version: 0, checkpoint: snapshot.checkpoint, base: {}, raw: (0, model_1.pretty)(data), operation_id: (0, model_1.uid)(), updated_at: new Date().toISOString() }; setCreateOpen(false); setJsonModal({ title: `New ${(0, model_1.label)(createKind)} · fill required references, then import as a batch`, data: { expected_checkpoint: snapshot.checkpoint, operation_id: next.operation_id, operations: [{ op: 'put', id, expected_revision: 0, select: false, data }] } }); setBatchText((0, model_1.pretty)({ expected_checkpoint: snapshot.checkpoint, operation_id: next.operation_id, operations: [{ op: 'put', id, expected_revision: 0, select: false, data }] })); }
+    async function example() { await guarded(async () => { const data = await (0, api_1.runCommand)(project, 'production.example', { expected_checkpoint: snapshot.checkpoint }); const result = await (0, api_1.runCommand)(project, 'production.preview', { batch: data.batch }); setPreview({ title: 'Build “The handoff” — synthetic production', batch: { ...data.batch, preview_sha256: result.preview_sha256 }, result }); }); }
+    async function exportPacket() { await guarded(async () => { const result = await (0, api_1.runCommand)(project, 'production.packet', { scene_id: sceneFilter || null, include_pdf: true }); setJsonModal({ title: 'Revision-stamped review packet', data: result }); props.notify(`Review packet created from checkpoint ${result.checkpoint}.`); }); }
+    async function importScript() { if (!scriptFile)
+        return; await guarded(async () => { if (scriptFile.size > 2 * 1024 * 1024)
+        throw new Error('Script originals are limited to 2 MiB.'); const bytes = new Uint8Array(await scriptFile.arrayBuffer()); let raw = ''; for (const byte of bytes)
+        raw += String.fromCharCode(byte); const existing = active?.kind === 'script' ? byId.get(active.id) : null; const result = await (0, api_1.runCommand)(project, 'production.script-import-preview', { id: existing?.id || (0, model_1.uid)(), expected_revision: existing?.revision || 0, expected_checkpoint: snapshot.checkpoint, operation_id: (0, model_1.uid)(), filename: scriptFile.name, format: scriptFormat, bytes_base64: btoa(raw), identity_map: JSON.parse(identityMap), select: false }); setImportOpen(false); setPreview({ title: 'Import script as a proposed revision', batch: { ...result.batch, preview_sha256: result.preview.preview_sha256 }, result: { ...result.preview, import_report: result.report || result.reports || result.import_report, diff: result.revision_diff } }); }); }
+    function sourceDownload() { if (!script?.data.source_file)
+        return; const source = script.data.source_file; const bytes = Uint8Array.from(atob(source.bytes_base64), c => c.charCodeAt(0)); const url = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' })); const a = document.createElement('a'); a.href = url; a.download = source.name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    function moveObject(id, x, y) {
+        if (writeLock.current)
+            return;
+        if (sampleLoading || sample?.action_frame !== frame) {
+            setError('The current frame has not finished evaluating. No position was changed.');
+            return;
+        }
+        const action = sourceAction;
+        if (!action) {
+            setError('Select a shared action or a shot with pinned action before editing blocking.');
+            return;
+        }
+        const instance = sample?.instances.find(i => i.id === id);
+        if (!instance || instance.parent_id) {
+            setError('Attached objects use parent-local coordinates. Edit their structured action record.');
+            return;
+        }
+        const retained = (0, model_1.getDraft)(project, action.id).draft;
+        const existing = draftRef.current?.id === action.id ? draftRef.current : retained;
+        if (existing && existing.base_version !== action.version) {
+            setError('A draft for another action version is retained. Export or discard that draft before editing this exact version.');
+            return;
+        }
+        if (draftRef.current && draftRef.current.id !== action.id)
+            (0, model_1.storeDraft)(draftRef.current);
+        const next = existing || (0, model_1.newDraft)(project, action, snapshot.checkpoint);
+        let data;
+        try {
+            data = JSON.parse(next.raw);
+        }
+        catch {
+            setError('Repair the action JSON draft before manipulating objects.');
+            return;
+        }
+        if (!Array.isArray(data.instances) || !data.instances.some((i) => i.id === id && Array.isArray(i.keyframes))) {
+            setError('Repair the action instances and keyframes in the JSON draft first.');
+            return;
+        }
+        const pose = { ...instance.pose, position: { ...instance.pose.position, x, y } };
+        data.instances = data.instances.map((i) => { if (i.id !== id)
+            return i; const keys = i.keyframes.filter((k) => k.frame !== frame); keys.push({ frame: Math.round(frame), pose, interpolation: 'linear' }); keys.sort((a, b) => a.frame - b.frame); return { ...i, keyframes: keys }; });
+        const changed = { ...next, raw: (0, model_1.pretty)(data), operation_id: (0, model_1.uid)(), updated_at: new Date().toISOString() };
+        setStorageError((0, model_1.storeDraft)(changed));
+        if (action.id !== activeId)
+            pendingSelection.current = { id: action.id, version: action.version, frame, objectId: id, pose: { id, pose } };
+        setActiveId(action.id);
+        setHistoryVersion(action.version);
+        setDraft(changed);
+        draftRef.current = changed;
+        setDraftPose({ id, pose });
+        setObjectId(id);
+        setSaveSelected(false);
+        setRawMode(false);
+        props.notify('Shared-action keyframe drafted. Saving it as an alternative does not change any selected shot.');
+    }
+    function annotate() { if (!active)
+        return; setBatchText((0, model_1.pretty)({ expected_checkpoint: snapshot.checkpoint, operation_id: (0, model_1.uid)(), operations: [{ op: 'put', id: (0, model_1.uid)(), expected_revision: 0, select: true, data: { kind: 'annotation', title: `Note · ${active.data.title}`, subject: (0, model_1.pin)(active), body: '', author: '', ...(active.kind === 'action' && objectId ? { object_id: objectId, action_frame: Math.round(frame) } : {}) } }] })); setBatchOpen(true); }
+    function reviewDecision() { if (!active)
+        return; setBatchText((0, model_1.pretty)({ expected_checkpoint: snapshot.checkpoint, operation_id: (0, model_1.uid)(), operations: [{ op: 'put', id: (0, model_1.uid)(), expected_revision: 0, select: true, data: { kind: 'review', title: `Review · ${active.data.title}`, subject: (0, model_1.pin)(active), decision: 'accepted', dimension: 'creative', reviewer: '', reason: '', dependencies: [] } }] })); setBatchOpen(true); }
+    async function impact() { if (!active)
+        return; await guarded(async () => setJsonModal({ title: 'Exact dependency impact', data: await (0, api_1.runCommand)(project, 'production.impact', { id: active.id }) })); }
+    async function reconcile() { if (!active)
+        return; await guarded(async () => { const result = await (0, api_1.runCommand)(project, 'production.impact', { id: active.id }); const needed = result.affected.filter((r) => r.stale_dependencies?.some((d) => d.needs_attention)).map((r) => r.id); setJsonModal({ title: 'Reconciliation is explicit: choose records and replacement pins', data: { hint: 'Use production.reconcile with same-ID from/to version pins. The command returns a batch for preview; it never silently rewrites shots.', affected: result.affected, example_request: { replacements: [{ from: { id: active.id, version: Math.max(1, active.version - 1) }, to: (0, model_1.pin)(active) }], ids: needed, operation_id: (0, model_1.uid)(), expected_checkpoint: snapshot.checkpoint } } }); }); }
+    const animatic = active?.kind === 'animatic' ? active : null;
+    const panelEntries = animatic ? animatic.data.entries.map((e) => ({ panel: resolve(e.panel), duration: e.duration_frames, cue: e.audio_cue })) : records.filter(r => r.kind === 'panel' && (!sceneFilter || resolve(r.data.shot)?.data.scene?.id === sceneFilter)).map(panel => ({ panel, duration: panel.data.duration_frames, cue: '' }));
+    const totalPanelFrames = panelEntries.reduce((n, e) => n + e.duration, 0), animaticRate = animatic?.data.frame_rate || { numerator: 24, denominator: 1 };
+    (0, react_1.useEffect)(() => { if (!playing || !totalPanelFrames)
+        return; let raf = 0; const start = performance.now(), initial = panelTime; const tick = (now) => { const at = initial + (now - start) / 1000 * (animaticRate.numerator / animaticRate.denominator); if (at >= totalPanelFrames) {
+        setPanelTime(totalPanelFrames - 1);
+        setPlaying(false);
+        return;
+    } setPanelTime(Math.floor(at)); raf = requestAnimationFrame(tick); }; raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf); }, [playing, totalPanelFrames, animaticRate.numerator, animaticRate.denominator]);
+    let cursor = 0;
+    const animated = panelEntries.find((e) => { const yes = panelTime >= cursor && panelTime < cursor + e.duration; cursor += e.duration; return yes; }) || panelEntries[0];
+    function PanelImage({ record }) { const d = record.data; return d.artwork?.media_id ? react_1.default.createElement("img", { src: (0, api_1.originalUrl)(project, d.artwork.media_id), alt: d.title, onError: (e) => { e.currentTarget.hidden = true; e.currentTarget.nextElementSibling?.removeAttribute('hidden'); } }) : react_1.default.createElement("svg", { viewBox: "0 0 800 450", role: "img", "aria-label": d.title },
+        react_1.default.createElement("rect", { width: "800", height: "450", fill: "#f7f8f2" }),
+        d.drawing?.length ? d.drawing.map((s, i) => react_1.default.createElement("polyline", { key: i, points: s.points.map((p) => `${p.x * 800},${p.y * 450}`).join(' '), stroke: s.color, strokeWidth: Math.max(1, s.width * 800), fill: "none", strokeLinecap: "round", strokeLinejoin: "round" })) : react_1.default.createElement("text", { x: "40", y: "230", fill: "#566c60", fontSize: "22" }, "Artwork not yet available")); }
+    return react_1.default.createElement("div", { className: "pd-workspace" },
+        react_1.default.createElement("header", { className: "pd-header" },
+            react_1.default.createElement("div", null,
+                react_1.default.createElement("p", { className: "pd-eyebrow" },
+                    "CONNECTED PRODUCTION / ",
+                    props.state.project.title),
+                react_1.default.createElement("h1", null, "A plan you can trace."),
+                react_1.default.createElement("p", { className: "pd-subtitle" }, "Script to scene. Action to angle. Every decision keeps its source.")),
+            react_1.default.createElement("div", { className: "pd-header-actions" },
+                react_1.default.createElement("span", { className: "pd-checkpoint" },
+                    "Checkpoint ",
+                    react_1.default.createElement("strong", null, snapshot.checkpoint)),
+                react_1.default.createElement("button", { disabled: busy, onClick: () => void load() },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "refresh", size: 15 }),
+                    "Refresh"),
+                react_1.default.createElement("button", { disabled: busy || !records.length, onClick: () => void exportPacket() },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "export", size: 15 }),
+                    "Review packet"))),
+        error && react_1.default.createElement("div", { className: "pd-notice pd-error", role: "alert" },
+            react_1.default.createElement("strong", null, "Needs attention"),
+            react_1.default.createElement("span", null, error),
+            react_1.default.createElement("button", { "aria-label": "Dismiss error", onClick: () => setError('') }, "\u00D7")),
+        storageError && react_1.default.createElement("div", { className: "pd-notice pd-error", role: "alert" },
+            storageError,
+            draft && react_1.default.createElement("button", { onClick: () => (0, model_1.downloadJSON)(draft, `production-draft-${draft.id}.json`) }, "Export draft")),
+        (changes || draftStale) && react_1.default.createElement("div", { className: "pd-notice", role: "status" },
+            react_1.default.createElement("span", null, draftStale ? 'Your draft is based on an older checkpoint. Saved work has not been overwritten.' : 'The dataset changed in another client. Refresh to see the current selection.'),
+            react_1.default.createElement("button", { disabled: busy, onClick: () => void load() }, "Refresh saved data"),
+            draftStale && react_1.default.createElement("button", { disabled: busy, onClick: rebase }, "Rebase non-conflicting fields")),
+        react_1.default.createElement("div", { className: "pd-stats" },
+            react_1.default.createElement("button", { onClick: () => { setKindFilter('scene'); setView('Records'); } },
+                react_1.default.createElement("span", null, "Scenes"),
+                react_1.default.createElement("strong", null, scenes.length.toString().padStart(2, '0')),
+                react_1.default.createElement("small", null, "Production, not script headings")),
+            react_1.default.createElement("button", { onClick: () => { setKindFilter('shot'); setView('Coverage'); } },
+                react_1.default.createElement("span", null, "Planned shots"),
+                react_1.default.createElement("strong", null, shots.length.toString().padStart(2, '0')),
+                react_1.default.createElement("small", null,
+                    currentReport?.coverage.summary.script_passages ?? '—',
+                    " script passages tracked")),
+            react_1.default.createElement("button", { onClick: () => setView('Review') },
+                react_1.default.createElement("span", null, "Planning gaps"),
+                react_1.default.createElement("strong", { className: currentReport?.planning.gaps ? 'pd-amber' : '' }, currentReport ? currentReport.planning.gaps.toString().padStart(2, '0') : '—'),
+                react_1.default.createElement("small", null,
+                    currentReport?.structural.valid ? 'Structure valid' : 'Structure not yet verified',
+                    " \u00B7 creative ",
+                    currentReport?.creative.accepted ? 'accepted' : 'pending')),
+            react_1.default.createElement("button", { onClick: () => setView('Review') },
+                react_1.default.createElement("span", null, "Changed dependencies"),
+                react_1.default.createElement("strong", { className: currentReport?.summary.stale_records ? 'pd-amber' : '' }, currentReport ? currentReport.summary.stale_records.toString().padStart(2, '0') : '—'),
+                react_1.default.createElement("small", null,
+                    currentReport?.summary.proposals ?? 0,
+                    " proposed alternatives"))),
+        react_1.default.createElement("div", { className: "pd-commandbar" },
+            react_1.default.createElement("nav", { className: "pd-view-tabs", "aria-label": "Production views" }, model_1.VIEWS.map(v => react_1.default.createElement("button", { key: v, "aria-current": view === v ? 'page' : undefined, onClick: () => setView(v) }, v))),
+            react_1.default.createElement("div", { className: "pd-tools" },
+                react_1.default.createElement("button", { onClick: () => setImportOpen(true) }, "Import script"),
+                react_1.default.createElement("button", { onClick: () => setBatchOpen(true) }, "Agent JSON"),
+                react_1.default.createElement("button", { className: "primary", onClick: () => setCreateOpen(true) }, "+ Record"))),
+        !loading && !records.length ? react_1.default.createElement("section", { className: "pd-onboarding" },
+            react_1.default.createElement("div", { className: "pd-onboarding-art" },
+                react_1.default.createElement("span", null, "SCRIPT"),
+                react_1.default.createElement("i", null, "\u2198"),
+                react_1.default.createElement("span", null, "SCENE"),
+                react_1.default.createElement("i", null, "\u2198"),
+                react_1.default.createElement("span", null, "SHOT")),
+            react_1.default.createElement("h2", null, "Build the dataset. Inspect the result."),
+            react_1.default.createElement("p", null, "Start with a script or an unscripted production. An agent can create all records through the CLI; this workspace reads and edits that exact graph."),
+            react_1.default.createElement("div", null,
+                react_1.default.createElement("button", { className: "primary", disabled: busy, onClick: () => void example() }, "Preview connected example"),
+                react_1.default.createElement("button", { onClick: () => setImportOpen(true) }, "Import a script"),
+                react_1.default.createElement("button", { disabled: busy, onClick: () => void guarded(async () => { const r = await (0, api_1.runCommand)(project, 'production.adopt-preview', { expected_checkpoint: snapshot.checkpoint, operation_id: (0, model_1.uid)(), select: false }); setPreview({ title: 'Adopt legacy outline — explicit proposed records', batch: { ...r.batch, preview_sha256: r.preview.preview_sha256 }, result: r.preview }); }) }, "Adopt existing outline")),
+            react_1.default.createElement("small", null, "The example is synthetic. It adds a complete handoff scene only after you apply its preview. Your existing outline and spatial plans are untouched.")) : react_1.default.createElement("div", { className: "pd-layout" },
+            react_1.default.createElement("aside", { className: "pd-record-nav" },
+                react_1.default.createElement("label", { className: "pd-search" },
+                    react_1.default.createElement(Primitives_1.Icon, { name: "search", size: 15 }),
+                    react_1.default.createElement("input", { "aria-label": "Search production records", placeholder: "Find a record\u2026", value: search, onChange: (e) => setSearch(e.target.value) })),
+                react_1.default.createElement("div", { className: "pd-nav-filters" },
+                    react_1.default.createElement("select", { "aria-label": "Filter production scene", value: sceneFilter, onChange: (e) => setSceneFilter(e.target.value) },
+                        react_1.default.createElement("option", { value: "" }, "All scenes"),
+                        scenes.map(r => react_1.default.createElement("option", { key: r.id, value: r.id },
+                            r.data.label,
+                            " ",
+                            r.data.title))),
+                    react_1.default.createElement("select", { "aria-label": "Filter record kind", value: kindFilter, onChange: (e) => setKindFilter(e.target.value) },
+                        react_1.default.createElement("option", { value: "" }, "All record types"),
+                        model_1.KINDS.map(k => react_1.default.createElement("option", { key: k, value: k }, (0, model_1.label)(k))))),
+                react_1.default.createElement("div", { className: "pd-record-count" },
+                    visible.length,
+                    " RECORDS ",
+                    react_1.default.createElement("span", null, loading ? 'Refreshing…' : 'Exact versions')),
+                react_1.default.createElement("div", { className: "pd-record-list", role: "list" }, visible.map(r => react_1.default.createElement("button", { key: r.id, role: "listitem", className: r.id === activeId ? 'is-active' : '', onClick: () => select(r.id) },
+                    react_1.default.createElement("span", { className: "pd-record-kind" },
+                        (0, model_1.label)(r.kind),
+                        " ",
+                        react_1.default.createElement("span", null,
+                            "v",
+                            r.version,
+                            !r.is_selected ? ' · proposal' : '')),
+                    react_1.default.createElement("strong", null,
+                        r.data.label && react_1.default.createElement("em", null, r.data.label),
+                        r.data.title),
+                    react_1.default.createElement("span", { className: "pd-record-meta" },
+                        r.data.planning !== 'planned' ? (0, model_1.label)(r.data.planning) : r.data.orders.shooting !== null ? `Shoot order ${r.data.orders.shooting}` : r.id.slice(0, 8),
+                        findingCount(r.id) > 0 && react_1.default.createElement("b", null,
+                            findingCount(r.id),
+                            " gaps")))))),
+            react_1.default.createElement("main", { className: "pd-content" },
+                active && react_1.default.createElement("div", { className: "pd-selection-heading" },
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("p", { className: "pd-eyebrow" },
+                            (0, model_1.label)(active.kind),
+                            " / ",
+                            active.data.label || active.id.slice(0, 8)),
+                        react_1.default.createElement("h2", null, active.data.title)),
+                    react_1.default.createElement("span", { className: 'pd-pill ' + (dirty ? 'is-draft' : proposal ? 'is-proposal' : 'is-saved') },
+                        dirty ? 'Local draft' : proposal ? 'Proposed version' : 'Selected',
+                        " \u00B7 v",
+                        active.version)),
+                view === 'Spatial' && react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("div", { className: "pd-stage-context" },
+                        sourceScene && react_1.default.createElement("button", { onClick: () => select(sourceScene.id, sourceScene.version) },
+                            "Scene \u00B7 ",
+                            sourceScene.data.title),
+                        sourceAction && react_1.default.createElement("button", { onClick: () => select(sourceAction.id, sourceAction.version) },
+                            "Action \u00B7 v",
+                            sourceAction.version),
+                        sourceScene?.data.location && react_1.default.createElement("button", { onClick: () => select(sourceScene.data.location.id, sourceScene.data.location.version) },
+                            "Set \u00B7 v",
+                            sourceScene.data.location.version),
+                        react_1.default.createElement("span", null,
+                            sample?.location.dimension_quality || 'Unknown',
+                            " dimensions")),
+                    react_1.default.createElement("div", { className: compareVersion !== null ? 'pd-comparison' : '' },
+                        react_1.default.createElement(Stage_1.Stage, { project: project, sample: sample, loading: sampleLoading, selectedObject: objectId, onSelect: setObjectId, onMove: moveObject, onOpen: select, draftPose: draftPose, error: sampleError }),
+                        compareVersion !== null && react_1.default.createElement(Stage_1.Stage, { sample: compareSample, loading: !compareSample, selectedObject: "", onSelect: () => { }, onMove: () => { }, onOpen: select, compact: true })),
+                    react_1.default.createElement("div", { className: "pd-timeline" },
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("strong", null, "Shared scene action"),
+                            react_1.default.createElement("span", null,
+                                sample?.frame_rate ? `${sample.frame_rate.numerator}/${sample.frame_rate.denominator} fps` : 'No action time base',
+                                " \u00B7 ",
+                                sample?.duration_frames || 0,
+                                " frames"),
+                            react_1.default.createElement("label", null,
+                                "Frame",
+                                react_1.default.createElement("input", { "aria-label": "Action frame", type: "number", min: "0", max: sample?.duration_frames || 0, step: "1", value: frame, onChange: (e) => { const n = Number(e.target.value); if (Number.isFinite(n))
+                                        setFrame(Math.min(sample?.duration_frames || 0, Math.max(0, Math.round(n)))); } }))),
+                        react_1.default.createElement("input", { "aria-label": "Scrub shared action", type: "range", min: "0", max: sample?.duration_frames || 0, step: "1", value: frame, onChange: (e) => setFrame(Number(e.target.value)) }),
+                        react_1.default.createElement("div", { className: "pd-beat-strip" }, sourceAction?.data.beats.map((b) => react_1.default.createElement("button", { key: b.id, className: frame >= b.interval.start && frame < b.interval.end ? 'is-active' : '', onClick: () => setFrame(b.interval.start) },
+                            react_1.default.createElement("span", null, b.label),
+                            react_1.default.createElement("small", null,
+                                b.interval.start,
+                                "\u2013",
+                                b.interval.end))))),
+                    react_1.default.createElement("div", { className: "pd-explain" },
+                        react_1.default.createElement("h3", null, "Why this shot exists"),
+                        react_1.default.createElement("p", null, active?.data.purpose || sourceScene?.data.purpose || 'No purpose has been recorded yet. A valid record is not a complete plan.'),
+                        active && active.data.provenance.assumptions?.length > 0 && react_1.default.createElement("details", null,
+                            react_1.default.createElement("summary", null, "Assumptions & provenance"),
+                            react_1.default.createElement("p", null, active.data.provenance.rationale),
+                            active.data.provenance.assumptions.map((s, i) => react_1.default.createElement("p", { key: i }, s))))),
+                view === 'Script' && react_1.default.createElement("section", { className: "pd-script" },
+                    react_1.default.createElement("div", { className: "pd-section-bar" },
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("p", { className: "pd-eyebrow" }, "IMPORTED WORDING / EXACT REVISION"),
+                            react_1.default.createElement("h3", null, script?.data.title || 'No script selected')),
+                        script?.data.source_file && react_1.default.createElement("button", { onClick: sourceDownload }, "Original file")),
+                    react_1.default.createElement("p", { className: "pd-muted" }, "Select a passage to reveal its coverage. Imported words stay separate from notes and agent interpretations."),
+                    script?.data.scenes.map((s) => react_1.default.createElement("article", { key: s.id },
+                        react_1.default.createElement("header", null,
+                            react_1.default.createElement("span", null, s.number || '—'),
+                            react_1.default.createElement("h3", null, s.heading)),
+                        s.blocks.map((b) => { const row = currentReport?.coverage.material.find(m => m.block_id === b.id && m.script.id === script.id); return react_1.default.createElement("div", { key: b.id, className: `pd-script-block is-${b.type}` },
+                            react_1.default.createElement("button", { className: "pd-script-text", onClick: () => { setJsonModal({ title: 'Script passage → production coverage', data: row || { block: b, pinned_script: (0, model_1.pin)(script) } }); } },
+                                b.character && react_1.default.createElement("strong", null, b.character),
+                                react_1.default.createElement("span", null, b.text)),
+                            react_1.default.createElement("div", { className: "pd-passage-coverage" }, row?.shot_ids.length ? row.shot_ids.map((id) => react_1.default.createElement("button", { key: id, onClick: () => { select(id); setView('Spatial'); } }, byId.get(id)?.data.label || byId.get(id)?.data.title || id.slice(0, 8))) : react_1.default.createElement("span", null, row?.status || 'Not mapped'))); }))),
+                    !script && react_1.default.createElement("p", null, "Import a screenplay, author structured script data, or plan an unscripted scene using objectives.")),
+                view === 'Coverage' && react_1.default.createElement("section", { className: "pd-report-view" },
+                    react_1.default.createElement("div", { className: "pd-section-bar" },
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("p", { className: "pd-eyebrow" }, "COVERAGE / SHARED ACTION"),
+                            react_1.default.createElement("h3", null, "Every beat, accounted for.")),
+                        react_1.default.createElement("button", { disabled: !currentReport, onClick: () => (0, model_1.downloadJSON)(currentReport?.coverage, 'production-coverage.json') }, "Export coverage")),
+                    react_1.default.createElement("p", { className: "pd-muted" }, "Overlapping angles can be intentional. This measures explicit coverage, not artistic sufficiency."),
+                    currentReport?.coverage.beats.map((b) => react_1.default.createElement("article", { className: "pd-coverage-row", key: b.action.id + '-' + b.beat_id },
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("button", { onClick: () => { select(b.action.id); setFrame(b.interval.start); setView('Spatial'); } },
+                                react_1.default.createElement("strong", null, b.label)),
+                            react_1.default.createElement("span", null,
+                                b.interval.start,
+                                "\u2013",
+                                b.interval.end,
+                                "f \u00B7 action v",
+                                b.action.version)),
+                        react_1.default.createElement("div", { className: "pd-coverage-track" }, b.coverage.map((c, i) => react_1.default.createElement("button", { key: c.shot_id + '-' + i, style: { marginLeft: `${100 * (c.start - b.interval.start) / (b.interval.end - b.interval.start)}%`, width: `${100 * (c.end - c.start) / (b.interval.end - b.interval.start)}%` }, onClick: () => { select(c.shot_id); setView('Spatial'); } }, byId.get(c.shot_id)?.data.label || byId.get(c.shot_id)?.data.title))),
+                        react_1.default.createElement("span", { className: 'pd-pill ' + (b.status === 'covered' ? 'is-saved' : 'is-draft') }, b.status))),
+                    !currentReport && react_1.default.createElement("p", null, "Refresh to obtain a report from the same checkpoint."),
+                    react_1.default.createElement("h3", null, "Script coverage"),
+                    react_1.default.createElement("div", { className: "pd-table-scroll" },
+                        react_1.default.createElement("table", null,
+                            react_1.default.createElement("thead", null,
+                                react_1.default.createElement("tr", null,
+                                    react_1.default.createElement("th", null, "Passage"),
+                                    react_1.default.createElement("th", null, "Scene"),
+                                    react_1.default.createElement("th", null, "Shots"),
+                                    react_1.default.createElement("th", null, "Disposition"))),
+                            react_1.default.createElement("tbody", null, currentReport?.coverage.material.map((m) => react_1.default.createElement("tr", { key: m.script.id + m.block_id },
+                                react_1.default.createElement("td", null, m.text.slice(0, 160)),
+                                react_1.default.createElement("td", null, m.production_scene_ids.map((id) => byId.get(id)?.data.title).join(', ') || '—'),
+                                react_1.default.createElement("td", null, m.shot_ids.map((id) => react_1.default.createElement("button", { key: id, onClick: () => { select(id); setView('Spatial'); } }, byId.get(id)?.data.label || byId.get(id)?.data.title))),
+                                react_1.default.createElement("td", null, (0, model_1.label)(m.status)))))))),
+                view === 'Records' && react_1.default.createElement("section", { className: "pd-report-view" },
+                    react_1.default.createElement("div", { className: "pd-section-bar" },
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("p", { className: "pd-eyebrow" }, "PRODUCTION DATABASE"),
+                            react_1.default.createElement("h3", null, "Independent records. Explicit connections.")),
+                        react_1.default.createElement("button", { onClick: () => void guarded(async () => (0, model_1.downloadJSON)(await (0, api_1.runCommand)(project, 'production.export'), 'production-package.json')) }, "Export history")),
+                    react_1.default.createElement("div", { className: "pd-table-scroll" },
+                        react_1.default.createElement("table", null,
+                            react_1.default.createElement("thead", null,
+                                react_1.default.createElement("tr", null,
+                                    react_1.default.createElement("th", null, "Record"),
+                                    react_1.default.createElement("th", null, "Type"),
+                                    react_1.default.createElement("th", null, "Selection"),
+                                    react_1.default.createElement("th", null, "Narrative"),
+                                    react_1.default.createElement("th", null, "Shooting"),
+                                    react_1.default.createElement("th", null, "Editorial"),
+                                    react_1.default.createElement("th", null, "Next action"))),
+                            react_1.default.createElement("tbody", null, visible.map(r => react_1.default.createElement("tr", { key: r.id, className: r.id === activeId ? 'is-active' : '' },
+                                react_1.default.createElement("td", null,
+                                    react_1.default.createElement("button", { onClick: () => select(r.id) },
+                                        r.data.label && react_1.default.createElement("small", null,
+                                            r.data.label,
+                                            " \u00B7 "),
+                                        r.data.title)),
+                                react_1.default.createElement("td", null, (0, model_1.label)(r.kind)),
+                                react_1.default.createElement("td", null,
+                                    "v",
+                                    r.version,
+                                    " \u00B7 ",
+                                    r.is_selected ? 'selected' : 'proposal'),
+                                react_1.default.createElement("td", null, r.data.orders.narrative ?? '—'),
+                                react_1.default.createElement("td", null, r.data.orders.shooting ?? '—'),
+                                react_1.default.createElement("td", null, r.data.orders.editorial ?? '—'),
+                                react_1.default.createElement("td", null, r.data.next_action || '—')))))),
+                    react_1.default.createElement("p", { className: "pd-muted" }, "These IDs survive renaming and reordering. Legacy outline records remain separate until explicitly adopted.")),
+                view === 'Panels' && react_1.default.createElement("section", { className: "pd-report-view" },
+                    react_1.default.createElement("div", { className: "pd-section-bar" },
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("p", { className: "pd-eyebrow" }, "PANELS & ANIMATIC"),
+                            react_1.default.createElement("h3", null, animatic?.data.title || 'Storyboard contact sheet')),
+                        react_1.default.createElement("select", { "aria-label": "Choose animatic", value: animatic?.id || '', onChange: (e) => { setPlaying(false); setPanelTime(0); if (e.target.value)
+                                select(e.target.value); } },
+                            react_1.default.createElement("option", { value: "" }, "Contact sheet \u00B7 assumed 24 fps"),
+                            records.filter(r => r.kind === 'animatic').map(r => react_1.default.createElement("option", { key: r.id, value: r.id }, r.data.title)))),
+                    animated?.panel && react_1.default.createElement("div", { className: "pd-animatic" },
+                        react_1.default.createElement(PanelImage, { record: animated.panel }),
+                        react_1.default.createElement("p", { hidden: true }, "Referenced image is missing or unavailable."),
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("button", { onClick: () => { if (panelTime >= totalPanelFrames - 1)
+                                    setPanelTime(0); setPlaying(v => !v); } }, playing ? 'Pause' : 'Play panels'),
+                            react_1.default.createElement("input", { "aria-label": "Animatic frame", type: "range", min: "0", max: Math.max(0, totalPanelFrames - 1), value: panelTime, onChange: (e) => { setPlaying(false); setPanelTime(Number(e.target.value)); } }),
+                            react_1.default.createElement("span", null,
+                                panelTime,
+                                " / ",
+                                totalPanelFrames,
+                                "f")),
+                        react_1.default.createElement("small", null,
+                            animaticRate.numerator,
+                            "/",
+                            animaticRate.denominator,
+                            " fps \u00B7 audio cue: ",
+                            animated.cue || 'none',
+                            " \u00B7 silent preview, no audio mix")),
+                    react_1.default.createElement("div", { className: "pd-panels" }, panelEntries.map((e, i) => e.panel && react_1.default.createElement("article", { key: e.panel.id + '-' + i },
+                        react_1.default.createElement("button", { onClick: () => select(e.panel.id) },
+                            react_1.default.createElement(PanelImage, { record: e.panel }),
+                            react_1.default.createElement("p", { hidden: true }, "Referenced image is missing or unavailable.")),
+                        react_1.default.createElement("p", null,
+                            react_1.default.createElement("strong", null, e.panel.data.title),
+                            react_1.default.createElement("span", null,
+                                "v",
+                                e.panel.version,
+                                " \u00B7 action ",
+                                e.panel.data.action_frame ?? '—',
+                                "f")),
+                        react_1.default.createElement("blockquote", null, e.panel.data.dialogue || e.panel.data.annotation))))),
+                view === 'Review' && react_1.default.createElement("section", { className: "pd-report-view" },
+                    react_1.default.createElement("div", { className: "pd-section-bar" },
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("p", { className: "pd-eyebrow" }, "READINESS & CHANGE IMPACT"),
+                            react_1.default.createElement("h3", null, "Valid is not the same as ready.")),
+                        react_1.default.createElement("button", { disabled: !currentReport, onClick: () => (0, model_1.downloadJSON)(currentReport, 'production-report.json') }, "Export report")),
+                    react_1.default.createElement("div", { className: "pd-review-dimensions" },
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("strong", null, "01 / Structural"),
+                            react_1.default.createElement("p", null, currentReport?.structural.valid ? 'Typed records and references validate.' : 'Structural errors need repair.')),
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("strong", null, "02 / Planning"),
+                            react_1.default.createElement("p", null, currentReport?.planning.complete ? 'Required planning fields are complete.' : `${currentReport?.planning.gaps ?? '—'} explicit gaps remain.`)),
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("strong", null, "03 / Creative"),
+                            react_1.default.createElement("p", null, currentReport?.creative.accepted ? 'Exact shot revisions accepted.' : 'A person still needs to review the plan.'))),
+                    currentReport?.issues.map((i, n) => react_1.default.createElement("article", { key: n, className: 'pd-finding ' + (i.status === 'accepted_exception' ? 'is-exception' : '') },
+                        react_1.default.createElement("span", { className: 'pd-pill ' + (i.severity === 'error' ? 'is-error' : i.severity === 'info' ? 'is-saved' : 'is-draft') }, (0, model_1.label)(i.category)),
+                        react_1.default.createElement("div", null,
+                            react_1.default.createElement("button", { onClick: () => { if (i.record_id)
+                                    select(i.record_id); } },
+                                react_1.default.createElement("strong", null, i.title),
+                                " \u00B7 v",
+                                i.version ?? '—'),
+                            react_1.default.createElement("p", null, i.message),
+                            i.reason && react_1.default.createElement("p", null,
+                                "Exception: ",
+                                i.reason),
+                            react_1.default.createElement("small", null,
+                                i.responsibility ? `Owner: ${i.responsibility}` : 'No responsible person recorded',
+                                i.next_action ? ` · Next: ${i.next_action}` : '')),
+                        react_1.default.createElement("button", { onClick: () => setJsonModal({ title: i.code, data: i }) }, "Details"))),
+                    currentReport && !currentReport.issues.length && react_1.default.createElement("p", null, "No structural or planning findings. Creative acceptance still requires an exact-revision review."),
+                    react_1.default.createElement("h3", null, "Equipment"),
+                    react_1.default.createElement("div", { className: "pd-table-scroll" },
+                        react_1.default.createElement("table", null,
+                            react_1.default.createElement("thead", null,
+                                react_1.default.createElement("tr", null,
+                                    react_1.default.createElement("th", null, "Item"),
+                                    react_1.default.createElement("th", null, "Type"),
+                                    react_1.default.createElement("th", null, "Max / setup"),
+                                    react_1.default.createElement("th", null, "Uses"))),
+                            react_1.default.createElement("tbody", null, currentReport?.equipment.items.map((i) => react_1.default.createElement("tr", { key: (0, model_1.refKey)(i.asset) },
+                                react_1.default.createElement("td", null,
+                                    react_1.default.createElement("button", { onClick: () => select(i.asset.id) }, i.title)),
+                                react_1.default.createElement("td", null, (0, model_1.label)(i.category)),
+                                react_1.default.createElement("td", null, i.max_in_one_setup),
+                                react_1.default.createElement("td", null, i.total_planned_uses)))))),
+                    react_1.default.createElement("p", { className: "pd-muted" }, "Quantities are planning requirements, not confirmed inventory or electrical-safety advice."))),
+            react_1.default.createElement("aside", { className: "pd-inspector" }, active ? react_1.default.createElement(react_1.default.Fragment, null,
+                react_1.default.createElement("div", { className: "pd-inspector-header" },
+                    react_1.default.createElement("span", null, "RECORD INSPECTOR"),
+                    react_1.default.createElement("button", { onClick: () => setRawMode(v => !v), "aria-pressed": rawMode }, rawMode ? 'Fields' : 'JSON')),
+                react_1.default.createElement("div", { className: "pd-version-line" },
+                    react_1.default.createElement("label", null,
+                        "Inspect version",
+                        react_1.default.createElement("select", { "aria-label": "Inspect record version", value: historyVersion ?? active.version, disabled: dirty, onChange: (e) => { setHistoryVersion(Number(e.target.value)); setDraft(null); setFrame(0); } }, history.map(v => react_1.default.createElement("option", { key: v.number, value: v.number },
+                            "v",
+                            v.number,
+                            byId.get(active.id)?.selected_version === v.number ? ' · selected' : '',
+                            byId.get(active.id)?.head_version === v.number ? ' · head' : '')))),
+                    SPATIAL.includes(active.kind) && history.length > 1 && react_1.default.createElement("label", null,
+                        "Compare",
+                        react_1.default.createElement("select", { "aria-label": "Compare spatial version", value: compareVersion ?? '', onChange: (e) => setCompareVersion(e.target.value ? Number(e.target.value) : null) },
+                            react_1.default.createElement("option", { value: "" }, "No comparison"),
+                            history.filter(h => h.number !== active.version).map(h => react_1.default.createElement("option", { key: h.number, value: h.number },
+                                "v",
+                                h.number))))),
+                rawMode ? react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("label", { className: "pd-field" },
+                        "Canonical record JSON",
+                        react_1.default.createElement("textarea", { className: "pd-json-editor", "aria-label": "Production record JSON", spellCheck: false, value: draft?.id === active.id ? draft.raw : (0, model_1.pretty)(active.data), onChange: (e) => updateRaw(e.target.value) })),
+                    !working && react_1.default.createElement("p", { className: "pd-danger" }, "Invalid JSON. The draft is retained; no changes can be applied.")) : working ? react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("label", { className: "pd-field" },
+                        "Title",
+                        react_1.default.createElement("input", { value: working.title || '', onChange: (e) => field('title', e.target.value) })),
+                    react_1.default.createElement("label", { className: "pd-field" },
+                        "Scene / shot label",
+                        react_1.default.createElement("input", { value: working.label || '', onChange: (e) => field('label', e.target.value) })),
+                    ['scene', 'shot'].includes(active.kind) && react_1.default.createElement("label", { className: "pd-field" },
+                        "Purpose",
+                        react_1.default.createElement("textarea", { value: working.purpose || '', onChange: (e) => field('purpose', e.target.value) })),
+                    active.kind === 'shot' && react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("label", { className: "pd-field" },
+                            "Framing",
+                            react_1.default.createElement("input", { value: working.framing || '', onChange: (e) => field('framing', e.target.value) })),
+                        react_1.default.createElement("label", { className: "pd-field" },
+                            "Composition",
+                            react_1.default.createElement("textarea", { value: working.composition || '', onChange: (e) => field('composition', e.target.value) }))),
+                    react_1.default.createElement("label", { className: "pd-field" },
+                        "Planning notes",
+                        react_1.default.createElement("textarea", { value: working.notes || '', onChange: (e) => field('notes', e.target.value) })),
+                    react_1.default.createElement("div", { className: "pd-order-fields" }, ['narrative', 'shooting', 'editorial'].map(k => react_1.default.createElement("label", { key: k },
+                        (0, model_1.label)(k),
+                        react_1.default.createElement("input", { type: "number", min: "0", step: "1", value: working.orders?.[k] ?? '', onChange: (e) => { const n = e.target.value === '' ? null : Number(e.target.value); if (n === null || Number.isSafeInteger(n) && n >= 0)
+                                field('orders', { ...working.orders, [k]: n }); } })))),
+                    react_1.default.createElement("label", { className: "pd-field" },
+                        "Responsible person",
+                        react_1.default.createElement("input", { value: working.responsibility || '', onChange: (e) => field('responsibility', e.target.value) })),
+                    react_1.default.createElement("label", { className: "pd-field" },
+                        "Next action",
+                        react_1.default.createElement("input", { value: working.next_action || '', onChange: (e) => field('next_action', e.target.value) })),
+                    react_1.default.createElement("details", null,
+                        react_1.default.createElement("summary", null, "Applicability & readiness"),
+                        react_1.default.createElement("label", { className: "pd-field" },
+                            "Planning state",
+                            react_1.default.createElement("select", { value: working.planning || 'planned', onChange: (e) => field('planning', e.target.value) },
+                                react_1.default.createElement("option", { value: "planned" }, "Planned"),
+                                react_1.default.createElement("option", { value: "not_applicable" }, "Not applicable"),
+                                react_1.default.createElement("option", { value: "intentionally_unplanned" }, "Intentionally unplanned"))),
+                        react_1.default.createElement("label", { className: "pd-field" },
+                            "Reason",
+                            react_1.default.createElement("textarea", { value: working.planning_reason || '', onChange: (e) => field('planning_reason', e.target.value) })),
+                        react_1.default.createElement("small", null, "Per-field applicability, typed relationships, geometry and keyframes are available in the full JSON editor."))) : react_1.default.createElement("p", { className: "pd-danger" }, "Repair the draft in JSON mode."),
+                dirty && react_1.default.createElement("div", { className: "pd-save-box" },
+                    react_1.default.createElement("p", null,
+                        react_1.default.createElement("strong", null, "Local draft"),
+                        react_1.default.createElement("br", null),
+                        react_1.default.createElement("small", null, draftStale ? 'Older checkpoint — reconcile before publishing.' : storageError ? 'In memory only.' : 'Retained in this browser; not yet saved to the project.')),
+                    react_1.default.createElement("label", null,
+                        react_1.default.createElement("input", { type: "checkbox", checked: saveSelected, onChange: (e) => setSaveSelected(e.target.checked) }),
+                        "Select this revision after saving"),
+                    react_1.default.createElement("button", { className: "primary", disabled: busy || !working || draftStale, onClick: () => void save() },
+                        "Preview ",
+                        saveSelected ? 'selected revision' : 'alternative'),
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("button", { onClick: () => draft && (0, model_1.downloadJSON)(draft, `draft-${draft.id}.json`) }, "Export draft"),
+                        react_1.default.createElement("button", { onClick: () => setJsonModal({ title: 'Discard this local draft?', data: { action: 'discard_draft', id: active.id } }) }, "Discard")),
+                    conflicts.length > 0 && react_1.default.createElement("div", { className: "pd-danger" },
+                        react_1.default.createElement("strong", null, "Conflicting fields"),
+                        react_1.default.createElement("pre", null, conflicts.join('\n')),
+                        react_1.default.createElement("button", { onClick: () => setJsonModal({ title: 'Confirm your manual conflict resolution', data: { action: 'resolve_draft', current: byId.get(active.id)?.data, retained_draft: working, conflicts } }) }, "Review manual resolution"),
+                        react_1.default.createElement("button", { onClick: () => setJsonModal({ title: 'Current saved version — compare with your retained draft', data: byId.get(active.id) }) }, "Inspect current record"))),
+                !dirty && proposal && react_1.default.createElement("button", { className: "primary", disabled: busy, onClick: () => void selectVersion(active.version) },
+                    "Preview selection of v",
+                    active.version),
+                react_1.default.createElement("div", { className: "pd-inspector-actions" },
+                    react_1.default.createElement("button", { disabled: busy, onClick: () => void impact() }, "Dependency impact"),
+                    react_1.default.createElement("button", { disabled: busy, onClick: () => void reconcile() }, "Reconciliation guide"),
+                    react_1.default.createElement("button", { onClick: annotate }, "Add exact-revision note"),
+                    react_1.default.createElement("button", { onClick: reviewDecision }, "Record creative review"),
+                    history.length > 1 && react_1.default.createElement("button", { onClick: () => void guarded(async () => setJsonModal({ title: 'Immutable version diff', data: await (0, api_1.runCommand)(project, 'production.diff', { id: active.id, from_version: Math.max(1, active.version - 1), to_version: active.version }) })) }, "Diff previous version"),
+                    react_1.default.createElement("button", { onClick: () => (0, model_1.downloadJSON)(active, 'production-record.json') }, "Export record"),
+                    react_1.default.createElement("button", { disabled: busy, onClick: () => void prepare('Archive record — history is retained', { expected_checkpoint: snapshot.checkpoint, operation_id: (0, model_1.uid)(), operations: [{ op: 'archive', id: active.id, expected_revision: active.revision }] }) }, "Archive with dependency check")),
+                react_1.default.createElement("details", null,
+                    react_1.default.createElement("summary", null, "Exact identity & provenance"),
+                    react_1.default.createElement("code", null, active.id),
+                    react_1.default.createElement("p", { className: "pd-muted" },
+                        "v",
+                        active.version,
+                        " \u00B7 header revision ",
+                        active.revision),
+                    react_1.default.createElement("code", null, active.sha256),
+                    react_1.default.createElement("p", null, active.data.provenance.rationale || 'No rationale recorded.'),
+                    react_1.default.createElement("p", { className: "pd-muted" },
+                        "Origin: ",
+                        active.data.provenance.origin,
+                        ". Source pins never automatically follow a new selection."))) : react_1.default.createElement("p", { className: "pd-muted" }, "Select a record to inspect its exact version."))),
+        react_1.default.createElement("footer", { className: "pd-footer" },
+            react_1.default.createElement("span", null, "Local-first \u00B7 immutable revisions \u00B7 proposals stay separate"),
+            react_1.default.createElement("button", { onClick: () => void guarded(async () => (0, model_1.downloadJSON)(await (0, api_1.runCommand)(project, 'production.schema'), 'production-schema.json')) }, "Agent schemas"),
+            react_1.default.createElement("button", { onClick: () => props.go('blocking') }, "Legacy spatial workspace")),
+        preview && react_1.default.createElement(Primitives_1.Modal, { title: preview.title, wide: true, onClose: () => { if (!busy && !uncertain)
+                setPreview(null); } },
+            react_1.default.createElement("div", { className: "pd-preview" },
+                react_1.default.createElement("p", null,
+                    "This atomic batch changes ",
+                    preview.batch.operations.length,
+                    " record",
+                    preview.batch.operations.length !== 1 ? 's' : '',
+                    " from checkpoint ",
+                    preview.batch.expected_checkpoint,
+                    ". Existing versions remain immutable."),
+                react_1.default.createElement("div", { className: "pd-table-scroll" },
+                    react_1.default.createElement("table", null,
+                        react_1.default.createElement("thead", null,
+                            react_1.default.createElement("tr", null,
+                                react_1.default.createElement("th", null, "Operation"),
+                                react_1.default.createElement("th", null, "Record"),
+                                react_1.default.createElement("th", null, "Selection"))),
+                        react_1.default.createElement("tbody", null, preview.batch.operations.map((o) => react_1.default.createElement("tr", { key: o.id },
+                            react_1.default.createElement("td", null, o.op),
+                            react_1.default.createElement("td", null, o.data?.title || byId.get(o.id)?.data.title || o.id),
+                            react_1.default.createElement("td", null, o.op === 'put' ? (o.select ? 'Select new revision' : 'Save proposal only') : o.version ? `Select v${o.version}` : 'Keep history')))))),
+                preview.result.affected?.length > 0 && react_1.default.createElement("p", { className: "pd-notice" },
+                    preview.result.affected.length,
+                    " selected dependent records may need review. They will not be rewritten."),
+                preview.result.import_report && react_1.default.createElement("pre", { className: "pd-code" }, (0, model_1.pretty)(preview.result.import_report)),
+                uncertain && react_1.default.createElement("div", { className: "pd-notice pd-error" }, "The response was lost. The change may already be saved. Retry this exact operation ID to retrieve its receipt; do not create a duplicate batch."),
+                react_1.default.createElement("details", null,
+                    react_1.default.createElement("summary", null, "Machine-readable preview"),
+                    react_1.default.createElement("pre", { className: "pd-code" }, (0, model_1.pretty)(preview.result))),
+                react_1.default.createElement("div", { className: "dialog-actions" },
+                    react_1.default.createElement("button", { disabled: busy || uncertain, onClick: () => setPreview(null) }, "Keep working"),
+                    react_1.default.createElement("button", { disabled: busy, onClick: () => (0, model_1.downloadJSON)(preview.batch, 'production-batch.json') }, "Export exact batch"),
+                    react_1.default.createElement("button", { className: "primary", disabled: busy, onClick: () => void applyPreview() }, busy ? 'Applying…' : uncertain ? 'Retry same operation' : 'Apply atomic batch')))),
+        createOpen && react_1.default.createElement(Primitives_1.Modal, { title: "Create a production record", onClose: () => setCreateOpen(false) },
+            react_1.default.createElement("p", null, "Every vertical uses the same typed mutation contract. Required references are validated before anything is saved."),
+            react_1.default.createElement("label", { className: "pd-field" },
+                "Record type",
+                react_1.default.createElement("select", { value: createKind, onChange: (e) => setCreateKind(e.target.value) }, model_1.KINDS.map(k => react_1.default.createElement("option", { key: k, value: k }, (0, model_1.label)(k))))),
+            react_1.default.createElement("div", { className: "dialog-actions" },
+                react_1.default.createElement("button", { onClick: () => setCreateOpen(false) }, "Cancel"),
+                react_1.default.createElement("button", { className: "primary", onClick: () => void createRecord() }, "Prepare editable JSON batch"))),
+        batchOpen && react_1.default.createElement(Primitives_1.Modal, { title: "Agent batch \u00B7 the same CLI mutation rules", wide: true, onClose: () => !busy && setBatchOpen(false) },
+            react_1.default.createElement("p", null, "Paste an atomic production batch, including its expected checkpoint and stable operation UUID. Proposed work is not selected unless each put explicitly requests it."),
+            react_1.default.createElement("textarea", { className: "pd-batch-editor", "aria-label": "Atomic production batch JSON", value: batchText, onChange: (e) => setBatchText(e.target.value), spellCheck: false }),
+            react_1.default.createElement("label", { className: "pd-field" },
+                "Load JSON file",
+                react_1.default.createElement("input", { type: "file", accept: ".json", onChange: async (e) => { const f = e.target.files?.[0]; if (!f)
+                        return; if (f.size > 32 * 1024 * 1024) {
+                        setError('Batch file exceeds 32 MiB.');
+                        return;
+                    } try {
+                        setBatchText(await f.text());
+                    }
+                    catch (err) {
+                        setError(errorText(err));
+                    } } })),
+            react_1.default.createElement("div", { className: "dialog-actions" },
+                react_1.default.createElement("button", { onClick: () => setBatchOpen(false) }, "Close"),
+                react_1.default.createElement("button", { className: "primary", disabled: busy || !batchText.trim(), onClick: () => { try {
+                        const b = JSON.parse(batchText);
+                        setBatchOpen(false);
+                        void prepare('Agent batch preview', b);
+                    }
+                    catch (e) {
+                        setError(errorText(e));
+                    } } }, "Validate & preview"))),
+        importOpen && react_1.default.createElement(Primitives_1.Modal, { title: active?.kind === 'script' ? 'Import a proposed script revision' : 'Import a script', onClose: () => !busy && setImportOpen(false) },
+            react_1.default.createElement("p", null, "The complete original file is retained. Scene identities are matched conservatively; ambiguous matches are reported. Imported wording never replaces notes or downstream plans."),
+            react_1.default.createElement("label", { className: "pd-field" },
+                "Format",
+                react_1.default.createElement("select", { value: scriptFormat, onChange: (e) => setScriptFormat(e.target.value) },
+                    react_1.default.createElement("option", { value: "fountain" }, "Fountain core syntax"),
+                    react_1.default.createElement("option", { value: "structured-json" }, "Structured scenes JSON"),
+                    react_1.default.createElement("option", { value: "screenjson" }, "ScreenJSON"))),
+            react_1.default.createElement("label", { className: "pd-field" },
+                "UTF-8 source file \u00B7 max 2 MiB",
+                react_1.default.createElement("input", { type: "file", accept: ".fountain,.txt,.json", onChange: (e) => setScriptFile(e.target.files?.[0] || null) })),
+            react_1.default.createElement("details", null,
+                react_1.default.createElement("summary", null, "Explicit scene identity resolution"),
+                react_1.default.createElement("p", { className: "pd-muted" }, "Map zero-based incoming scene indexes to existing scene UUIDs. Ambiguous headings should be resolved explicitly."),
+                react_1.default.createElement("textarea", { className: "pd-code", "aria-label": "Scene identity map JSON", value: identityMap, onChange: (e) => setIdentityMap(e.target.value) })),
+            react_1.default.createElement("div", { className: "dialog-actions" },
+                react_1.default.createElement("button", { onClick: () => setImportOpen(false) }, "Cancel"),
+                react_1.default.createElement("button", { className: "primary", disabled: !scriptFile || busy, onClick: () => void importScript() }, "Preview retained source"))),
+        jsonModal && react_1.default.createElement(Primitives_1.Modal, { title: jsonModal.title, wide: true, onClose: () => setJsonModal(null) }, jsonModal.data?.action === 'resolve_draft' ? react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("p", null, "Compare the saved record and your complete draft below. Proceeding deliberately keeps your draft as the resolution, including conflicting fields. Nothing is saved until the next preview and apply."),
+            react_1.default.createElement("pre", { className: "pd-code" }, (0, model_1.pretty)(jsonModal.data)),
+            react_1.default.createElement("div", { className: "dialog-actions" },
+                react_1.default.createElement("button", { onClick: () => setJsonModal(null) }, "Keep editing"),
+                react_1.default.createElement("button", { onClick: () => { if (draft) {
+                        const current = byId.get(draft.id);
+                        if (current) {
+                            const next = { ...(0, model_1.newDraft)(project, current, snapshot.checkpoint), raw: draft.raw };
+                            setDraft(next);
+                            draftRef.current = next;
+                            setConflicts([]);
+                            setError('');
+                        }
+                    } setJsonModal(null); } }, "Use my draft as explicit resolution"))) : jsonModal.data?.action === 'discard_draft' ? react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("p", null, "Discard only this browser draft? Saved project history will not change."),
+            react_1.default.createElement("div", { className: "dialog-actions" },
+                react_1.default.createElement("button", { onClick: () => setJsonModal(null) }, "Keep draft"),
+                react_1.default.createElement("button", { onClick: () => { discard(); setJsonModal(null); } }, "Discard local draft"))) : react_1.default.createElement(react_1.default.Fragment, null,
+            jsonModal.data?.files && react_1.default.createElement("div", { className: "pd-output-links" }, jsonModal.data.files.filter((f) => /\.(zip|pdf|html|json|csv)$/.test(f) && !f.includes('/plots/')).map((f) => react_1.default.createElement("a", { key: f, href: (0, api_1.exportUrl)(project, f, true), download: true }, f.split('/').pop()))),
+            react_1.default.createElement("pre", { className: "pd-code" }, (0, model_1.pretty)(jsonModal.data)),
+            react_1.default.createElement("div", { className: "dialog-actions" },
+                react_1.default.createElement("button", { onClick: () => (0, model_1.downloadJSON)(jsonModal.data, 'production-details.json') }, "Export JSON"),
+                jsonModal.data?.operations && react_1.default.createElement("button", { className: "primary", onClick: () => { setBatchText((0, model_1.pretty)(jsonModal.data)); setJsonModal(null); setBatchOpen(true); } }, "Edit batch"),
+                react_1.default.createElement("button", { onClick: () => setJsonModal(null) }, "Close")))),
+        navigate && react_1.default.createElement(Primitives_1.Modal, { title: "Keep your production draft", onClose: () => setNavigate(null) },
+            react_1.default.createElement("p", null, storageError ? 'This browser could not retain the draft. Export it before leaving.' : 'The draft is retained in this browser. It has not been applied to the project.'),
+            react_1.default.createElement("div", { className: "dialog-actions" },
+                react_1.default.createElement("button", { onClick: () => setNavigate(null) }, "Stay here"),
+                draft && react_1.default.createElement("button", { onClick: () => (0, model_1.downloadJSON)(draft, 'production-draft.json') }, "Export draft"),
+                react_1.default.createElement("button", { disabled: !!storageError, onClick: () => { const commit = navigate; setNavigate(null); commit(); } }, "Leave with draft retained"))));
+}
+
+},
+"production/Stage":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.rotate = rotate;
+exports.corners = corners;
+exports.cameraProjection = cameraProjection;
+exports.Stage = Stage;
+const react_1 = __importStar(require("../react"));
+const model_1 = require("./model");
+const vector = (p) => [p.x, p.y, p.z];
+const add = (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
+function rotate(p, pose) { const a = pose.yaw_deg * Math.PI / 180, b = pose.pitch_deg * Math.PI / 180, c = pose.roll_deg * Math.PI / 180; const [x, y, z] = p; const q = [Math.cos(c) * x + Math.sin(c) * z, y, -Math.sin(c) * x + Math.cos(c) * z]; const r = [q[0], Math.cos(b) * q[1] - Math.sin(b) * q[2], Math.sin(b) * q[1] + Math.cos(b) * q[2]]; return [Math.cos(a) * r[0] - Math.sin(a) * r[1], Math.sin(a) * r[0] + Math.cos(a) * r[1], r[2]]; }
+function corners(pose, size, feet = false) { return [-1, 1].flatMap(z => [-1, 1].flatMap(y => [-1, 1].map(x => add(vector(pose.position), rotate([x * size.x / 2, y * size.y / 2, (feet ? (z + 1) / 2 : z / 2) * size.z], pose))))); }
+function cameraProjection(camera, p) { const v = [p[0] - camera.pose.position.x, p[1] - camera.pose.position.y, p[2] - camera.pose.position.z]; const basis = camera.basis; const q = [0, 1, 2].map(i => basis[0][i] * v[0] + basis[1][i] * v[1] + basis[2][i] * v[2]); if (q[1] <= .01)
+    return null; const x = .5 + q[0] / q[1] / (2 * Math.tan(camera.horizontal_fov_deg * Math.PI / 360)), y = .5 - q[2] / q[1] / (2 * Math.tan(camera.vertical_fov_deg * Math.PI / 360)); return [x, y, q[1]]; }
+const edges = [[0, 1], [0, 2], [1, 3], [2, 3], [4, 5], [4, 6], [5, 7], [6, 7], [0, 4], [1, 5], [2, 6], [3, 7]];
+function Stage(props) {
+    const [view, setView] = (0, react_1.useState)('orbit'), [azimuth, setAzimuth] = (0, react_1.useState)(-35), [zoom, setZoom] = (0, react_1.useState)(1), [cameraId, setCameraId] = (0, react_1.useState)(''), [layers, setLayers] = (0, react_1.useState)({ geometry: true, actors: true, cameras: true, lights: true, paths: true, labels: true });
+    const [drag, setDrag] = (0, react_1.useState)(null), svg = (0, react_1.useRef)(null), gesture = (0, react_1.useRef)(null);
+    const sample = props.sample;
+    const cameras = sample?.cameras || [];
+    const camera = cameras.find(c => c.id === cameraId) || cameras[0];
+    const az = azimuth * Math.PI / 180;
+    const aspect = camera?.aspect_ratio ? camera.aspect_ratio.width / camera.aspect_ratio.height : 16 / 9;
+    const gateW = Math.min(920, 518 * aspect), gateH = gateW / aspect, gateX = (1000 - gateW) / 2, gateY = (560 - gateH) / 2;
+    const project = (p) => view === 'top' ? [p[0], -p[1]] : view === 'front' ? [p[0], -p[2]] : view === 'side' ? [p[1], -p[2]] : [p[0] * Math.cos(az) - p[1] * Math.sin(az), -(p[0] * Math.sin(az) + p[1] * Math.cos(az)) * .45 - p[2] * .9];
+    const allPoints = [];
+    for (const g of sample?.location.geometry || [])
+        allPoints.push(...corners(g.pose, g.size));
+    for (const i of sample?.instances || [])
+        allPoints.push(vector(i.pose.position));
+    for (const c of cameras)
+        allPoints.push(vector(c.pose.position));
+    const flat = allPoints.length ? allPoints.map(project) : [[-4, -3], [4, 3]];
+    const minX = Math.min(...flat.map(p => p[0])) - 1, maxX = Math.max(...flat.map(p => p[0])) + 1, minY = Math.min(...flat.map(p => p[1])) - 1, maxY = Math.max(...flat.map(p => p[1])) + 1;
+    const scale = Math.min(900 / Math.max(2, maxX - minX), 480 / Math.max(2, maxY - minY)) * zoom;
+    const screen = (p) => { const [x, y] = project(p); return [500 + (x - (minX + maxX) / 2) * scale, 280 + (y - (minY + maxY) / 2) * scale]; };
+    function xy(e) { if (!svg.current)
+        return [0, 0]; const pt = svg.current.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; const m = svg.current.getScreenCTM(); if (!m)
+        return [0, 0]; const t = pt.matrixTransform(m.inverse()); return [t.x, t.y]; }
+    function down(e, id) { if (e.button !== 0)
+        return; if (id) {
+        e.stopPropagation();
+        props.onSelect(id);
+        if (view !== 'top')
+            return;
+        const item = sample?.instances.find(i => i.id === id);
+        if (!item || item.parent_id)
+            return;
+        gesture.current = { id, start: xy(e), origin: { ...item.pose.position } };
+        setDrag({ id, x: item.pose.position.x, y: item.pose.position.y });
+    }
+    else if (view === 'orbit') {
+        gesture.current = { orbit: true, start: xy(e), az: azimuth };
+    }
+    else
+        return; e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault(); }
+    function moving(e) { const g = gesture.current; if (!g)
+        return; const pos = xy(e); if (g.orbit) {
+        setAzimuth(g.az + (pos[0] - g.start[0]) * .3);
+        return;
+    } const next = { id: g.id, x: g.origin.x + (pos[0] - g.start[0]) / scale, y: g.origin.y - (pos[1] - g.start[1]) / scale }; g.last = next; setDrag(next); }
+    function finish(cancel = false) { const g = gesture.current; gesture.current = null; const last = g?.last || drag; if (g && !g.orbit && !cancel && last)
+        props.onMove(g.id, Math.round(last.x * 100) / 100, Math.round(last.y * 100) / 100); if (cancel && g?.orbit)
+        setAzimuth(g.az); setDrag(null); }
+    function line(a, b, cls, key) { const [x1, y1] = screen(a), [x2, y2] = screen(b); return react_1.default.createElement("line", { key: key, x1: x1, y1: y1, x2: x2, y2: y2, className: cls }); }
+    function outline(points, cls) { return react_1.default.createElement("g", { className: cls }, edges.map(([a, b], n) => line(points[a], points[b], cls, String(n)))); }
+    function title(p, text) { const [x, y] = screen(p); return layers.labels ? react_1.default.createElement("text", { x: x + 12, y: y - 10, className: "pd-object-label", pointerEvents: "none" }, text) : null; }
+    const grid = []; // React runtime bridge deliberately accepts SVG children.
+    for (let n = -12; n <= 12; n += 1) {
+        grid.push(line([n, -12, 0], [n, 12, 0], n === 0 ? 'pd-grid-axis' : 'pd-grid', `x${n}`));
+        grid.push(line([-12, n, 0], [12, n, 0], n === 0 ? 'pd-grid-axis' : 'pd-grid', `y${n}`));
+    }
+    return react_1.default.createElement("div", { className: 'pd-stage ' + (props.compact ? 'pd-stage-compact' : '') },
+        react_1.default.createElement("div", { className: "pd-stage-tools" },
+            react_1.default.createElement("div", { className: "pd-segmented", "aria-label": "Spatial view" }, ['orbit', 'top', 'front', 'side', 'camera'].map(v => react_1.default.createElement("button", { key: v, "aria-pressed": view === v, onClick: () => { finish(true); setView(v); } }, v === 'orbit' ? '3D proxy' : (0, model_1.label)(v)))),
+            react_1.default.createElement("div", { className: "pd-stage-settings" },
+                view === 'camera' ? react_1.default.createElement("select", { "aria-label": "Preview camera", value: camera?.id || '', onChange: (e) => setCameraId(e.target.value) }, cameras.map(c => react_1.default.createElement("option", { key: c.id, value: c.id }, c.title))) : react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("button", { "aria-label": "Zoom out", onClick: () => setZoom(z => Math.max(.25, z / 1.25)) }, "\u2212"),
+                    react_1.default.createElement("button", { onClick: () => { setZoom(1); setAzimuth(-35); } }, "Fit"),
+                    react_1.default.createElement("button", { "aria-label": "Zoom in", onClick: () => setZoom(z => Math.min(4, z * 1.25)) }, "+")),
+                react_1.default.createElement("details", { className: "pd-layers" },
+                    react_1.default.createElement("summary", null, "Layers"),
+                    Object.keys(layers).map(k => react_1.default.createElement("label", { key: k },
+                        react_1.default.createElement("input", { type: "checkbox", checked: layers[k], onChange: (e) => setLayers(v => ({ ...v, [k]: e.target.checked })) }),
+                        (0, model_1.label)(k)))))),
+        react_1.default.createElement("div", { className: "pd-stage-status", "aria-live": "polite" }, props.error ? react_1.default.createElement("span", { className: "pd-danger" }, props.error) : props.loading ? 'Evaluating exact revision…' : sample ? react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("span", { className: "pd-live-dot" }),
+            "v",
+            sample.source.version,
+            " \u00B7 frame ",
+            sample.action_frame,
+            " \u00B7 ",
+            sample.seconds.toFixed(2),
+            " s",
+            props.draftPose && react_1.default.createElement("strong", null, " \u00B7 local position preview")) : 'Select a shot, action, setup or location.'),
+        view === 'camera' ? (camera ? react_1.default.createElement("svg", { className: "pd-viewport", viewBox: "0 0 1000 560", role: "img", "aria-label": `Pinhole framing preview: ${camera.title}` },
+            react_1.default.createElement("defs", null,
+                react_1.default.createElement("clipPath", { id: props.compact ? 'pd-camera-clip-alt' : 'pd-camera-clip' },
+                    react_1.default.createElement("rect", { x: gateX, y: gateY, width: gateW, height: gateH }))),
+            react_1.default.createElement("rect", { width: "1000", height: "560", fill: "#22332d" }),
+            react_1.default.createElement("g", { clipPath: `url(#${props.compact ? 'pd-camera-clip-alt' : 'pd-camera-clip'})` },
+                react_1.default.createElement("rect", { x: gateX, y: gateY, width: gateW, height: gateH, fill: "#e7ede3" }),
+                [...(sample?.location.geometry || []).filter((g) => layers.geometry).map((g) => ({ ...g, dimensions: g.size, category: g.type })), ...(sample?.instances || []).filter((i) => i.present && layers.actors)].map((item) => { const pts = corners(item.pose, item.dimensions, ['character', 'performer'].includes(item.category)).map(p => cameraProjection(camera, p)); return react_1.default.createElement("g", { key: item.id }, edges.map(([a, b], i) => pts[a] && pts[b] ? react_1.default.createElement("line", { key: i, x1: gateX + pts[a][0] * gateW, y1: gateY + pts[a][1] * gateH, x2: gateX + pts[b][0] * gateW, y2: gateY + pts[b][1] * gateH, stroke: ['character', 'performer'].includes(item.category) ? '#375f50' : '#98aa99', strokeWidth: ['character', 'performer'].includes(item.category) ? 2.6 : 1.5 }) : null)); })),
+            [1 / 3, 2 / 3].map(n => react_1.default.createElement("g", { key: n, stroke: "#c3b77d", strokeOpacity: ".8", strokeDasharray: "6 5" },
+                react_1.default.createElement("line", { x1: gateX + n * gateW, x2: gateX + n * gateW, y1: gateY, y2: gateY + gateH }),
+                react_1.default.createElement("line", { x1: gateX, x2: gateX + gateW, y1: gateY + n * gateH, y2: gateY + n * gateH }))),
+            react_1.default.createElement("rect", { x: gateX + gateW * (1 - (camera.safe_area || .9)) / 2, y: gateY + gateH * (1 - (camera.safe_area || .9)) / 2, width: gateW * (camera.safe_area || .9), height: gateH * (camera.safe_area || .9), fill: "none", stroke: "#c3b77d", strokeDasharray: "3 5" }),
+            react_1.default.createElement("text", { x: "55", y: "45", fill: "#344f43", fontSize: "14" },
+                camera.title,
+                " \u00B7 HFOV ",
+                camera.horizontal_fov_deg?.toFixed(1),
+                "\u00B0")) : react_1.default.createElement("div", { className: "pd-stage-empty" },
+            react_1.default.createElement("strong", null, "No camera is pinned."),
+            react_1.default.createElement("p", null, "Add a camera setup to this shot, or inspect a camera record."))) : react_1.default.createElement("svg", { ref: svg, className: "pd-viewport", viewBox: "0 0 1000 560", role: "group", tabIndex: 0, "aria-label": `${view} view of the connected production plan`, onPointerDown: (e) => down(e), onPointerMove: moving, onPointerUp: () => finish(), onPointerCancel: () => finish(true), onLostPointerCapture: () => finish(true), onKeyDown: (e) => { if (e.key === 'Escape') {
+                finish(true);
+                e.preventDefault();
+            } if (view === 'top' && props.selectedObject && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                const i = sample?.instances.find(i => i.id === props.selectedObject);
+                if (i && !i.parent_id) {
+                    e.preventDefault();
+                    const n = e.shiftKey ? .5 : .1;
+                    props.onMove(i.id, i.pose.position.x + (e.key === 'ArrowRight' ? n : e.key === 'ArrowLeft' ? -n : 0), i.pose.position.y + (e.key === 'ArrowUp' ? n : e.key === 'ArrowDown' ? -n : 0));
+                }
+            } } },
+            react_1.default.createElement("rect", { width: "1000", height: "560", fill: "#f1f4ec" }),
+            grid,
+            layers.geometry && (sample?.location.geometry || []).filter((g) => g.type !== 'room').map((g) => { const points = corners(g.pose, g.size); const base = [0, 1, 3, 2].map(i => screen(points[i]).join(',')).join(' '); return react_1.default.createElement("g", { key: g.id },
+                react_1.default.createElement("polygon", { points: base, className: g.type === 'floor' ? 'pd-floor' : 'pd-solid' }),
+                g.type !== 'floor' && outline(points, 'pd-box'),
+                g.type !== 'floor' && g.type !== 'wall' && title(vector(g.pose.position), g.label)); }),
+            layers.paths && (sample?.paths || []).filter(p => !p.parent_id).map(p => react_1.default.createElement("g", { key: p.id }, p.keys.map((k, i) => i < p.keys.length - 1 ? line(vector(k.pose.position), vector(p.keys[i + 1].pose.position), 'pd-path', String(i)) : null))),
+            (sample?.location.marks || []).map((m) => { const [x, y] = screen(vector(m.position)); return react_1.default.createElement("g", { key: m.id },
+                react_1.default.createElement("path", { d: `M${x - 4},${y - 4}l8,8m-8,0l8,-8`, stroke: "#9a8250", strokeWidth: "2" }),
+                title(vector(m.position), m.label)); }),
+            layers.actors && (sample?.instances || []).filter(i => i.present).sort((a, b) => project(vector(a.pose.position))[1] - project(vector(b.pose.position))[1]).map(i => { let pose = props.draftPose && props.draftPose.id === i.id ? props.draftPose.pose : i.pose; if (drag && drag.id === i.id)
+                pose = { ...pose, position: { ...pose.position, x: drag.x, y: drag.y } }; const pos = vector(pose.position), [x, y] = screen(pos), chosen = i.id === props.selectedObject; const actor = ['character', 'performer'].includes(i.category); const pts = corners(pose, i.dimensions, actor); const [tx, ty] = screen(add(pos, [0, 0, actor ? i.dimensions.z : 0])); return react_1.default.createElement("g", { key: i.id, className: 'pd-proxy ' + (chosen ? 'is-selected' : ''), tabIndex: 0, role: "button", "aria-label": `${i.label}, ${i.category}, x ${pose.position.x.toFixed(2)} y ${pose.position.y.toFixed(2)}`, onPointerDown: (e) => down(e, i.id), onClick: (e) => { e.stopPropagation(); props.onSelect(i.id); }, onFocus: () => props.onSelect(i.id) },
+                react_1.default.createElement("title", null,
+                    i.label,
+                    ": ",
+                    JSON.stringify(i.state),
+                    " \u00B7 ",
+                    i.dimension_assumption),
+                actor ? react_1.default.createElement(react_1.default.Fragment, null,
+                    react_1.default.createElement("line", { x1: x, y1: y - 7, x2: tx, y2: ty + 12, className: "pd-actor-body" }),
+                    react_1.default.createElement("circle", { cx: tx, cy: ty + 7, r: Math.max(5, Math.min(12, scale * .12)), className: "pd-actor-head" }),
+                    react_1.default.createElement("ellipse", { cx: x, cy: y, rx: Math.max(9, Math.min(22, scale * .25)), ry: view === 'top' ? Math.max(7, Math.min(18, scale * .2)) : 5, className: "pd-actor-foot" })) : outline(pts, 'pd-prop'),
+                line(pos, add(pos, rotate([0, .6, 0], pose)), 'pd-facing'),
+                chosen && react_1.default.createElement("circle", { cx: x, cy: y, r: "25", className: "pd-selection-ring" }),
+                i.eyeline_target && line(pos, vector(i.eyeline_target), 'pd-eyeline'),
+                title(add(pos, [0, 0, actor ? i.dimensions.z : 0]), i.label)); }),
+            layers.cameras && cameras.map(c => { const pos = vector(c.pose.position), [x, y] = screen(pos); return react_1.default.createElement("g", { key: c.id, role: "button", tabIndex: 0, "aria-label": `Open camera setup ${c.title}`, onClick: () => props.onOpen(c.id, c.version), onKeyDown: (e) => { if (e.key === 'Enter')
+                    props.onOpen(c.id, c.version); } },
+                c.frustum?.corners.map((p, i) => line(pos, vector(p), 'pd-frustum', String(i))),
+                react_1.default.createElement("rect", { x: x - 9, y: y - 6, width: "18", height: "12", rx: "3", className: "pd-camera-proxy" }),
+                title(pos, c.title)); }),
+            layers.lights && (sample?.fixtures || []).map(f => { const pos = vector(f.pose.position), [x, y] = screen(pos); return react_1.default.createElement("g", { key: f.id, role: "button", tabIndex: 0, "aria-label": `Open lighting setup for ${f.label}`, onClick: () => props.onOpen(f.setup.id, f.setup.version), onKeyDown: (e) => { if (e.key === 'Enter')
+                    props.onOpen(f.setup.id, f.setup.version); } },
+                line([pos[0], pos[1], 0], pos, 'pd-light-stand'),
+                react_1.default.createElement("circle", { cx: x, cy: y, r: "12", className: "pd-light-glow", opacity: f.enabled ? .25 + f.relative_intensity * .35 : .1 }),
+                react_1.default.createElement("circle", { cx: x, cy: y, r: "5", className: "pd-light-source" }),
+                title(pos, `${f.label}${f.enabled ? '' : ' · OFF'}`)); }),
+            react_1.default.createElement("text", { x: "22", y: "535", className: "pd-scale-label" },
+                view === 'top' ? '+X →  +Y ↑' : view === 'front' ? '+X →  +Z ↑' : view === 'side' ? '+Y →  +Z ↑' : 'Drag background to orbit',
+                " \u00B7 1 m grid")),
+        react_1.default.createElement("div", { className: "pd-stage-caption" },
+            react_1.default.createElement("span", null, view === 'camera' ? 'Rectilinear pinhole · no lens distortion, depth-of-field or occlusion' : view === 'top' ? 'Drag unparented actor / prop proxies or use arrow keys. Changes stay in an explicit action draft.' : 'World-space proxies · not a measured scout or photometric simulation'),
+            react_1.default.createElement("span", null, "Right-handed \u00B7 Z up")));
+}
+
+},
+"production/model":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.uid = exports.label = exports.refKey = exports.pin = exports.pretty = exports.VIEWS = exports.KINDS = void 0;
+exports.indexVersions = indexVersions;
+exports.getDraft = getDraft;
+exports.storeDraft = storeDraft;
+exports.clearDraft = clearDraft;
+exports.newDraft = newDraft;
+exports.isDirty = isDirty;
+exports.mergeDraft = mergeDraft;
+exports.makeBatch = makeBatch;
+exports.downloadJSON = downloadJSON;
+exports.starter = starter;
+exports.KINDS = ['production', 'sequence', 'script', 'location', 'asset', 'scene', 'action', 'camera_setup', 'lighting_setup', 'shot', 'panel', 'animatic', 'edit', 'take', 'review', 'annotation', 'exception'];
+exports.VIEWS = ['Spatial', 'Script', 'Coverage', 'Records', 'Panels', 'Review'];
+const pretty = (value) => JSON.stringify(value, null, 2);
+exports.pretty = pretty;
+const pin = (r) => ({ id: r.id, version: r.version });
+exports.pin = pin;
+const refKey = (ref) => `${ref.id}@${ref.version}`;
+exports.refKey = refKey;
+const label = (value) => value.replace(/_/g, ' ');
+exports.label = label;
+const uid = () => crypto.randomUUID();
+exports.uid = uid;
+function indexVersions(snapshot) {
+    const map = new Map();
+    for (const r of [...snapshot.pinned_versions, ...snapshot.records])
+        map.set((0, exports.refKey)((0, exports.pin)(r)), r);
+    return map;
+}
+function getDraft(project, id) {
+    try {
+        const raw = localStorage.getItem(`storyboarder.production.draft:${project}:${id}`);
+        if (!raw)
+            return { draft: null, error: '' };
+        if (raw.length > 2_000_000)
+            return { draft: null, error: 'Stored draft exceeds 2 MB. It was left in browser storage, not deleted.' };
+        const d = JSON.parse(raw);
+        if (d.format !== 'production-draft/v1' || d.project !== project || d.id !== id || typeof d.raw !== 'string' || !d.base || !Number.isSafeInteger(d.base_revision) || !Number.isSafeInteger(d.base_version))
+            return { draft: null, error: 'A stored draft could not be validated. It was not deleted.' };
+        return { draft: d, error: '' };
+    }
+    catch {
+        return { draft: null, error: 'Local draft storage is unavailable. Export your draft JSON before navigating away.' };
+    }
+}
+function storeDraft(draft) {
+    try {
+        const raw = JSON.stringify(draft);
+        if (raw.length > 2_000_000)
+            return 'Draft exceeds the browser storage limit. Export JSON to preserve it.';
+        localStorage.setItem(`storyboarder.production.draft:${draft.project}:${draft.id}`, raw);
+        return '';
+    }
+    catch {
+        return 'Browser storage is full or unavailable. Your in-memory draft is NOT backed up. Export draft JSON.';
+    }
+}
+function clearDraft(project, id) { try {
+    localStorage.removeItem(`storyboarder.production.draft:${project}:${id}`);
+    return '';
+}
+catch {
+    return 'The saved draft could not be removed from browser storage.';
+} }
+function newDraft(project, r, checkpoint) { return { format: 'production-draft/v1', project, id: r.id, base_revision: r.revision, base_version: r.version, checkpoint, base: structuredClone(r.data), raw: (0, exports.pretty)(r.data), operation_id: (0, exports.uid)(), updated_at: new Date().toISOString() }; }
+function isDirty(draft) { if (!draft)
+    return false; try {
+    return JSON.stringify(JSON.parse(draft.raw)) !== JSON.stringify(draft.base);
+}
+catch {
+    return true;
+} }
+/** Object fields merge independently; arrays are atomic, never reordered or heuristically joined. */
+function mergeDraft(base, ours, theirs, path = '') {
+    const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+    if (same(ours, base))
+        return { value: theirs, conflicts: [] };
+    if (same(theirs, base) || same(ours, theirs))
+        return { value: ours, conflicts: [] };
+    const object = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+    if (object(base) && object(ours) && object(theirs)) {
+        const value = Object.create(null), conflicts = [];
+        for (const key of new Set([...Object.keys(base), ...Object.keys(ours), ...Object.keys(theirs)])) {
+            const result = mergeDraft(base[key], ours[key], theirs[key], `${path}/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`);
+            if (result.value !== undefined)
+                value[key] = result.value;
+            conflicts.push(...result.conflicts);
+        }
+        return { value, conflicts };
+    }
+    return { value: ours, conflicts: [path || '/'] };
+}
+function makeBatch(draft, select) { return { expected_checkpoint: draft.checkpoint, operation_id: draft.operation_id, operations: [{ op: 'put', id: draft.id, expected_revision: draft.base_revision, base_version: draft.base_version || null, select, data: JSON.parse(draft.raw) }] }; }
+function downloadJSON(value, name) { const url = URL.createObjectURL(new Blob([(0, exports.pretty)(value)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+function starter(kind, records) {
+    const first = (k) => { const r = records.find(x => x.kind === k && x.is_selected); return r ? (0, exports.pin)(r) : null; };
+    const defaults = records.find(r => r.kind === 'production' && r.is_selected)?.data;
+    const data = { kind, title: `New ${(0, exports.label)(kind)}`, provenance: { origin: 'human', rationale: '' } };
+    if (defaults && ['action', 'shot', 'animatic', 'edit', 'take'].includes(kind))
+        data.frame_rate = structuredClone(defaults.frame_rate);
+    if (defaults && kind === 'camera_setup')
+        data.aspect_ratio = structuredClone(defaults.aspect_ratio);
+    if (kind === 'asset')
+        data.category = 'prop';
+    if (['action', 'camera_setup', 'lighting_setup', 'shot'].includes(kind))
+        data.scene = first('scene');
+    if (['action', 'camera_setup', 'lighting_setup'].includes(kind))
+        data.location = first('location');
+    if (kind === 'action')
+        data.duration_frames = 240;
+    if (['panel', 'take'].includes(kind))
+        data.shot = first('shot');
+    if (kind === 'take')
+        data.slate = 'Unslated';
+    if (kind === 'review')
+        Object.assign(data, { subject: first('shot') || first('scene'), decision: 'changes_requested', dimension: 'creative', reviewer: '', reason: '' });
+    if (kind === 'annotation')
+        Object.assign(data, { subject: first('shot') || first('scene'), body: '', author: '' });
+    if (kind === 'exception')
+        Object.assign(data, { subject: first('shot'), check_code: '', reason: '', reviewer: '' });
+    return data;
+}
+
+},
+"react":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createRoot = exports.useRef = exports.useCallback = exports.useMemo = exports.useLayoutEffect = exports.useEffect = exports.useState = void 0;
+const React = window.React;
+exports.useState = React.useState;
+exports.useEffect = React.useEffect;
+exports.useLayoutEffect = React.useLayoutEffect;
+exports.useMemo = React.useMemo;
+exports.useCallback = React.useCallback;
+exports.useRef = React.useRef;
+exports.createRoot = window.ReactDOM.createRoot;
+exports.default = React;
+
+},
+"spatial/Form":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.label = void 0;
+exports.resolve = resolve;
+exports.defaultValue = defaultValue;
+exports.NumberInput = NumberInput;
+exports.SchemaForm = SchemaForm;
+const react_1 = __importStar(require("../react"));
+const draft_1 = require("./draft");
+const evaluate_1 = require("./evaluate");
+const label = (v) => v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+exports.label = label;
+function resolve(schema, root) { if (schema?.$ref)
+    return root.$defs?.[schema.$ref.split('/').pop()] || {}; return schema || {}; }
+function variants(schema, root) { return (schema.oneOf || schema.anyOf || []).map((x) => resolve(x, root)); }
+function fits(s, v) { if (s.type === 'null')
+    return v === null; if (s.const !== undefined)
+    return v === s.const; if (s.type === 'object')
+    return v && typeof v === 'object' && !Array.isArray(v) && Object.entries(s.properties || {}).every(([k, p]) => (p.const === undefined || v[k] === p.const) && (!p.enum || p.enum.includes(v[k]))); return s.type === 'string' ? typeof v === 'string' : s.type === 'number' || s.type === 'integer' ? typeof v === 'number' : s.type === 'boolean' ? typeof v === 'boolean' : s.type === 'array' ? Array.isArray(v) : true; }
+function defaultValue(schema, root, name = '') { const s = resolve(schema, root); if (name === 'id')
+    return (0, draft_1.uid)(); if (s.default !== undefined && s.default !== null)
+    return structuredClone(s.default); if (s.const !== undefined)
+    return s.const; if (s.enum)
+    return s.enum[0]; const vs = variants(s, root); if (vs.length)
+    return defaultValue(vs.find(x => x.type !== 'null') || vs[0], root, name); if (s.type === 'object') {
+    const result = {};
+    for (const k of s.required || [])
+        result[k] = defaultValue(s.properties[k], root, k);
+    return result;
+} if (s.type === 'array')
+    return s.prefixItems ? s.prefixItems.map((x) => defaultValue(x, root)) : Array.from({ length: s.minItems || 0 }, () => defaultValue(s.items, root)); if (s.type === 'boolean')
+    return false; if (s.type === 'number' || s.type === 'integer')
+    return s.minimum ?? (s.exclusiveMinimum !== undefined ? s.exclusiveMinimum + 1 : 0); if (s.type === 'null')
+    return null; return ''; }
+function NumberInput({ value, onChange, name, integer = false, time = false }) { const [text, setText] = (0, react_1.useState)(String(time ? value / 1e6 : value)), [error, setError] = (0, react_1.useState)(''); (0, react_1.useEffect)(() => { setText(String(time ? value / 1e6 : value)); setError(''); }, [value, time]); function commit() { try {
+    const n = time ? (0, evaluate_1.secondsToUs)(text) : Number(text);
+    if (!text.trim() || !Number.isFinite(n) || integer && !Number.isSafeInteger(n))
+        throw Error(integer ? 'Enter a whole number.' : 'Enter a finite number.');
+    onChange(n);
+    setError('');
+}
+catch (e) {
+    setError(e.message);
+} } return react_1.default.createElement("span", { className: "sp-number" },
+    react_1.default.createElement("input", { "aria-label": name, "aria-invalid": !!error, inputMode: integer ? 'numeric' : 'decimal', value: text, onChange: (e) => setText(e.target.value), onBlur: commit, onKeyDown: (e) => { if (e.key === 'Enter') {
+            e.preventDefault();
+            commit();
+        } if (e.key === 'Escape') {
+            setText(String(time ? value / 1e6 : value));
+            setError('');
+        } } }),
+    error && react_1.default.createElement("small", { role: "alert" }, error)); }
+/** Closed-schema form: every persisted field has a keyboard/numeric equivalent. */
+function SchemaForm({ schema, root, value, onChange, name = '', path = '', choices, depth = 0, hide = [] }) {
+    const s = resolve(schema, root), vs = variants(s, root), title = (0, exports.label)(name);
+    if (depth > 16)
+        return react_1.default.createElement("p", { role: "alert" }, "This form exceeds the supported nesting depth.");
+    const child = (sub, v, change, n, p) => react_1.default.createElement(SchemaForm, { schema: sub, root: root, value: v, onChange: change, name: n, path: p, choices: choices, depth: depth + 1 });
+    if (vs.length) {
+        let index = vs.findIndex(v => fits(v, value));
+        if (index < 0)
+            index = 0;
+        const selected = vs[index], nullable = vs.some(v => v.type === 'null');
+        return react_1.default.createElement("div", { className: "sp-union" },
+            react_1.default.createElement("label", null,
+                title,
+                nullable ? ' (optional)' : '',
+                react_1.default.createElement("select", { "aria-label": title + ' type', value: index, onChange: (e) => onChange(vs[Number(e.target.value)].type === 'null' ? null : defaultValue(vs[Number(e.target.value)], root, name)) }, vs.map((v, i) => react_1.default.createElement("option", { key: i, value: i }, v.type === 'null' ? 'None' : v.properties?.kind?.const || v.properties?.mode?.const || v.properties?.property?.const || v.title || v.type || 'Value')))),
+            selected.type !== 'null' && child(selected, value, onChange, name, path));
+    }
+    if (s.const !== undefined)
+        return react_1.default.createElement("div", { className: "sp-constant" },
+            react_1.default.createElement("span", null, title),
+            react_1.default.createElement("code", null, String(s.const)));
+    if (s.type === 'object' || s.properties) {
+        const object = value || {}, required = new Set(s.required || []);
+        return react_1.default.createElement("div", { className: "sp-fields" }, Object.entries(s.properties || {}).filter(([k]) => !hide.includes(k)).map(([k, sub]) => { const present = Object.prototype.hasOwnProperty.call(object, k), optional = !required.has(k); if (k === 'id')
+            return react_1.default.createElement("label", { key: k },
+                "Identity",
+                react_1.default.createElement("code", { className: "sp-id" }, object[k])); return react_1.default.createElement("div", { className: "sp-field", key: k },
+            optional && react_1.default.createElement("div", { className: "sp-optional" },
+                react_1.default.createElement("span", null, (0, exports.label)(k)),
+                present ? react_1.default.createElement("button", { type: "button", onClick: () => { const n = { ...object }; delete n[k]; onChange(n); } }, "Remove optional field") : react_1.default.createElement("button", { type: "button", onClick: () => onChange({ ...object, [k]: defaultValue(sub, root, k) }) },
+                    "Add ",
+                    (0, exports.label)(k))),
+            present || !optional ? child(sub, object[k] ?? defaultValue(sub, root, k), (x) => onChange({ ...object, [k]: x }), k, path + '/' + k) : null); }));
+    }
+    if (s.type === 'array') {
+        const values = Array.isArray(value) ? value : [];
+        if (s.prefixItems)
+            return react_1.default.createElement("fieldset", null,
+                react_1.default.createElement("legend", null, title),
+                react_1.default.createElement("div", { className: "sp-tuple" }, s.prefixItems.map((sub, i) => react_1.default.createElement("div", { key: i }, child(sub, values[i] ?? 0, x => onChange(values.map((v, j) => j === i ? x : v)), String(i), path + '/' + i)))));
+        return react_1.default.createElement("fieldset", { className: "sp-array" },
+            react_1.default.createElement("legend", null,
+                title,
+                " \u00B7 ",
+                values.length),
+            values.map((v, i) => react_1.default.createElement("details", { key: v?.id || i, open: values.length <= 3 },
+                react_1.default.createElement("summary", null,
+                    v?.label || v?.property || v?.kind || typeof v === 'string' && v.slice(0, 45) || 'Entry',
+                    " ",
+                    i + 1),
+                child(s.items, v, (x) => onChange(values.map((item, j) => j === i ? x : item)), name === 'keys' ? 'key' : name, path + '/' + i),
+                react_1.default.createElement("button", { type: "button", onClick: () => onChange(values.filter((_, j) => j !== i)) },
+                    "Remove entry ",
+                    i + 1))),
+            react_1.default.createElement("button", { type: "button", disabled: s.maxItems !== undefined && values.length >= s.maxItems, onClick: () => onChange([...values, defaultValue(s.items, root, name === 'keys' ? 'key' : '')]) },
+                "Add ",
+                title.replace(/s$/, '')));
+    }
+    if (s.enum)
+        return react_1.default.createElement("label", null,
+            title,
+            react_1.default.createElement("select", { "aria-label": title, value: value ?? s.enum[0], onChange: (e) => onChange(e.target.value) }, s.enum.map((v) => react_1.default.createElement("option", { key: v, value: v }, (0, exports.label)(v)))));
+    if (s.type === 'boolean')
+        return react_1.default.createElement("label", { className: "sp-check" },
+            react_1.default.createElement("input", { type: "checkbox", checked: !!value, onChange: (e) => onChange(e.target.checked) }),
+            title);
+    if (s.type === 'number' || s.type === 'integer')
+        return react_1.default.createElement("label", null,
+            title,
+            name.endsWith('_us') ? ' (seconds)' : '',
+            react_1.default.createElement(NumberInput, { name: title, value: Number(value) || 0, onChange: onChange, integer: s.type === 'integer', time: name.endsWith('_us') }));
+    const options = choices?.(name, path);
+    if (options)
+        return react_1.default.createElement("label", null,
+            title,
+            react_1.default.createElement("select", { value: value || '', "aria-label": title, onChange: (e) => onChange(e.target.value) },
+                react_1.default.createElement("option", { value: "" }, "Choose\u2026"),
+                value && !options.some(x => x.id === value) && react_1.default.createElement("option", { value: value },
+                    value,
+                    " (not currently available)"),
+                options.map(o => react_1.default.createElement("option", { key: o.id, value: o.id }, o.label))));
+    if (name.endsWith('_sha256'))
+        return react_1.default.createElement("label", null,
+            title,
+            react_1.default.createElement("input", { "aria-label": title, value: value || '', onChange: (e) => onChange(e.target.value), maxLength: 64 }));
+    const multiline = ['notes', 'note', 'statement', 'reason', 'source_note', 'assumptions'].includes(name);
+    return react_1.default.createElement("label", null,
+        title,
+        multiline ? react_1.default.createElement("textarea", { "aria-label": title, rows: 3, maxLength: s.maxLength || 4000, value: value || '', onChange: (e) => onChange(e.target.value) }) : react_1.default.createElement("input", { "aria-label": title, maxLength: s.maxLength || 240, value: value || '', onChange: (e) => onChange(e.target.value) }));
+}
+
+},
+"spatial/SpatialEditor":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SpatialEditor = SpatialEditor;
+const react_1 = __importStar(require("../react"));
+const api_1 = require("../api");
+const Form_1 = require("./Form");
+const draft_1 = require("./draft");
+const defaults_1 = require("./defaults");
+const evaluate_1 = require("./evaluate");
+const SpatialPlan_1 = require("./SpatialPlan");
+const styles_1 = require("./styles");
+function Dialog({ title, children, onClose }) { const ref = (0, react_1.useRef)(null); (0, react_1.useEffect)(() => { const previous = document.activeElement; ref.current?.querySelector('button,input,select,[tabindex="0"]')?.focus(); const handler = (e) => { if (e.key === 'Escape') {
+    e.preventDefault();
+    e.stopPropagation();
+    onClose();
+} if (e.key === 'Tab') {
+    const items = Array.from(ref.current?.querySelectorAll('button:not(:disabled),input,textarea,select,a[href],[tabindex="0"]') || []).filter(i => i.getClientRects().length);
+    if (!items.length) {
+        e.preventDefault();
+        return;
+    }
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) {
+        last.focus();
+        e.preventDefault();
+    }
+    else if (!e.shiftKey && document.activeElement === last) {
+        first.focus();
+        e.preventDefault();
+    }
+} }; document.addEventListener('keydown', handler, true); return () => { document.removeEventListener('keydown', handler, true); if (previous?.isConnected)
+    previous.focus(); }; }, []); return react_1.default.createElement("div", { className: "sp-modal-backdrop" },
+    react_1.default.createElement("div", { className: "sp-modal", ref: ref, role: "dialog", "aria-modal": "true", "aria-label": title },
+        react_1.default.createElement("h2", null, title),
+        children)); }
+function Difference({ value }) { const changes = value?.diff?.changes || value?.changes || []; return react_1.default.createElement(react_1.default.Fragment, null,
+    value?.physical_changed !== undefined && react_1.default.createElement("p", null, value.physical_changed ? 'Physical or timing basis changes.' : 'Physical basis unchanged.'),
+    changes.length > 0 && react_1.default.createElement("table", null,
+        react_1.default.createElement("thead", null,
+            react_1.default.createElement("tr", null,
+                react_1.default.createElement("th", null, "Field"),
+                react_1.default.createElement("th", null, "Before"),
+                react_1.default.createElement("th", null, "Proposed"))),
+        react_1.default.createElement("tbody", null, changes.slice(0, 80).map((v, i) => react_1.default.createElement("tr", { key: i },
+            react_1.default.createElement("td", null, v.path),
+            react_1.default.createElement("td", null,
+                react_1.default.createElement("div", { className: "sp-preview-value" }, JSON.stringify(v.before))),
+            react_1.default.createElement("td", null,
+                react_1.default.createElement("div", { className: "sp-preview-value" }, JSON.stringify(v.after))))))),
+    (changes.length > 80 || value?.diff?.truncated) && react_1.default.createElement("p", null, "Comparison truncated; review the exact historical version for the full payload."),
+    value?.impact && react_1.default.createElement("p", null,
+        value.impact.total,
+        " current/historical bindings use this setup. Saving never repins them."),
+    value?.warnings?.map((v, i) => react_1.default.createElement("p", { key: i }, v.message)),
+    value?.conflicts?.length > 0 && react_1.default.createElement("div", { role: "alert", className: "sp-message sp-error" }, value.conflicts.map((c) => c.code + ': ' + (c.message || c.id || c.shot_id || '')).join('\n')),
+    value?.actions?.length > 0 && react_1.default.createElement("p", null,
+        value.actions.length,
+        " reviewed import actions.")); }
+function SpatialEditor(props) {
+    const project = props.state.project.id, entities = props.state.entities, scenes = entities.filter(e => e.kind === 'scene' && !e.archived), shots = entities.filter(e => e.kind === 'shot' && !e.archived), assets = entities.filter(e => e.kind === 'asset' && !e.archived);
+    const selectedShot = shots.find(s => s.id === props.selected), initialScene = selectedShot?.parent_id || scenes[0]?.id || '';
+    const [schemas, setSchemas] = (0, react_1.useState)(null), [sceneId, setSceneId] = (0, react_1.useState)(initialScene), [setups, setSetups] = (0, react_1.useState)([]), [moreSetups, setMoreSetups] = (0, react_1.useState)(null), [setupId, setSetupId] = (0, react_1.useState)(''), [saved, setSaved] = (0, react_1.useState)(null), [payload, setPayload] = (0, react_1.useState)(null), [binding, setBinding] = (0, react_1.useState)(null), [bindingDraft, setBindingDraft] = (0, react_1.useState)(null);
+    const [objectId, setObjectId] = (0, react_1.useState)(''), [time, setTime] = (0, react_1.useState)(0), [plane, setPlane] = (0, react_1.useState)(0), [bounds, setBounds] = (0, react_1.useState)({ ...evaluate_1.DEFAULT_BOUNDS }), [playing, setPlaying] = (0, react_1.useState)(false), [speed, setSpeed] = (0, react_1.useState)(1), [autoKey, setAutoKey] = (0, react_1.useState)(false), [editMode, setEditMode] = (0, react_1.useState)('choose'), [displayUnit, setDisplayUnit] = (0, react_1.useState)('m');
+    const [busy, setBusy] = (0, react_1.useState)(false), [message, setMessage] = (0, react_1.useState)(''), [error, setError] = (0, react_1.useState)(''), [storageWarning, setStorageWarning] = (0, react_1.useState)(''), [tab, setTab] = (0, react_1.useState)('timing'), [history, setHistory] = (0, react_1.useState)([]), [moreHistory, setMoreHistory] = (0, react_1.useState)(null), [back, setBack] = (0, react_1.useState)([]), [forward, setForward] = (0, react_1.useState)([]);
+    const [review, setReview] = (0, react_1.useState)(null), [conflict, setConflict] = (0, react_1.useState)(null), [navigation, setNavigation] = (0, react_1.useState)(null), [recoveries, setRecoveries] = (0, react_1.useState)([]), [recoverPrompt, setRecoverPrompt] = (0, react_1.useState)(null), [exports, setExports] = (0, react_1.useState)(null), [spatialReview, setSpatialReview] = (0, react_1.useState)(null), [reviewBody, setReviewBody] = (0, react_1.useState)(null), [reviewNumber, setReviewNumber] = (0, react_1.useState)(0);
+    const [property, setProperty] = (0, react_1.useState)('position'), [trackId, setTrackId] = (0, react_1.useState)(''), [chair, setChair] = (0, react_1.useState)(''), [floorMedia, setFloorMedia] = (0, react_1.useState)(''), [exportTimes, setExportTimes] = (0, react_1.useState)('0, 5'), [format, setFormat] = (0, react_1.useState)('all'), [importInput, setImportInput] = (0, react_1.useState)(null), [importMode, setImportMode] = (0, react_1.useState)('exact'), [importPreview, setImportPreview] = (0, react_1.useState)(null), [mappingRows, setMappingRows] = (0, react_1.useState)([]), [copyTitle, setCopyTitle] = (0, react_1.useState)('Imported setup'), [newCopyId, setNewCopyId] = (0, react_1.useState)((0, draft_1.uid)());
+    const [documents, setDocuments] = (0, react_1.useState)([]), [nodes, setNodes] = (0, react_1.useState)([]), [docId, setDocId] = (0, react_1.useState)(''), [nodeOffset, setNodeOffset] = (0, react_1.useState)(null), [nodeId, setNodeId] = (0, react_1.useState)('');
+    const current = (0, react_1.useRef)({});
+    const gesture = (0, react_1.useRef)(null), operation = (0, react_1.useRef)((0, draft_1.uid)()), loadEpoch = (0, react_1.useRef)(0), queued = (0, react_1.useRef)(null);
+    const dirty = !!payload && !(0, draft_1.same)(payload, saved?.version?.payload_json || null);
+    current.current = { payload, saved, setupId, dirty, busy, review, conflict, navigation, objectId, time, autoKey, editMode, sceneId };
+    const call = (0, react_1.useCallback)((name, p = {}) => (0, api_1.runCommand)(project, name, p), [project]);
+    const makeDraft = () => ({ schema: 'storyboarder.spatial-draft/v1', project_id: project, setup_id: current.current.setupId, base_version_id: current.current.saved?.version.id || null, base: current.current.saved?.version.payload_json || null, payload: current.current.payload, revision: current.current.saved?.header.revision || 0, operation_id: operation.current, updated_at: new Date().toISOString() });
+    function draftList() { try {
+        setRecoveries((0, draft_1.localDrafts)(project));
+    }
+    catch (e) {
+        setStorageWarning('Browser storage is unavailable. Export your draft before leaving.');
+    } }
+    (0, react_1.useEffect)(() => { let alive = true; call('spatial.schema').then(v => { if (alive)
+        setSchemas(v); }).catch(e => { if (alive)
+        setError(e.message); }); draftList(); return () => { alive = false; loadEpoch.current++; }; }, [project]);
+    (0, react_1.useEffect)(() => { if (!sceneId)
+        return; let alive = true; call('spatial.list', { scene_id: sceneId, include_archived: true, limit: 100 }).then(v => { if (alive) {
+        setSetups(v.items);
+        setMoreSetups(v.next_offset);
+    } }).catch(e => { if (alive)
+        setError(e.message); }); return () => { alive = false; }; }, [sceneId, project]);
+    function edit(next, record = true) { if (current.current.busy)
+        return; if (record && current.current.payload) {
+        setBack(v => (0, draft_1.boundedHistory)(v, (0, draft_1.copy)(current.current.payload)));
+        setForward([]);
+    } setPayload(next); current.current.payload = next; setError(''); operation.current = (0, draft_1.uid)(); }
+    function mutate(fn) { if (!current.current.payload)
+        return; const next = (0, draft_1.copy)(current.current.payload); fn(next); edit(next); }
+    function requireClean(commit) { if (current.current.dirty) {
+        queued.current = commit;
+        setNavigation(() => commit);
+        setPlaying(false);
+        return false;
+    } commit(); return true; }
+    (0, react_1.useEffect)(() => { if (!props.registerNavigationGuard)
+        return; return props.registerNavigationGuard((commit) => { if (!current.current.dirty)
+        return true; queued.current = commit; setNavigation(() => commit); setPlaying(false); return false; }); }, [props.registerNavigationGuard]);
+    (0, react_1.useEffect)(() => { const before = (e) => { if (current.current.dirty) {
+        try {
+            (0, draft_1.saveLocal)(makeDraft());
+        }
+        catch { }
+        e.preventDefault();
+        e.returnValue = '';
+    } }; window.addEventListener('beforeunload', before); return () => window.removeEventListener('beforeunload', before); }, [project]);
+    (0, react_1.useEffect)(() => { if (!dirty || !payload || !setupId)
+        return; const timer = setTimeout(() => { try {
+        (0, draft_1.saveLocal)(makeDraft());
+        setStorageWarning('');
+    }
+    catch (e) {
+        setStorageWarning(e.message);
+    } }, 300); return () => clearTimeout(timer); }, [payload, setupId, dirty, project]);
+    (0, react_1.useEffect)(() => { if (!playing || !payload)
+        return; const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; if (reduced) {
+        setPlaying(false);
+        setMessage('Reduced motion is enabled. Use the scrubber or step controls.');
+        return;
+    } let frame = 0, last = performance.now(); const tick = (now) => { const delta = now - last; last = now; setTime(v => { const next = Math.min(payload.action.duration_us, v + Math.round(delta * 1000 * speed)); if (next >= payload.action.duration_us)
+        setPlaying(false); return next; }); frame = requestAnimationFrame(tick); }; frame = requestAnimationFrame(tick); return () => cancelAnimationFrame(frame); }, [playing, speed, payload?.action.duration_us]);
+    const sample = (0, react_1.useMemo)(() => { if (!payload)
+        return null; try {
+        return (0, evaluate_1.evaluate)(payload, time, plane, bounds);
+    }
+    catch (e) {
+        return { error: e.message, items: [], camera_coverage: [], light_coverage: [], diagnostics: [] };
+    } }, [payload, time, plane, bounds]);
+    const picked = payload && (0, defaults_1.itemById)(payload, objectId);
+    const selectedTrack = payload?.tracks.find(t => t.id === trackId) || null;
+    const choose = (name, path) => { if (!payload)
+        return undefined; const local = (values) => values.map(i => ({ id: i.id, label: i.label || i.id })); if (name === 'scene_ids')
+        return local(scenes.map(s => ({ ...s, label: s.title }))); if (name === 'asset_id' || name === 'reference_asset_id' || name === 'location_asset_id')
+        return assets.filter(a => name !== 'location_asset_id' || a.fields.type === 'location').map(a => ({ id: a.id, label: a.title })); if (name === 'resource_id')
+        return local(payload.resources); if (name === 'item_id' || name === 'owner_id')
+        return local([...payload.instances, ...payload.cameras, ...payload.lights, ...payload.modifiers]); if (name === 'mark_id')
+        return local(payload.marks); if (name === 'modifier_ids')
+        return local(payload.modifiers); if (name === 'pin_id')
+        return payload.source_pins.map(p => ({ id: p.id, label: p.kind + ' ' + p.id.slice(0, 8) })); if (name === 'camera_plan_id')
+        return local(payload.cameras); if (name.endsWith('beat_id'))
+        return local(payload.beats); if (name === 'media_id')
+        return props.state.media.map(m => ({ id: m.id, label: m.original_name })); return undefined; };
+    async function refreshList() { const v = await call('spatial.list', { scene_id: current.current.sceneId, include_archived: true }); setSetups(v.items); setMoreSetups(v.next_offset); }
+    async function adopted(value) { const previous = current.current.payload && current.current.setupId ? makeDraft() : null; setSaved(value); setSetupId(value.header.id); setPayload((0, draft_1.copy)(value.version.payload_json)); setBack([]); setForward([]); setConflict(null); operation.current = (0, draft_1.uid)(); current.current = { ...current.current, payload: (0, draft_1.copy)(value.version.payload_json), saved: value, setupId: value.header.id, dirty: false }; if (previous)
+        try {
+            (0, draft_1.removeLocal)(previous);
+        }
+        catch { } draftList(); setMessage(`Saved setup version ${value.version.number}; existing shot pins are unchanged.`); try {
+        await props.refresh();
+        await refreshList();
+    }
+    catch (e) {
+        setMessage('The save succeeded. Project refresh failed: ' + e.message);
+    } }
+    async function openSetup(id, version_id) { const epoch = ++loadEpoch.current; setBusy(true); setError(''); setPlaying(false); try {
+        const v = await call('spatial.show', { setup_id: id, ...(version_id ? { version_id } : {}) });
+        if (epoch !== loadEpoch.current)
+            return;
+        setSaved(v);
+        setSetupId(v.header.id);
+        setPayload((0, draft_1.copy)(v.version.payload_json));
+        setBack([]);
+        setForward([]);
+        setTime(0);
+        setObjectId('');
+        setTrackId('');
+        setConflict(null);
+        setExports(null);
+        setBindingDraft(null);
+        operation.current = (0, draft_1.uid)();
+        current.current = { ...current.current, payload: (0, draft_1.copy)(v.version.payload_json), saved: v, setupId: v.header.id, dirty: false };
+        try {
+            const ds = (0, draft_1.localDrafts)(project).filter(d => d.setup_id === id);
+            if (ds.length)
+                setRecoverPrompt(ds[0]);
+        }
+        catch {
+            setStorageWarning('Browser storage is unavailable. Export your draft before leaving.');
+        }
+    }
+    catch (e) {
+        if (epoch === loadEpoch.current)
+            setError(e.message);
+    }
+    finally {
+        if (epoch === loadEpoch.current)
+            setBusy(false);
+    } }
+    async function selectShot(id) { requireClean(() => { props.select(id || null); const shot = shots.find(s => s.id === id); if (shot)
+        setSceneId(shot.parent_id || ''); setBinding(null); setBindingDraft(null); if (!id)
+        return; setBusy(true); call('spatial.binding-show', { shot_id: id }).then(v => { setBinding(v); setBindingDraft((0, draft_1.copy)(v.version.binding_json)); return openSetup(v.setup.header.id, v.setup.version.id); }).catch(e => { if (e.code !== 'not_found')
+        setError(e.message);
+    else
+        setMessage('This shot has no spatial binding. Choose a scene setup explicitly.'); }).finally(() => setBusy(false)); }); }
+    // Open the selected shot's exact pinned plan once, never silently follow a new head.
+    (0, react_1.useEffect)(() => { if (!selectedShot)
+        return; let alive = true; call('spatial.binding-show', { shot_id: selectedShot.id }).then(v => { if (!alive)
+        return; setBinding(v); setBindingDraft((0, draft_1.copy)(v.version.binding_json)); if (!current.current.payload)
+        void openSetup(v.setup.header.id, v.setup.version.id); }).catch(e => { if (alive && e.code !== 'not_found')
+        setError(e.message); }); return () => { alive = false; }; }, [selectedShot?.id, project]);
+    async function create(fixture = false) { if (!sceneId) {
+        setError('Add a scene in Story outline first.');
+        return;
+    } requireClean(() => { void (async () => { setBusy(true); try {
+        const p = fixture ? await call('spatial.fixture', { scene_id: sceneId, ...(chair ? { chair_asset_id: chair } : {}) }) : (0, defaults_1.blank)(sceneId);
+        setSetupId((0, draft_1.uid)());
+        setSaved(null);
+        setPayload(p);
+        setObjectId(p.instances[0]?.id || '');
+        setBack([]);
+        setForward([]);
+        setTime(0);
+        setMessage('Local draft only. Review and save to publish its first version.');
+        setBindingDraft(null);
+        setConflict(null);
+        operation.current = (0, draft_1.uid)();
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } })(); }); }
+    async function failed(e) { setError((e.message || String(e)) + (e.details?.errors ? '\n' + JSON.stringify(e.details.errors) : '')); if (e.status === 409 && current.current.saved) {
+        try {
+            const server = await call('spatial.show', { setup_id: current.current.setupId });
+            setConflict({ server, base: current.current.saved.version.payload_json });
+        }
+        catch { }
+    } }
+    async function previewSave() { if (!current.current.payload || busy)
+        return; setPlaying(false); setBusy(true); setError(''); try {
+        const p = (0, draft_1.copy)(current.current.payload), s = current.current.saved, id = current.current.setupId;
+        if (s && s.header.current_version_id !== s.version.id) {
+            const server = await call('spatial.show', { setup_id: id });
+            setConflict({ server, base: s.version.payload_json });
+            return;
+        }
+        const projectRevision = props.state.entities.find(e => e.id === project)?.revision || props.state.project.revision;
+        const request = s ? { setup_id: id, revision: s.header.revision, payload: p } : { setup_id: id, expected_project_revision: projectRevision, payload: p };
+        const name = s ? 'spatial.revise' : 'spatial.create';
+        const preview = await call(name + '-preview', request), operationId = operation.current;
+        setReview({ title: s ? 'Review setup changes' : 'Publish first setup version', preview, apply: async () => { setBusy(true); try {
+                const v = await call(name, { ...request, expected_basis_sha256: preview.expected_basis_sha256, operation_id: operationId });
+                await adopted(v);
+                setReview(null);
+                if (queued.current) {
+                    const next = queued.current;
+                    queued.current = null;
+                    setNavigation(null);
+                    next();
+                }
+            }
+            catch (e) {
+                if (e.code === 'connection') {
+                    try {
+                        const status = await call('spatial.operation-show', { operation_id: operationId });
+                        if (status.found) {
+                            const v = await call('spatial.show', { setup_id: id, version_id: status.event.details.version_id });
+                            await adopted(v);
+                            setReview(null);
+                            return;
+                        }
+                    }
+                    catch { }
+                }
+                await failed(e);
+                setReview(null);
+            }
+            finally {
+                setBusy(false);
+            } } });
+    }
+    catch (e) {
+        await failed(e);
+    }
+    finally {
+        setBusy(false);
+    } }
+    async function reviewedAction(title, previewName, applyName, request, accept) { setBusy(true); setError(''); setPlaying(false); try {
+        const preview = await call(previewName, request);
+        setReview({ title, preview, apply: async () => { setBusy(true); try {
+                const v = await call(applyName, { ...request, expected_basis_sha256: preview.expected_basis_sha256 });
+                await accept(v);
+                setReview(null);
+            }
+            catch (e) {
+                await failed(e);
+                setReview(null);
+            }
+            finally {
+                setBusy(false);
+            } } });
+    }
+    catch (e) {
+        await failed(e);
+    }
+    finally {
+        setBusy(false);
+    } }
+    function changeItem(next) { if (!payload || !picked)
+        return; const old = picked.item, g = picked.group; let candidate = (0, draft_1.copy)(payload); candidate[g] = candidate[g].map((i) => i.id === old.id ? next : i); if (old.pose && next.pose && !(0, draft_1.same)(old.pose.position, next.pose.position)) {
+        candidate = positionCandidate(candidate, old.id, next.pose.position, payload);
+        if (!candidate)
+            return;
+    } if (old.pose && next.pose && !(0, draft_1.same)(old.pose.orientation, next.pose.orientation)) {
+        const t = payload.tracks.find(t => t.owner_id === old.id && t.property === 'orientation');
+        if (t && !autoKey && editMode === 'choose') {
+            setError('This orientation has a track. Choose Edit base pose, Edit key at scrub time, or Auto-key.');
+            return;
+        }
+        if ((t && (autoKey || editMode === 'key')) || (!t && autoKey)) {
+            if (!autoKey && !t?.keys.some(k => k.time_us === time)) {
+                setError('There is no orientation key at this time. Enable Auto-key or select a key time.');
+                return;
+            }
+            if (old.aim || old.framing_target || payload.tracks.some(t => t.owner_id === old.id && t.property === 'aim')) {
+                setError('This item uses an aim authority. Edit its aim/roll, or remove aim before adding orientation keys.');
+                return;
+            }
+            (0, defaults_1.itemById)(candidate, old.id).item.pose.orientation = (0, draft_1.copy)(old.pose.orientation);
+            let track = candidate.tracks.find((t) => t.owner_id === old.id && t.property === 'orientation');
+            if (!track) {
+                track = { id: (0, draft_1.uid)(), owner_id: old.id, property: 'orientation', keys: [] };
+                candidate.tracks.push(track);
+            }
+            const k = track.keys.find((k) => k.time_us === time);
+            if (k)
+                k.value = (0, draft_1.copy)(next.pose.orientation);
+            else
+                track.keys.push({ id: (0, draft_1.uid)(), time_us: time, value: (0, draft_1.copy)(next.pose.orientation), next: 'linear' });
+            track.keys.sort((a, b) => a.time_us - b.time_us);
+            setTrackId(track.id);
+        }
+    } edit(candidate); }
+    function positionCandidate(candidate, id, position, base) { const found = (0, defaults_1.itemById)(base, id); if (!found)
+        return candidate; if (found.group === 'marks') {
+        candidate.marks = candidate.marks.map((m) => m.id === id ? { ...m, position } : m);
+        return candidate;
+    } const t = base.tracks.find((t) => t.owner_id === id && t.property === 'position'); if (t && !autoKey && editMode === 'choose') {
+        setError('This position has a motion track. Choose Edit base pose, Edit key at scrub time, or Auto-key before moving.');
+        return null;
+    } if (t && (autoKey || editMode === 'key') || !t && autoKey) {
+        if (!autoKey && t && !t.keys.some((k) => k.time_us === time)) {
+            setError('There is no key at this time. Enable Auto-key or select a key time.');
+            return null;
+        }
+        const item = (0, defaults_1.itemById)(candidate, id).item;
+        item.pose.position = (0, draft_1.copy)(found.item.pose.position);
+        const key = { id: (0, draft_1.uid)(), time_us: time, value: { kind: 'point', point: (0, draft_1.copy)(position) }, next: 'linear' };
+        let track = candidate.tracks.find((t) => t.owner_id === id && t.property === 'position');
+        if (!track) {
+            track = { id: (0, draft_1.uid)(), owner_id: id, property: 'position', keys: [] };
+            candidate.tracks.push(track);
+        }
+        const current = track.keys.find((k) => k.time_us === time);
+        if (current)
+            current.value = key.value;
+        else
+            track.keys.push(key);
+        track.keys.sort((a, b) => a.time_us - b.time_us);
+        setTrackId(track.id);
+    }
+    else
+        (0, defaults_1.itemById)(candidate, id).item.pose.position = position; return candidate; }
+    function beginMove(id) { if (busy || !payload)
+        return false; setPlaying(false); const track = payload.tracks.find(t => t.owner_id === id && t.property === 'position'); if (track && !autoKey && editMode === 'choose') {
+        setError('Choose how to edit the tracked position before dragging.');
+        return false;
+    } gesture.current = (0, draft_1.copy)(payload); return true; }
+    function move(id, x, y) { if (!gesture.current)
+        return; const candidate = (0, draft_1.copy)(gesture.current), i = sample?.items.find((i) => i.id === id) || (0, defaults_1.itemById)(candidate, id)?.item; const pos = i?.pose?.position || i?.position; const next = positionCandidate(candidate, id, { x, y, z: pos?.z || 0 }, gesture.current); if (next) {
+        setPayload(next);
+        current.current.payload = next;
+    } }
+    function endMove(cancel) { const base = gesture.current; gesture.current = null; if (!base)
+        return; if (cancel) {
+        setPayload(base);
+        current.current.payload = base;
+    }
+    else if (!(0, draft_1.same)(base, current.current.payload)) {
+        setBack(v => (0, draft_1.boundedHistory)(v, base));
+        setForward([]);
+        operation.current = (0, draft_1.uid)();
+    } }
+    function nudge(id, dx, dy) { if (!payload || !beginMove(id))
+        return; const i = sample.items.find((i) => i.id === id) || (0, defaults_1.itemById)(payload, id)?.item, pos = i?.pose?.position || i?.position; if (pos)
+        move(id, pos.x + dx, pos.y + dy); endMove(false); }
+    function addItem(kind) { if (!payload)
+        return; try {
+        const result = (0, defaults_1.newItem)(kind, payload.instances.length + payload.cameras.length + payload.lights.length, props.state.media.find(m => m.id === floorMedia));
+        mutate(p => p[result.group].push(result.item));
+        setObjectId(result.item.id);
+    }
+    catch (e) {
+        setError(e.message);
+    } }
+    function duplicateItem() { if (!payload || !picked)
+        return; const next = (0, draft_1.copy)(payload), item = (0, draft_1.copy)(picked.item), old = item.id; item.id = (0, draft_1.uid)(); if (item.label)
+        item.label += ' copy'; if (item.pose)
+        item.pose.position.x += .5; next[picked.group].push(item); for (const t of payload.tracks.filter(t => t.owner_id === old)) {
+        const nt = (0, draft_1.copy)(t);
+        nt.id = (0, draft_1.uid)();
+        nt.owner_id = item.id;
+        nt.keys.forEach(k => { k.id = (0, draft_1.uid)(); });
+        next.tracks.push(nt);
+    } edit(next); setObjectId(item.id); }
+    function deleteItem() { if (!payload || !picked)
+        return; const deps = (0, defaults_1.dependentPaths)(payload, picked.item.id); if (deps.length) {
+        setError('Retarget or remove these dependencies first:\n' + deps.join('\n'));
+        return;
+    } mutate(p => { p[picked.group] = p[picked.group].filter((i) => i.id !== objectId); p.tracks = p.tracks.filter((t) => t.owner_id !== objectId); }); setObjectId(''); }
+    function addTrack() { if (!payload || !picked?.item.pose)
+        return; const item = picked.item; const existing = payload.tracks.find(t => t.owner_id === objectId && t.property === property); if (existing) {
+        setTrackId(existing.id);
+        return;
+    } mutate(p => { const id = (0, draft_1.uid)(); if (property === 'aim' && !item.aim)
+        (0, defaults_1.itemById)(p, objectId).item.aim = (0, defaults_1.keyValue)(item, 'aim'); p.tracks.push({ id, owner_id: objectId, property, keys: [{ id: (0, draft_1.uid)(), time_us: time, value: (0, defaults_1.keyValue)(item, property), next: ['actor-posture', 'light-enabled'].includes(property) ? 'hold' : 'linear' }] }); setTrackId(id); }); }
+    function prepareBinding() { if (!saved || !selectedShot) {
+        setError('Select a shot and save a setup first.');
+        return;
+    } const b = { schema: 'storyboarder.spatial-binding/v1', status: 'active', setup_version_id: saved.version.id, camera_plan_id: payload?.cameras[0]?.id || '', sample: { kind: 'instant', time_us: time }, time_mapping: { kind: 'none' }, notes: '' }; setBindingDraft(b); }
+    async function bindSave() { if (!bindingDraft || !selectedShot || dirty) {
+        setError('Save the setup and select a shot before binding.');
+        return;
+    } const request = { shot_id: selectedShot.id, expected_shot_revision: selectedShot.revision, binding_id: binding?.header.id || (0, draft_1.uid)(), binding: (0, draft_1.copy)(bindingDraft) }; if (binding)
+        request.revision = binding.header.revision; await reviewedAction('Review exact camera, version and timing', binding ? 'spatial.rebind-preview' : 'spatial.bind-preview', binding ? 'spatial.rebind' : 'spatial.bind', request, async (v) => { setBinding(v); setBindingDraft((0, draft_1.copy)(v.version.binding_json)); setMessage('Shot binding saved. Shot prose and duration are unchanged.'); try {
+        await props.refresh();
+    }
+    catch (e) {
+        setMessage('Binding saved; project refresh failed: ' + e.message);
+    } }); }
+    async function initReview() { if (!selectedShot || !binding) {
+        setError('Select a shot with an exact binding first.');
+        return;
+    } setBusy(true); try {
+        const v1 = await call('observation.list', { shot_id: selectedShot.id, limit: 100 });
+        const head = v1.items[0];
+        if (!head)
+            throw Error('Author a v1 observation contract in the shot editor before adding a v2 spatial review.');
+        let previous = null;
+        try {
+            previous = await call('observation.spatial-review-show', { shot_id: selectedShot.id });
+        }
+        catch (e) {
+            if (e.code !== 'not_found')
+                throw e;
+        }
+        setSpatialReview(previous);
+        setReviewNumber(previous?.review?.number || previous?.number || 0);
+        setReviewBody({ schema: 'storyboarder.observation-contract/v2', observation_version_id: head.current_version_id, binding_version_id: binding.version.id, reviewed: { blocking: false, timing: false, camera_coverage: false, schematic_lighting: false }, assumptions: (0, draft_1.copy)(payload?.assumptions || []), unresolved: [], notes: '' });
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } }
+    function downloadDraft() { if (!payload)
+        return; const blob = new Blob([JSON.stringify(makeDraft(), null, 2)], { type: 'application/json' }), url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = 'storyboarder-unsaved-spatial-draft.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); }
+    async function recover(d) { setBusy(true); try {
+        const valid = await call('spatial.validate', { payload: d.payload });
+        if (!valid.valid)
+            throw Error('Recovery draft needs correction: ' + JSON.stringify(valid.errors));
+        let server = null;
+        if (d.base_version_id) {
+            server = await call('spatial.show', { setup_id: d.setup_id, version_id: d.base_version_id });
+        }
+        setSetupId(d.setup_id);
+        setSaved(server);
+        setPayload(valid.payload);
+        setBack([]);
+        setForward([]);
+        operation.current = d.operation_id;
+        setRecoverPrompt(null);
+        setMessage('Recovered local unsaved data. It has not been published.');
+        if (server && server.header.current_version_id !== d.base_version_id) {
+            const head = await call('spatial.show', { setup_id: d.setup_id });
+            setConflict({ server: head, base: d.base });
+        }
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } }
+    async function doExport(native = false) { if (!saved || dirty) {
+        setError('Save the plan before exporting an exact version.');
+        return;
+    } setBusy(true); try {
+        const v = native ? await call('spatial.plan-export', { setup_id: setupId, version_id: saved.version.id, scope: 'selected-with-history-closure' }) : await call('spatial.diagram-export', { version_id: saved.version.id, times_us: exportTimes.split(',').map(x => (0, evaluate_1.secondsToUs)(x.trim())), target_plane_z_m: plane, view_bounds: bounds, format });
+        setExports(v);
+        setMessage('Exported exact saved version; no shot pin or plan changed.');
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } }
+    function importMappings() { const m = importMode === 'copy' ? { new_setup_id: newCopyId, title: copyTitle, scenes: {}, assets: {}, media: {} } : { shots: {} }; for (const row of mappingRows) {
+        if (!row.to)
+            continue;
+        if (row.kind === 'shots') {
+            const shot = shots.find(s => s.id === row.to);
+            m.shots[row.from] = { shot_id: row.to, expected_revision: shot?.revision };
+        }
+        else {
+            m[row.kind] ??= {};
+            m[row.kind][row.from] = row.to;
+        }
+    } return m; }
+    async function previewImport() { if (!importInput)
+        return; setBusy(true); try {
+        const request = { ...importInput, mode: importMode, mappings: importMappings() }, v = await call('spatial.plan-import-preview', request);
+        setImportPreview(v);
+        if (v.conflicts?.length) {
+            const list = v.conflicts.filter((c) => c.code === 'shot_mapping_required').map((c) => ({ kind: 'shots', from: c.shot_id, to: '' }));
+            setMappingRows(rows => [...rows, ...list.filter((l) => !rows.some(r => r.kind === l.kind && r.from === l.from))]);
+        }
+        else
+            setReview({ title: 'Apply native package import', preview: v, apply: async () => { setBusy(true); try {
+                    await call('spatial.plan-import-apply', { ...request, expected_basis_sha256: v.expected_basis_sha256 });
+                    setMessage('Native import committed. Choose the imported setup to inspect it.');
+                    setReview(null);
+                    await refreshList();
+                    await props.refresh();
+                }
+                catch (e) {
+                    setError(e.message);
+                    setReview(null);
+                }
+                finally {
+                    setBusy(false);
+                } } });
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } }
+    async function loadSources(documentId, offset = 0) { setBusy(true); try {
+        const v = await call('document.tree', { document_id: documentId, limit: 100, offset });
+        const items = v.items || v.nodes || [];
+        setNodes(prev => offset ? [...prev, ...items] : items);
+        setNodeOffset(v.next_offset ?? null);
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } }
+    async function addSource() { if (!nodeId || !docId)
+        return; setBusy(true); try {
+        const node = await call('document.node', { id: nodeId }), versions = await call('document.versions', { document_id: docId, limit: 100 }), v = versions.items.find((v) => v.id === node.version_id);
+        if (!v)
+            throw Error('Exact document version is not available in this page.');
+        setBusy(false);
+        current.current.busy = false;
+        mutate(p => p.source_pins.push({ id: (0, draft_1.uid)(), kind: 'document-node', document_id: docId, document_version_id: node.version_id, node_id: node.id, expected_source_sha256: node.content_sha256, expected_document_sha256: v.content_sha256 }));
+        setMessage('Exact source pin added to the draft. No measurements were inferred from prose.');
+    }
+    catch (e) {
+        setError(e.message);
+    }
+    finally {
+        setBusy(false);
+    } }
+    const numericPosition = picked?.item.pose?.position || picked?.item.position;
+    const simpleId = picked?.item.id;
+    return react_1.default.createElement("section", { className: "sp-editor", "aria-label": "Blocking and lighting workspace" },
+        react_1.default.createElement("style", null, styles_1.SPATIAL_CSS),
+        react_1.default.createElement("header", { className: "sp-header" },
+            react_1.default.createElement("div", null,
+                react_1.default.createElement("div", { className: "sp-eyebrow" }, "Scene planning \u00B7 metres \u00B7 exact versions"),
+                react_1.default.createElement("h1", null, "Blocking & lighting"),
+                react_1.default.createElement("div", { className: "sp-subline" },
+                    saved ? `Version ${saved.version.number} · header revision ${saved.header.revision}` : 'New local plan',
+                    " \u00B7 ",
+                    react_1.default.createElement("span", { className: 'sp-badge ' + (dirty ? 'warn' : '') }, dirty ? 'Unsaved draft' : 'Saved'),
+                    saved?.newer_setup_available && react_1.default.createElement("span", { className: "sp-badge warn" }, "Newer setup available \u00B7 shot stays pinned"))),
+            react_1.default.createElement("div", { className: "sp-actions" },
+                react_1.default.createElement("button", { onClick: () => props.go('canvas') }, "Board"),
+                react_1.default.createElement("button", { onClick: () => props.go('editor') }, "Script"),
+                react_1.default.createElement("button", { "aria-pressed": "true" }, "Blocking"),
+                react_1.default.createElement("button", { disabled: !dirty || busy, className: "primary", onClick: () => void previewSave() }, "Review & save"),
+                react_1.default.createElement("button", { disabled: !back.length || busy, onClick: () => { const prior = back[back.length - 1]; setForward(v => (0, draft_1.boundedHistory)(v, (0, draft_1.copy)(payload))); setBack(back.slice(0, -1)); setPayload(prior); current.current.payload = prior; } }, "Undo"),
+                react_1.default.createElement("button", { disabled: !forward.length || busy, onClick: () => { const next = forward[forward.length - 1]; setBack(v => (0, draft_1.boundedHistory)(v, (0, draft_1.copy)(payload))); setForward(forward.slice(0, -1)); setPayload(next); current.current.payload = next; } }, "Redo"))),
+        error && react_1.default.createElement("div", { role: "alert", className: "sp-message sp-error" },
+            error,
+            react_1.default.createElement("button", { "aria-label": "Dismiss error", onClick: () => setError('') }, "\u00D7")),
+        message && react_1.default.createElement("div", { role: "status", className: "sp-message sp-success" },
+            message,
+            react_1.default.createElement("button", { "aria-label": "Dismiss notice", onClick: () => setMessage('') }, "\u00D7")),
+        storageWarning && react_1.default.createElement("div", { role: "alert", className: "sp-message" },
+            storageWarning,
+            react_1.default.createElement("button", { onClick: downloadDraft }, "Export local draft")),
+        react_1.default.createElement("div", { className: "sp-selector" },
+            react_1.default.createElement("label", null,
+                "Scene",
+                react_1.default.createElement("select", { disabled: busy, value: sceneId, onChange: (e) => requireClean(() => { setSceneId(e.target.value); props.select(null); setBinding(null); setBindingDraft(null); setSaved(null); setPayload(null); setSetupId(''); }) },
+                    react_1.default.createElement("option", { value: "" }, "Choose scene"),
+                    scenes.map(s => react_1.default.createElement("option", { key: s.id, value: s.id }, s.title)))),
+            react_1.default.createElement("label", null,
+                "Shot",
+                react_1.default.createElement("select", { disabled: busy, value: selectedShot?.id || '', onChange: (e) => void selectShot(e.target.value) },
+                    react_1.default.createElement("option", { value: "" }, "Scene planning (no shot selected)"),
+                    shots.filter(s => s.parent_id === sceneId).map(s => react_1.default.createElement("option", { key: s.id, value: s.id }, s.title)))),
+            react_1.default.createElement("label", null,
+                "Saved setup",
+                react_1.default.createElement("select", { disabled: busy, value: saved ? setupId : '', onChange: (e) => e.target.value && requireClean(() => void openSetup(e.target.value)) },
+                    react_1.default.createElement("option", { value: "" }, "Choose explicitly"),
+                    setups.map(s => react_1.default.createElement("option", { key: s.id, value: s.id },
+                        s.title,
+                        s.archived ? ' · archived' : '')))),
+            moreSetups !== null && react_1.default.createElement("button", { onClick: () => call('spatial.list', { scene_id: sceneId, include_archived: true, offset: moreSetups }).then(v => { setSetups(x => [...x, ...v.items]); setMoreSetups(v.next_offset); }).catch(e => setError(e.message)) }, "More setups"),
+            react_1.default.createElement("div", { className: "sp-actions" },
+                react_1.default.createElement("button", { disabled: !sceneId || busy, onClick: () => void create(false) }, "New setup"),
+                react_1.default.createElement("button", { disabled: !sceneId || busy, onClick: () => void create(true) }, "Doorway example"))),
+        !payload ? react_1.default.createElement("div", { className: "sp-empty" },
+            react_1.default.createElement("h2", null, "Plan the action, not the card layout."),
+            react_1.default.createElement("p", null, "Choose a saved setup or create a scene plan. Selecting a bound shot opens its exact saved version."),
+            react_1.default.createElement("label", null,
+                "Optional shared chair asset for Doorway example",
+                react_1.default.createElement("select", { value: chair, onChange: (e) => setChair(e.target.value) },
+                    react_1.default.createElement("option", { value: "" }, "Generic chairs"),
+                    assets.map(a => react_1.default.createElement("option", { key: a.id, value: a.id }, a.title)))),
+            recoveries.length > 0 && react_1.default.createElement("div", null,
+                react_1.default.createElement("h3", null, "Local unsaved drafts"),
+                recoveries.map(d => react_1.default.createElement("button", { key: d.setup_id + String(d.base_version_id), onClick: () => setRecoverPrompt(d) },
+                    d.payload.setup_label,
+                    " \u00B7 ",
+                    d.updated_at)))) : react_1.default.createElement(react_1.default.Fragment, null,
+            react_1.default.createElement("div", { className: "sp-workbench" },
+                react_1.default.createElement("aside", { className: "sp-panel" },
+                    react_1.default.createElement("h2", null, "Layers & objects"),
+                    react_1.default.createElement("div", { className: "sp-panel-body" },
+                        react_1.default.createElement("div", { className: "sp-add" }, ['actor', 'prop', 'wall', 'mark', 'camera', 'light', 'flag', 'bounce', 'diffusion', 'negative-fill', 'camera-resource', 'light-resource'].map(k => react_1.default.createElement("button", { key: k, disabled: busy, onClick: () => addItem(k) },
+                            "+ ",
+                            (0, Form_1.label)(k)))),
+                        defaults_1.groups.map(group => react_1.default.createElement("details", { key: group, open: ['instances', 'marks', 'cameras', 'lights', 'modifiers'].includes(group) },
+                            react_1.default.createElement("summary", null,
+                                (0, Form_1.label)(group),
+                                " \u00B7 ",
+                                payload[group].length),
+                            payload[group].map(i => react_1.default.createElement("button", { key: i.id, className: 'sp-object ' + (objectId === i.id ? 'active' : ''), onClick: () => { setObjectId(i.id); setTrackId(''); } },
+                                react_1.default.createElement("span", null, i.label || i.kind || i.id.slice(0, 8)),
+                                react_1.default.createElement("small", null, i.role || i.kind || ''))))),
+                        react_1.default.createElement("label", null,
+                            "Floor-plan raster",
+                            react_1.default.createElement("select", { value: floorMedia, onChange: (e) => setFloorMedia(e.target.value) },
+                                react_1.default.createElement("option", { value: "" }, "Select imported image"),
+                                props.state.media.map(m => react_1.default.createElement("option", { key: m.id, value: m.id }, m.original_name)))),
+                        react_1.default.createElement("button", { disabled: !floorMedia || busy, onClick: () => addItem('floor-plan') }, "Add floor-plan reference"))),
+                react_1.default.createElement("div", { className: "sp-panel" },
+                    react_1.default.createElement("div", { className: "sp-canvas-toolbar" },
+                        react_1.default.createElement("button", { onClick: () => setBounds({ ...evaluate_1.DEFAULT_BOUNDS }) }, "Reset view"),
+                        react_1.default.createElement("button", { onClick: () => { const x = (bounds.min_x + bounds.max_x) / 2, y = (bounds.min_y + bounds.max_y) / 2, w = (bounds.max_x - bounds.min_x) * .4, h = (bounds.max_y - bounds.min_y) * .4; setBounds({ min_x: x - w, max_x: x + w, min_y: y - h, max_y: y + h }); } }, "Zoom in"),
+                        react_1.default.createElement("button", { onClick: () => { const x = (bounds.min_x + bounds.max_x) / 2, y = (bounds.min_y + bounds.max_y) / 2, w = (bounds.max_x - bounds.min_x) * .65, h = (bounds.max_y - bounds.min_y) * .65; setBounds({ min_x: x - w, max_x: x + w, min_y: y - h, max_y: y + h }); } }, "Zoom out"),
+                        react_1.default.createElement("label", null,
+                            "Coverage plane",
+                            react_1.default.createElement(Form_1.NumberInput, { value: plane, onChange: setPlane, name: "Coverage plane height metres" })),
+                        react_1.default.createElement("button", { onClick: () => setPlane(0) }, "Floor"),
+                        react_1.default.createElement("button", { onClick: () => setPlane(1.6) }, "Face 1.6 m"),
+                        react_1.default.createElement("label", { className: "sp-check" },
+                            react_1.default.createElement("input", { type: "checkbox", checked: autoKey, onChange: (e) => setAutoKey(e.target.checked) }),
+                            "Auto-key pose"),
+                        react_1.default.createElement("label", null,
+                            "Tracked pose",
+                            react_1.default.createElement("select", { "aria-label": "Tracked pose editing mode", value: editMode, onChange: (e) => setEditMode(e.target.value) },
+                                react_1.default.createElement("option", { value: "choose" }, "Choose before moving"),
+                                react_1.default.createElement("option", { value: "base" }, "Edit base pose"),
+                                react_1.default.createElement("option", { value: "key" }, "Edit key at scrub time")))),
+                    sample?.error && react_1.default.createElement("div", { role: "alert", className: "sp-message" },
+                        "Preview unavailable: ",
+                        sample.error,
+                        ". Correct the inspector fields or undo."),
+                    react_1.default.createElement(SpatialPlan_1.SpatialPlan, { project: project, payload: payload, sample: sample, bounds: bounds, selected: objectId, media: props.state.media, onSelect: setObjectId, onBounds: setBounds, begin: beginMove, move: move, end: endMove, nudge: nudge })),
+                react_1.default.createElement("aside", { className: "sp-panel sp-inspector" },
+                    react_1.default.createElement("h2", null, picked?.item.label || 'Numeric inspector'),
+                    react_1.default.createElement("div", { className: "sp-panel-body" }, picked && schemas ? react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("div", { className: "sp-actions" },
+                            react_1.default.createElement("button", { disabled: busy, onClick: duplicateItem }, "Duplicate placement"),
+                            react_1.default.createElement("button", { disabled: busy, onClick: deleteItem }, "Delete placement")),
+                        numericPosition && react_1.default.createElement("fieldset", null,
+                            react_1.default.createElement("legend", null, "Position \u00B7 selected editing context"),
+                            react_1.default.createElement("label", null,
+                                "Display unit",
+                                react_1.default.createElement("select", { value: displayUnit, onChange: (e) => setDisplayUnit(e.target.value) },
+                                    react_1.default.createElement("option", { value: "m" }, "Metres"),
+                                    react_1.default.createElement("option", { value: "ft" }, "Feet"))),
+                            ['x', 'y', 'z'].map(axis => react_1.default.createElement("label", { key: axis },
+                                axis.toUpperCase(),
+                                " (",
+                                displayUnit,
+                                ")",
+                                react_1.default.createElement(Form_1.NumberInput, { key: simpleId + axis + displayUnit, name: axis.toUpperCase() + ' position ' + displayUnit, value: numericPosition[axis] / (displayUnit === 'ft' ? .3048 : 1), onChange: n => { const next = (0, draft_1.copy)(picked.item), position = { ...numericPosition, [axis]: n * (displayUnit === 'ft' ? .3048 : 1) }; if (next.pose)
+                                        next.pose.position = position;
+                                    else
+                                        next.position = position; changeItem(next); } }))),
+                            react_1.default.createElement("p", { className: "sp-unit-note" }, "Stored metres do not change when switching display units. One foot = 0.3048 m.")),
+                        picked.item.pose && react_1.default.createElement("fieldset", null,
+                            react_1.default.createElement("legend", null, "Orientation \u00B7 degrees"),
+                            ['Heading CCW from +Y', 'Pitch around X', 'Roll around Y'].map((name, index) => react_1.default.createElement("label", { key: name },
+                                name,
+                                react_1.default.createElement(Form_1.NumberInput, { value: (0, evaluate_1.euler)(picked.item.pose.orientation)[index] * 180 / Math.PI, name: name, onChange: n => { const v = (0, evaluate_1.euler)(picked.item.pose.orientation); v[index] = n * Math.PI / 180; const next = (0, draft_1.copy)(picked.item); next.pose.orientation = (0, evaluate_1.yawPitchRoll)(v[0], v[1], v[2]); changeItem(next); } }))),
+                            react_1.default.createElement("p", { className: "sp-unit-note" }, "+90\u00B0 heading points \u2212X. In aim mode this quaternion is the degeneracy fallback; aim roll owns the view.")),
+                        react_1.default.createElement(Form_1.SchemaForm, { key: objectId, schema: schemas.payload.properties[picked.group].items, root: schemas.payload, value: picked.item, onChange: changeItem, name: picked.group.slice(0, -1), choices: choose }),
+                        sample?.items.find((i) => i.id === objectId) && react_1.default.createElement("p", { className: "sp-unit-note" },
+                            "Evaluated XYZ: ",
+                            JSON.stringify(sample.items.find((i) => i.id === objectId).pose.position),
+                            ". Base pose fields do not override a tracked property.")) : react_1.default.createElement("p", { className: "sp-subline" }, "Select an object or mark. Arrow keys nudge 0.1 m; Shift + arrows nudges 0.5 m. Drag empty space to pan.")))),
+            react_1.default.createElement("div", { className: "sp-timebar" },
+                react_1.default.createElement("div", { className: "sp-actions" },
+                    react_1.default.createElement("button", { onClick: () => { setTime(v => v >= payload.action.duration_us ? 0 : v); setPlaying(v => !v); } }, playing ? 'Pause' : 'Play'),
+                    react_1.default.createElement("button", { onClick: () => setTime(v => Math.max(0, v - 100000)) }, "\u22120.1 s"),
+                    react_1.default.createElement("input", { type: "range", "aria-label": "Action time scrubber", min: 0, max: payload.action.duration_us, step: 1000, value: Math.min(time, payload.action.duration_us), onChange: (e) => { setPlaying(false); setTime(Number(e.target.value)); } }),
+                    react_1.default.createElement("button", { onClick: () => setTime(v => Math.min(payload.action.duration_us, v + 100000)) }, "+0.1 s"),
+                    react_1.default.createElement("label", null,
+                        "Action time (s)",
+                        react_1.default.createElement(Form_1.NumberInput, { value: time, onChange: setTime, name: "Action time seconds", time: true, integer: true })),
+                    react_1.default.createElement("label", null,
+                        "Playback speed",
+                        react_1.default.createElement("select", { value: speed, onChange: (e) => setSpeed(Number(e.target.value)) }, [.25, .5, 1, 2].map(v => react_1.default.createElement("option", { key: v, value: v },
+                            v,
+                            "\u00D7"))))),
+                react_1.default.createElement("div", { className: "sp-timeline" }, payload.tracks.filter(t => !objectId || t.owner_id === objectId).map((t) => react_1.default.createElement("div", { className: "sp-lane", key: t.id },
+                    react_1.default.createElement("span", null, t.property),
+                    react_1.default.createElement("div", { className: "sp-lane-grid" },
+                        t.keys.map((k) => react_1.default.createElement("button", { key: k.id, className: "sp-key", style: { left: (payload.action.duration_us ? k.time_us / payload.action.duration_us * 100 : 0) + '%' }, "aria-label": `${t.property} key at ${k.time_us / 1e6} seconds, ${k.next}`, title: `${k.time_us / 1e6}s · ${k.next}`, onClick: () => { setTime(k.time_us); setTrackId(t.id); setTab('timing'); } }, "\u25C6")),
+                        react_1.default.createElement("div", { className: "sp-cursor", style: { left: (payload.action.duration_us ? time / payload.action.duration_us * 100 : 0) + '%' } })))))),
+            react_1.default.createElement("nav", { className: "sp-tabs", "aria-label": "Spatial tools" }, ['timing', 'setup', 'binding', 'history', 'review', 'sources', 'delivery', 'import', 'care'].map(key => react_1.default.createElement("button", { key: key, "aria-pressed": tab === key, onClick: () => setTab(key) }, (0, Form_1.label)(key)))),
+            react_1.default.createElement("section", { className: "sp-section" },
+                tab === 'timing' && schemas && react_1.default.createElement("div", { className: "sp-two" },
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("h2", null, "Movement, facing, aim & light cues"),
+                        react_1.default.createElement("p", { className: "sp-subline" }, "Position paths are hold/linear, not decorative splines. At a hold's next endpoint the next key takes effect."),
+                        picked?.item.pose ? react_1.default.createElement(react_1.default.Fragment, null,
+                            react_1.default.createElement("div", { className: "sp-actions" },
+                                react_1.default.createElement("label", null,
+                                    "Property",
+                                    react_1.default.createElement("select", { value: property, onChange: (e) => setProperty(e.target.value) }, (0, defaults_1.properties)(picked.item, picked.group).map(p => react_1.default.createElement("option", { key: p, value: p }, (0, Form_1.label)(p))))),
+                                react_1.default.createElement("button", { onClick: addTrack }, "Add / select track")),
+                            payload.tracks.filter(t => t.owner_id === objectId).map(t => react_1.default.createElement("button", { key: t.id, onClick: () => setTrackId(t.id) }, (0, Form_1.label)(t.property)))) : react_1.default.createElement("p", null, "Select an actor, camera, light, prop, wall or modifier to author its tracks."),
+                        selectedTrack && react_1.default.createElement(react_1.default.Fragment, null,
+                            react_1.default.createElement("button", { disabled: busy, onClick: () => { mutate(p => { p.tracks = p.tracks.filter((t) => t.id !== selectedTrack.id); }); setTrackId(''); } }, "Remove selected track"),
+                            react_1.default.createElement(Form_1.SchemaForm, { schema: schemas.payload.properties.tracks.items, root: schemas.payload, value: selectedTrack, name: "Track", choices: choose, onChange: v => mutate(p => { p.tracks = p.tracks.map((t) => t.id === selectedTrack.id ? v : t); }) }))),
+                    react_1.default.createElement("div", null,
+                        react_1.default.createElement("h2", null, "Named beats & action duration"),
+                        react_1.default.createElement("label", null,
+                            "Duration (s)",
+                            react_1.default.createElement(Form_1.NumberInput, { value: payload.action.duration_us, time: true, integer: true, name: "Action duration seconds", onChange: n => mutate(p => { p.action.duration_us = n; }) })),
+                        react_1.default.createElement(Form_1.SchemaForm, { schema: schemas.payload.properties.beats, root: schemas.payload, value: payload.beats, name: "Beats", onChange: v => mutate(p => { p.beats = v; }) }))),
+                tab === 'setup' && schemas && react_1.default.createElement("div", null,
+                    react_1.default.createElement("h2", null, "Physical planning assumptions"),
+                    react_1.default.createElement(Form_1.SchemaForm, { schema: schemas.payload, root: schemas.payload, value: payload, onChange: v => edit(v), hide: ['instances', 'marks', 'beats', 'resources', 'cameras', 'lights', 'modifiers', 'tracks', 'floor_plans', 'source_pins', 'origin'], choices: choose }),
+                    react_1.default.createElement("button", { onClick: () => call('spatial.validate', { payload }).then(v => v.valid ? setMessage('Draft is structurally valid. This does not verify physical results.') : setError(JSON.stringify(v.errors))).catch(e => setError(e.message)) }, "Validate draft without saving")),
+                tab === 'binding' && schemas && react_1.default.createElement("div", null,
+                    react_1.default.createElement("h2", null, "Exact shot plan"),
+                    react_1.default.createElement("p", null,
+                        selectedShot?.title || 'Select a shot above.',
+                        " ",
+                        binding ? `· pinned setup v${binding.setup.version.number} / binding v${binding.version.number}` : '· no binding'),
+                    react_1.default.createElement("div", { className: "sp-actions" },
+                        react_1.default.createElement("button", { disabled: !saved || !selectedShot || busy, onClick: prepareBinding }, "Use displayed saved version"),
+                        react_1.default.createElement("button", { disabled: !binding || busy || !selectedShot, onClick: () => { setReview({ title: 'Detach shot (retains history)', preview: { warnings: [{ message: 'This appends a detached binding. All historical plan references remain readable.' }] }, apply: async () => { setBusy(true); try {
+                                    const v = await call('spatial.detach', { binding_id: binding.header.id, revision: binding.header.revision, expected_shot_revision: selectedShot.revision });
+                                    setBinding(v);
+                                    setBindingDraft((0, draft_1.copy)(v.version.binding_json));
+                                    setReview(null);
+                                }
+                                catch (e) {
+                                    setError(e.message);
+                                }
+                                finally {
+                                    setBusy(false);
+                                } } }); } }, "Detach")),
+                    bindingDraft && react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement(Form_1.SchemaForm, { schema: schemas.binding, root: schemas.binding, value: bindingDraft, name: "Binding", choices: (name, path) => name === 'setup_version_id' ? [{ id: saved?.version.id || '', label: 'Displayed exact version ' + saved?.version.number }] : choose(name, path), onChange: setBindingDraft }),
+                        react_1.default.createElement("button", { className: "primary", disabled: busy || dirty, onClick: () => void bindSave() }, "Review binding")),
+                    react_1.default.createElement("p", { className: "sp-subline" }, "An interval is action time, not automatically shot time. Select a linear mapping explicitly; ShotFields.duration is never rewritten.")),
+                tab === 'history' && react_1.default.createElement("div", null,
+                    react_1.default.createElement("h2", null, "Immutable setup history"),
+                    react_1.default.createElement("div", { className: "sp-actions" },
+                        react_1.default.createElement("button", { disabled: !saved || busy, onClick: () => call('spatial.history', { setup_id: setupId }).then(v => { setHistory(v.items); setMoreHistory(v.next_offset); }).catch(e => setError(e.message)) }, "Read history"),
+                        react_1.default.createElement("button", { disabled: !saved || dirty || busy, onClick: () => void reviewedAction('Duplicate exact authored plan', 'spatial.duplicate-preview', 'spatial.duplicate', { setup_id: setupId, version_id: saved.version.id, new_setup_id: (0, draft_1.uid)(), title: payload.setup_label + ' copy' }, adopted) }, "Duplicate setup"),
+                        react_1.default.createElement("button", { disabled: !saved || dirty || busy, onClick: () => setReview({ title: saved.header.archived ? 'Unarchive setup' : 'Archive setup', preview: { warnings: [{ message: 'A new version is appended. Exact shot pins and historical dependencies are retained.' }] }, apply: async () => { setBusy(true); try {
+                                    await adopted(await call(saved.header.archived ? 'spatial.unarchive' : 'spatial.archive', { setup_id: setupId, revision: saved.header.revision }));
+                                    setReview(null);
+                                }
+                                catch (e) {
+                                    setError(e.message);
+                                }
+                                finally {
+                                    setBusy(false);
+                                } } }) }, saved?.header.archived ? 'Unarchive' : 'Archive')),
+                    history.map(v => react_1.default.createElement("div", { key: v.id, className: "sp-actions" },
+                        react_1.default.createElement("span", null,
+                            "v",
+                            v.number,
+                            " \u00B7 ",
+                            v.operation,
+                            " \u00B7 ",
+                            v.content_sha256.slice(0, 12)),
+                        react_1.default.createElement("button", { onClick: () => requireClean(() => void openSetup(setupId, v.id)) }, "Open exact version"),
+                        react_1.default.createElement("button", { disabled: dirty || busy, onClick: () => void reviewedAction('Restore historical content as a new child', 'spatial.restore-preview', 'spatial.restore', { setup_id: setupId, revision: saved.header.revision, version_id: v.id }, adopted) }, "Restore as new version"))),
+                    moreHistory !== null && react_1.default.createElement("button", { onClick: () => call('spatial.history', { setup_id: setupId, offset: moreHistory }).then(v => { setHistory(h => [...h, ...v.items]); setMoreHistory(v.next_offset); }).catch(e => setError(e.message)) }, "More history")),
+                tab === 'review' && schemas && react_1.default.createElement("div", null,
+                    react_1.default.createElement("h2", null, "Spatial plan reviewed \u00B7 observation v2"),
+                    react_1.default.createElement("p", null, "This is an authored review, not physical verification or frame approval. The original observation v1 remains unchanged."),
+                    react_1.default.createElement("button", { disabled: busy, onClick: () => void initReview() }, "Prepare review for current shot"),
+                    spatialReview && react_1.default.createElement("div", { className: "sp-message" }, JSON.stringify(spatialReview.status || spatialReview.validation || spatialReview.reasons)),
+                    reviewBody && react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement(Form_1.SchemaForm, { schema: schemas.review, root: schemas.review, value: reviewBody, name: "Spatial review", onChange: setReviewBody }),
+                        react_1.default.createElement("button", { className: "primary", disabled: busy, onClick: () => void reviewedAction('Append spatial review', 'observation.spatial-review-preview', 'observation.spatial-review', { shot_id: selectedShot.id, expected_previous_number: reviewNumber, review: reviewBody }, v => { setSpatialReview(v); setReviewNumber(v.review?.number || v.number || reviewNumber + 1); setMessage('Spatial review appended. The v1 observation was not changed.'); }) }, "Review & append"))),
+                tab === 'sources' && schemas && react_1.default.createElement("div", null,
+                    react_1.default.createElement("h2", null, "Exact source anchors"),
+                    react_1.default.createElement("button", { onClick: () => call('document.list', { limit: 100 }).then(v => setDocuments(v.items)).catch(e => setError(e.message)) }, "Load source documents"),
+                    react_1.default.createElement("label", null,
+                        "Document",
+                        react_1.default.createElement("select", { value: docId, onChange: (e) => { setDocId(e.target.value); void loadSources(e.target.value); } },
+                            react_1.default.createElement("option", { value: "" }, "Choose document"),
+                            documents.map(d => react_1.default.createElement("option", { key: d.id, value: d.id }, d.title)))),
+                    react_1.default.createElement("label", null,
+                        "Exact node",
+                        react_1.default.createElement("select", { value: nodeId, onChange: (e) => setNodeId(e.target.value) },
+                            react_1.default.createElement("option", { value: "" }, "Choose node"),
+                            nodes.map(n => react_1.default.createElement("option", { key: n.id, value: n.id },
+                                n.title || n.text?.slice(0, 70) || n.node_type,
+                                " \u00B7 ",
+                                n.id.slice(0, 8))))),
+                    nodeOffset !== null && react_1.default.createElement("button", { onClick: () => void loadSources(docId, nodeOffset) }, "More nodes"),
+                    react_1.default.createElement("button", { disabled: !nodeId || busy, onClick: () => void addSource() }, "Pin selected source"),
+                    react_1.default.createElement(Form_1.SchemaForm, { schema: schemas.payload.properties.source_pins, root: schemas.payload, value: payload.source_pins, name: "Source pins", onChange: v => mutate(p => { p.source_pins = v; }) })),
+                tab === 'delivery' && react_1.default.createElement("div", null,
+                    react_1.default.createElement("h2", null, "Exact diagrams & native package"),
+                    react_1.default.createElement("div", { className: "sp-actions" },
+                        react_1.default.createElement("label", null,
+                            "Action samples (comma-separated seconds)",
+                            react_1.default.createElement("input", { value: exportTimes, onChange: (e) => setExportTimes(e.target.value) })),
+                        react_1.default.createElement("label", null,
+                            "Format",
+                            react_1.default.createElement("select", { value: format, onChange: (e) => setFormat(e.target.value) }, ['all', 'svg', 'png', 'pdf'].map(v => react_1.default.createElement("option", { key: v }, v)))),
+                        react_1.default.createElement("button", { disabled: busy || dirty || !saved, onClick: () => void doExport(false) }, "Export diagrams"),
+                        react_1.default.createElement("button", { disabled: busy || dirty || !saved, onClick: () => void doExport(true) }, "Export native history closure")),
+                    exports && react_1.default.createElement("div", { className: "sp-downloads" },
+                        react_1.default.createElement("a", { href: (0, api_1.exportUrl)(project, exports.archive, true) }, "Complete export packet"),
+                        exports.files?.map((path) => react_1.default.createElement("a", { key: path, href: (0, api_1.exportUrl)(project, path, true) }, path.split('/').pop()))),
+                    react_1.default.createElement("p", { className: "sp-subline" }, "For native import use native-spatial.zip, not the enclosing delivery packet. Diagrams label exact version, plane, scale, timing, renderer and schematic limitations.")),
+                tab === 'import' && react_1.default.createElement("div", null,
+                    react_1.default.createElement("h2", null, "Native package \u00B7 preview then apply"),
+                    react_1.default.createElement("input", { "aria-label": "Native spatial ZIP", type: "file", accept: ".zip", onChange: (e) => { const f = e.target.files?.[0]; if (!f)
+                            return; if (f.size > 100 * 1024 * 1024) {
+                            setError('Native archive must not exceed 100 MiB.');
+                            return;
+                        } const reader = new FileReader(); reader.onload = () => { setImportInput({ archive_base64: String(reader.result).split(',')[1] }); setImportPreview(null); setMappingRows([]); setNewCopyId((0, draft_1.uid)()); }; reader.onerror = () => setError('The file could not be read.'); reader.readAsDataURL(f); } }),
+                    react_1.default.createElement("label", null,
+                        "Import mode",
+                        react_1.default.createElement("select", { value: importMode, onChange: (e) => { setImportMode(e.target.value); setImportPreview(null); } },
+                            react_1.default.createElement("option", { value: "exact" }, "Exact history (same project identity)"),
+                            react_1.default.createElement("option", { value: "copy" }, "Copy as new setup root"))),
+                    importMode === 'copy' && react_1.default.createElement(react_1.default.Fragment, null,
+                        react_1.default.createElement("label", null,
+                            "Copy title",
+                            react_1.default.createElement("input", { value: copyTitle, onChange: (e) => setCopyTitle(e.target.value) })),
+                        react_1.default.createElement("p", null, "Copy keeps local placement IDs in a new setup namespace. Source prerequisites must still match.")),
+                    react_1.default.createElement("h3", null, "Explicit mappings"),
+                    mappingRows.map((r, i) => react_1.default.createElement("div", { className: "sp-actions", key: i },
+                        react_1.default.createElement("label", null,
+                            "Kind",
+                            react_1.default.createElement("select", { value: r.kind, onChange: (e) => setMappingRows(v => v.map((x, j) => j === i ? { ...x, kind: e.target.value, to: '' } : x)) }, (importMode === 'exact' ? ['shots'] : ['scenes', 'assets', 'media']).map(k => react_1.default.createElement("option", { key: k }, k)))),
+                        react_1.default.createElement("label", null,
+                            "Source identity",
+                            react_1.default.createElement("input", { value: r.from, onChange: (e) => setMappingRows(v => v.map((x, j) => j === i ? { ...x, from: e.target.value } : x)) })),
+                        react_1.default.createElement("label", null,
+                            "Destination",
+                            react_1.default.createElement("select", { value: r.to, onChange: (e) => setMappingRows(v => v.map((x, j) => j === i ? { ...x, to: e.target.value } : x)) },
+                                react_1.default.createElement("option", { value: "" }, "Choose"),
+                                (r.kind === 'shots' ? shots : r.kind === 'scenes' ? scenes : r.kind === 'assets' ? assets : props.state.media).map((v) => react_1.default.createElement("option", { key: v.id, value: v.id }, v.title || v.original_name)))))),
+                    react_1.default.createElement("button", { onClick: () => setMappingRows(v => [...v, { kind: importMode === 'exact' ? 'shots' : 'scenes', from: '', to: '' }]) }, "Add mapping"),
+                    react_1.default.createElement("button", { className: "primary", disabled: !importInput || busy, onClick: () => void previewImport() }, "Preview import"),
+                    importPreview && react_1.default.createElement(Difference, { value: importPreview })),
+                tab === 'care' && react_1.default.createElement("div", null,
+                    react_1.default.createElement("h2", null, "Integrity & recovery"),
+                    react_1.default.createElement("div", { className: "sp-actions" },
+                        react_1.default.createElement("button", { onClick: () => call('spatial.doctor').then(v => setMessage(JSON.stringify(v, null, 2))).catch(e => setError(e.message)) }, "Run read-only spatial doctor"),
+                        react_1.default.createElement("button", { onClick: () => call('spatial.backup').then(v => setMessage('Backup created: ' + v.path)).catch(e => setError(e.message)) }, "Back up project"),
+                        react_1.default.createElement("button", { onClick: downloadDraft }, "Export local unsaved draft"),
+                        react_1.default.createElement("button", { onClick: draftList }, "Find local drafts")),
+                    recoveries.map(d => react_1.default.createElement("div", { key: d.setup_id + String(d.base_version_id), className: "sp-actions" },
+                        react_1.default.createElement("span", null,
+                            d.payload.setup_label,
+                            " \u00B7 ",
+                            d.updated_at),
+                        react_1.default.createElement("button", { onClick: () => requireClean(() => setRecoverPrompt(d)) }, "Review recovery"),
+                        react_1.default.createElement("button", { onClick: () => { try {
+                                (0, draft_1.removeLocal)(d);
+                                draftList();
+                            }
+                            catch (e) {
+                                setError(e.message);
+                            } } }, "Discard this local copy"))),
+                    react_1.default.createElement("p", null, "Use a new destination when restoring a backup. Schema 8 is not downgraded by reversing source files; retain the schema-7 pre-upgrade backup.")))),
+        review && react_1.default.createElement(Dialog, { title: review.title, onClose: () => { if (!busy) {
+                setReview(null);
+                queued.current = null;
+            } } },
+            react_1.default.createElement(Difference, { value: review.preview }),
+            react_1.default.createElement("p", null, "Review the proposed changes. Apply checks the same dependencies again and rejects a stale preview."),
+            react_1.default.createElement("div", { className: "sp-actions" },
+                react_1.default.createElement("button", { disabled: busy, onClick: () => { setReview(null); queued.current = null; } }, "Cancel"),
+                react_1.default.createElement("button", { className: "primary", disabled: busy || !!review.preview.conflicts?.length, onClick: () => void review.apply() }, busy ? 'Applying…' : 'Apply reviewed changes'))),
+        conflict && !review && react_1.default.createElement(Dialog, { title: "Server head changed \u2014 your draft is intact", onClose: () => setConflict(null) },
+            react_1.default.createElement("p", null,
+                "Server version ",
+                conflict.server.version.number,
+                "; local draft is based on ",
+                saved?.version.number || 'a recovered version',
+                ". Nothing has been overwritten."),
+            conflict.merge && react_1.default.createElement("div", { className: "sp-message" }, conflict.merge.conflicts.length ? 'Conflicting fields (local values retained):\n' + conflict.merge.conflicts.join('\n') : 'Disjoint changes can be merged as a draft. Validation and explicit save are still required.'),
+            react_1.default.createElement("div", { className: "sp-actions" },
+                react_1.default.createElement("button", { onClick: () => { const result = (0, draft_1.mergeDraft)(conflict.base || saved.version.payload_json, payload, conflict.server.version.payload_json); setConflict({ ...conflict, merge: result }); } }, "Propose three-way merge"),
+                react_1.default.createElement("button", { disabled: !conflict.merge, onClick: () => { setSaved(conflict.server); setPayload(conflict.merge.payload); setBack(v => (0, draft_1.boundedHistory)(v, (0, draft_1.copy)(payload))); setForward([]); setConflict(null); setMessage('Merged local draft only. Resolve reported conflicts, validate, then review and save.'); } }, "Use proposed draft"),
+                react_1.default.createElement("button", { onClick: () => { setSaved(conflict.server); setConflict(null); setMessage('Your complete local candidate is retained against the new head. Review its full diff before saving.'); } }, "Keep my complete draft for review"),
+                react_1.default.createElement("button", { onClick: () => { setConflict(null); } }, "Keep draft, cancel"))),
+        navigation && !review && !conflict && react_1.default.createElement(Dialog, { title: "Unsaved spatial draft", onClose: () => { setNavigation(null); queued.current = null; } },
+            react_1.default.createElement("p", null, "Save, explicitly discard, or keep this local unsaved draft before leaving."),
+            react_1.default.createElement("div", { className: "sp-actions" },
+                react_1.default.createElement("button", { onClick: () => { queued.current = navigation; setNavigation(null); void previewSave(); } }, "Review & save"),
+                react_1.default.createElement("button", { onClick: () => { try {
+                        (0, draft_1.saveLocal)(makeDraft());
+                        const commit = navigation;
+                        setNavigation(null);
+                        queued.current = null;
+                        current.current.dirty = false;
+                        commit();
+                    }
+                    catch (e) {
+                        setError(e.message);
+                    } } }, "Keep local draft & leave"),
+                react_1.default.createElement("button", { onClick: () => { try {
+                        (0, draft_1.removeLocal)(makeDraft());
+                    }
+                    catch { } const commit = navigation; setPayload(saved ? (0, draft_1.copy)(saved.version.payload_json) : null); current.current.dirty = false; setNavigation(null); queued.current = null; commit(); } }, "Discard & leave"),
+                react_1.default.createElement("button", { onClick: () => { setNavigation(null); queued.current = null; } }, "Stay"))),
+        recoverPrompt && !review && !conflict && !navigation && react_1.default.createElement(Dialog, { title: "Recover local unsaved data?", onClose: () => setRecoverPrompt(null) },
+            react_1.default.createElement("p", null,
+                recoverPrompt.payload.setup_label,
+                " \u00B7 ",
+                recoverPrompt.updated_at,
+                ". Recovery validates the draft and checks the server head; it never publishes automatically."),
+            react_1.default.createElement("div", { className: "sp-actions" },
+                react_1.default.createElement("button", { disabled: busy, onClick: () => void recover(recoverPrompt) }, "Validate & recover draft"),
+                react_1.default.createElement("button", { onClick: () => setRecoverPrompt(null) }, "Keep saved version"))));
+}
+
+},
+"spatial/SpatialPlan":function(require,module,exports){
+"use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SpatialPlan = SpatialPlan;
+const react_1 = __importStar(require("../react"));
+const evaluate_1 = require("./evaluate");
+const api_1 = require("../api");
+function SpatialPlan(p) {
+    const svg = (0, react_1.useRef)(null), gesture = (0, react_1.useRef)(null);
+    const { bounds: b, payload, sample } = p, w = b.max_x - b.min_x, h = b.max_y - b.min_y;
+    const point = (event) => { const r = svg.current.getBoundingClientRect(), scale = Math.min(r.width / w, r.height / h), left = (r.width - w * scale) / 2, top = (r.height - h * scale) / 2; return { x: b.min_x + (event.clientX - r.left - left) / scale, y: b.max_y - (event.clientY - r.top - top) / scale }; };
+    function down(e, id) { if (e.button !== 0)
+        return; const pt = point(e); if (id) {
+        p.onSelect(id);
+        if (!p.begin(id))
+            return;
+        const item = sample?.items.find((i) => i.id === id) || payload.marks.find(i => i.id === id);
+        const pos = item?.pose?.position || item?.position;
+        if (!pos)
+            return;
+        gesture.current = { id, origin: pos, start: pt };
+    }
+    else
+        gesture.current = { start: pt, bounds: { ...b } }; e.currentTarget.setPointerCapture(e.pointerId); e.preventDefault(); e.stopPropagation(); }
+    function moving(e) { const g = gesture.current; if (!g)
+        return; const v = point(e); if (g.id)
+        p.move(g.id, g.origin.x + v.x - g.start.x, g.origin.y + v.y - g.start.y);
+    else {
+        const dx = v.x - g.start.x, dy = v.y - g.start.y;
+        p.onBounds({ min_x: b.min_x - dx, max_x: b.max_x - dx, min_y: b.min_y - dy, max_y: b.max_y - dy });
+    } }
+    function finish(cancel) { if (!gesture.current)
+        return; const g = gesture.current; gesture.current = null; if (g.id)
+        p.end(cancel);
+    else if (cancel)
+        p.onBounds(g.bounds); }
+    const polygon = (points) => points.map(q => q[0] + ',' + (-q[1])).join(' ');
+    const gridStep = w > 80 ? 10 : w > 24 ? 5 : w < 3 ? .1 : 1, xs = [], ys = [];
+    for (let x = Math.ceil(b.min_x / gridStep) * gridStep; x <= b.max_x && xs.length < 250; x += gridStep)
+        xs.push(x);
+    for (let y = Math.ceil(b.min_y / gridStep) * gridStep; y <= b.max_y && ys.length < 250; y += gridStep)
+        ys.push(y);
+    const marks = Object.fromEntries(payload.marks.map(m => [m.id, m]));
+    return react_1.default.createElement("div", { className: "sp-canvas-wrap" },
+        react_1.default.createElement("svg", { ref: svg, className: "sp-plan", "aria-label": "Blocking plan, X right, Y forward and up the screen, metres", role: "group", tabIndex: 0, viewBox: `${b.min_x} ${-b.max_y} ${w} ${h}`, onPointerDown: (e) => down(e), onPointerMove: moving, onPointerUp: () => finish(false), onPointerCancel: () => finish(true), onLostPointerCapture: () => finish(false), onKeyDown: (e) => { if (e.key === 'Escape') {
+                finish(true);
+                e.preventDefault();
+            } if (p.selected && ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) {
+                e.preventDefault();
+                const n = e.shiftKey ? .5 : .1;
+                p.nudge(p.selected, e.key === 'ArrowLeft' ? -n : e.key === 'ArrowRight' ? n : 0, e.key === 'ArrowUp' ? n : e.key === 'ArrowDown' ? -n : 0);
+            } } },
+            react_1.default.createElement("rect", { x: b.min_x, y: -b.max_y, width: w, height: h, fill: "#fafbf7" }),
+            payload.floor_plans.filter(f => f.calibration.status !== 'unscaled').map(f => { const m = p.media.find(m => m.id === f.media_id); if (!m)
+                return null; const c = f.calibration, scale = c.status === 'approximate' ? c.metres_per_pixel : c.status === 'measured' ? c.real_distance_m / Math.hypot(c.pixel_a[0] - c.pixel_b[0], c.pixel_a[1] - c.pixel_b[1]) : 0; return react_1.default.createElement("image", { key: f.id, href: (0, api_1.originalUrl)(p.project, f.media_id), width: m.width * scale, height: m.height * scale, opacity: .45, preserveAspectRatio: "none", transform: `translate(${f.image_to_plan.origin_world.x},${-f.image_to_plan.origin_world.y}) rotate(${-f.image_to_plan.rotation_rad * 180 / Math.PI})`, pointerEvents: "none" },
+                react_1.default.createElement("title", null,
+                    c.status,
+                    " floor-plan reference")); }),
+            xs.map(x => react_1.default.createElement("g", { key: 'x' + x, pointerEvents: "none" },
+                react_1.default.createElement("line", { x1: x, y1: -b.max_y, x2: x, y2: -b.min_y, stroke: Math.abs(x) < 1e-9 ? '#78958b' : '#dfe7db', strokeWidth: Math.abs(x) < 1e-9 ? .02 : .01 }),
+                react_1.default.createElement("text", { className: "sp-grid-label", x: x + .04, y: -b.min_y - .12 },
+                    Number(x.toFixed(2)),
+                    " m"))),
+            ys.map(y => react_1.default.createElement("g", { key: 'y' + y, pointerEvents: "none" },
+                react_1.default.createElement("line", { x1: b.min_x, y1: -y, x2: b.max_x, y2: -y, stroke: Math.abs(y) < 1e-9 ? '#78958b' : '#dfe7db', strokeWidth: Math.abs(y) < 1e-9 ? .02 : .01 }),
+                react_1.default.createElement("text", { className: "sp-grid-label", x: b.min_x + .06, y: -y - .06 }, Number(y.toFixed(2))))),
+            sample?.light_coverage.map((c) => { const light = sample.items.find((i) => i.id === c.id), role = light?.role, color = role === 'key' ? '#d99d35' : role === 'fill' ? '#6aaab6' : role === 'rim' ? '#aa80be' : '#c1ac69'; return react_1.default.createElement("g", { key: c.id, pointerEvents: "none" },
+                react_1.default.createElement("title", null,
+                    light?.label,
+                    ": ",
+                    c.status,
+                    ". ",
+                    c.label),
+                c.polygons.map((poly, i) => react_1.default.createElement("polygon", { key: i, points: polygon(poly), fill: color, fillOpacity: c.kind === 'directional' ? .025 : .05 + (light?.output.relative || 0) * .12, stroke: color, strokeWidth: .016, strokeDasharray: c.status.includes('clip') ? '.1 .08' : undefined }))); }),
+            sample?.camera_coverage.map((c) => react_1.default.createElement("g", { key: c.id, pointerEvents: "none" },
+                react_1.default.createElement("title", null,
+                    c.label,
+                    ": ",
+                    c.status),
+                c.polygons.map((poly, i) => react_1.default.createElement("polygon", { key: i, points: polygon(poly), fill: "#4b8a67", fillOpacity: .045, stroke: "#368561", strokeWidth: .025, strokeDasharray: c.status === 'clipped' ? '.14 .08' : '.06 .04' })))),
+            payload.tracks.filter(t => t.property === 'position').map((t) => { const keys = [...t.keys].sort((a, b) => a.time_us - b.time_us); return react_1.default.createElement("g", { key: t.id, pointerEvents: "none" }, keys.map((k, i) => { let a, next = null; try {
+                a = (0, evaluate_1.resolvePosition)(k.value, marks);
+                if (i < keys.length - 1 && k.next === 'linear')
+                    next = (0, evaluate_1.resolvePosition)(keys[i + 1].value, marks);
+            }
+            catch {
+                return null;
+            } return react_1.default.createElement("g", { key: k.id },
+                next && react_1.default.createElement("line", { x1: a[0], y1: -a[1], x2: next[0], y2: -next[1], stroke: "#766b93", strokeWidth: .025, strokeDasharray: ".08 .05" }),
+                react_1.default.createElement("circle", { cx: a[0], cy: -a[1], r: .06, fill: "#fff", stroke: "#766b93", strokeWidth: .02 }),
+                react_1.default.createElement("text", { x: a[0] + .07, y: -a[1] - .08, className: "sp-grid-label" },
+                    k.time_us / 1e6,
+                    "s ",
+                    k.next === 'hold' ? 'hold' : '')); })); }),
+            sample?.items.filter((i) => i.present).map((i) => {
+                const pos = i.pose.position, selected = i.id === p.selected, q = i.pose.orientation, f = (0, evaluate_1.rotate)(q, [0, .7, 0]);
+                let points = [];
+                if (i.shape?.kind === 'box') {
+                    const d = i.shape.extents;
+                    points = [[-d.width_m / 2, -d.depth_m / 2, 0], [d.width_m / 2, -d.depth_m / 2, 0], [d.width_m / 2, d.depth_m / 2, 0], [-d.width_m / 2, d.depth_m / 2, 0]].map(v => (0, evaluate_1.rotate)(q, v)).map(v => [pos.x + v[0], pos.y + v[1]]);
+                }
+                const eye = i.eyeline_target_world;
+                return react_1.default.createElement("g", { key: i.id, role: "button", tabIndex: 0, "aria-label": `${i.label}, ${i.kind || i.category}, X ${pos.x.toFixed(2)}, Y ${pos.y.toFixed(2)}, height ${pos.z.toFixed(2)} metres`, className: "sp-item", onPointerDown: (e) => down(e, i.id), onClick: (e) => { e.stopPropagation(); p.onSelect(i.id); }, onFocus: () => p.onSelect(i.id) },
+                    react_1.default.createElement("title", null,
+                        i.label,
+                        " \u00B7 ",
+                        i.posture || i.role || i.kind || i.category,
+                        " \u00B7 Z ",
+                        pos.z,
+                        "m"),
+                    eye && react_1.default.createElement("line", { x1: pos.x, y1: -pos.y, x2: eye.x, y2: -eye.y, stroke: "#706a90", strokeDasharray: ".035 .075", strokeWidth: .02, pointerEvents: "none" }),
+                    points.length ? react_1.default.createElement("polygon", { points: polygon(points), fill: i.kind === 'wall' ? '#cad2c9' : '#d6c5aa', stroke: selected ? '#ba6410' : '#526a60', strokeWidth: selected ? .06 : .025 }) : i.category === 'modifiers' ? react_1.default.createElement("rect", { x: pos.x - i.width_m / 2, y: -pos.y - .035, width: i.width_m, height: .07, fill: i.kind === 'flag' ? '#343f39' : '#dadbcb', stroke: selected ? '#ba6410' : '#526a60', strokeWidth: .025, transform: `rotate(${-Math.atan2(-f[0], f[1]) * 180 / Math.PI},${pos.x},${-pos.y})` }) : react_1.default.createElement("circle", { cx: pos.x, cy: -pos.y, r: i.shape?.radius_m || .18, fill: i.category === 'lights' ? '#fae0a3' : i.category === 'cameras' ? '#c3dfce' : '#c3d6df', stroke: selected ? '#ba6410' : '#526a60', strokeWidth: selected ? .06 : .025 }),
+                    react_1.default.createElement("line", { x1: pos.x, y1: -pos.y, x2: pos.x + f[0], y2: -pos.y - f[1], stroke: "#335648", strokeWidth: .03 }),
+                    react_1.default.createElement("circle", { cx: pos.x + f[0], cy: -pos.y - f[1], r: .04, fill: "#335648" }),
+                    react_1.default.createElement("text", { className: "sp-item-title", x: pos.x + .23, y: -pos.y - .22 },
+                        i.label,
+                        i.posture === 'seated' ? ' · seated' : '',
+                        i.category === 'lights' && !i.enabled ? ' · OFF' : ''),
+                    selected && react_1.default.createElement("circle", { cx: pos.x, cy: -pos.y, r: .43, fill: "none", stroke: "#ba6410", strokeDasharray: ".06 .04", strokeWidth: .02, pointerEvents: "none" }));
+            }),
+            payload.marks.map(m => react_1.default.createElement("g", { key: m.id, role: "button", tabIndex: 0, "aria-label": 'Mark ' + m.label, onFocus: () => p.onSelect(m.id), onPointerDown: (e) => down(e, m.id) },
+                react_1.default.createElement("path", { d: `M${m.position.x - .08},${-m.position.y - .08}l.16,.16m-.16,0l.16,-.16`, stroke: m.id === p.selected ? '#ba6410' : '#7a628a', strokeWidth: .03 }),
+                react_1.default.createElement("text", { className: "sp-item-title", x: m.position.x + .1, y: -m.position.y + .22 }, m.label))),
+            react_1.default.createElement("text", { x: b.max_x - .9, y: -b.max_y + .3, className: "sp-grid-label" }, "+Y \u2191 \u00B7 +X \u2192")),
+        react_1.default.createElement("div", { className: "sp-legend" },
+            react_1.default.createElement("strong", null,
+                sample?.evaluated_time_us / 1e6 || 0,
+                " s \u00B7 Plane Z=",
+                sample?.target_plane_z_m || 0,
+                " m \u00B7 ",
+                payload.scale.status,
+                " scale"),
+            react_1.default.createElement("br", null),
+            "Dashed boundaries are display clips. Purple paths are timed hold/linear motion. Key/fill/rim labels distinguish roles; colour and opacity are symbolic, not brightness.",
+            react_1.default.createElement("br", null),
+            evaluate_1.LIMITATIONS),
+        payload.floor_plans.filter(f => f.calibration.status === 'unscaled').map(f => react_1.default.createElement("details", { key: f.id },
+            react_1.default.createElement("summary", null, "Unscaled floor-plan reference (not a metric layer)"),
+            react_1.default.createElement("img", { src: (0, api_1.originalUrl)(p.project, f.media_id), alt: "Unscaled floor-plan reference", style: { maxWidth: '100%', maxHeight: 220, objectFit: 'contain' } }))));
+}
+
+},
+"spatial/defaults":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.groups = exports.target = exports.pose = exports.origin = void 0;
+exports.blank = blank;
+exports.newItem = newItem;
+exports.itemById = itemById;
+exports.keyValue = keyValue;
+exports.properties = properties;
+exports.dependentPaths = dependentPaths;
+const draft_1 = require("./draft");
+const origin = () => ({ x: 0, y: 0, z: 0 });
+exports.origin = origin;
+const pose = () => ({ position: (0, exports.origin)(), orientation: { x: 0, y: 0, z: 0, w: 1 } });
+exports.pose = pose;
+const target = () => ({ target: { kind: 'point', point: { x: 0, y: 3, z: 1.2 } }, roll_rad: 0 });
+exports.target = target;
+function blank(scene) { return { schema: 'storyboarder.spatial-plan/v1', frame: 'rh-z-up-x-right-y-forward/v1', length_unit: 'm', setup_label: 'Untitled setup', scene_ids: [scene], location_asset_id: null, scale: { status: 'approximate', note: 'Authored planning dimensions; verify on location.' }, action: { duration_us: 8000000 }, floor_plans: [], instances: [], marks: [], beats: [], resources: [], cameras: [], lights: [], modifiers: [], tracks: [], source_pins: [], assumptions: ['Coverage is schematic, not photometry.'], origin: null }; }
+function newItem(kind, index, media) { const common = { id: (0, draft_1.uid)(), label: kind.replace(/-/g, ' ') + ' ' + (index + 1) }, p = (0, exports.pose)(); p.position = { x: index % 3, y: Math.floor(index / 3), z: 0 }; if (['actor', 'prop', 'wall'].includes(kind))
+    return { group: 'instances', item: { ...common, kind, pose: p, shape: kind === 'actor' ? { kind: 'actor-proxy', radius_m: .25, standing_height_m: 1.75, seated_height_m: 1.2 } : { kind: 'box', extents: { width_m: kind === 'wall' ? 3 : 1, depth_m: kind === 'wall' ? .15 : 1, height_m: kind === 'wall' ? 2.5 : .8 } }, ...(kind === 'actor' ? { posture: 'standing' } : {}), notes: '', source_claims: [] } }; if (kind === 'mark')
+    return { group: 'marks', item: { ...common, position: p.position } }; if (kind === 'beat')
+    return { group: 'beats', item: { ...common, order: index, time_us: null } }; if (kind === 'camera-resource' || kind === 'light-resource')
+    return { group: 'resources', item: { ...common, kind: kind.split('-')[0] } }; if (kind === 'camera')
+    return { group: 'cameras', item: { ...common, pose: { ...p, position: { ...p.position, z: 1.5 } }, projection: { kind: 'perspective', focal_length_mm: 50, sensor_width_mm: 36, sensor_height_mm: 24, active_gate_mm: { x: 0, y: 0, width: 36, height: 24 } }, coverage_display_distance_m: 15, notes: '' } }; if (kind === 'light')
+    return { group: 'lights', item: { ...common, role: 'key', pose: { ...p, position: { ...p.position, z: 3 } }, aim: { target: { kind: 'point', point: { x: 0, y: 3, z: 1.2 } }, roll_rad: 0 }, emitter: { kind: 'spot', full_beam_angle_deg: 60 }, source_dimensions_m: { width_m: .2, depth_m: .1, height_m: .2 }, color: { mode: 'cct', kelvin: 5600 }, output: { mode: 'schematic', relative: .5 }, enabled: true, modifier_ids: [], coverage_display_distance_m: 15, notes: '' } }; if (kind === 'floor-plan') {
+    if (!media)
+        throw Error('Import a raster reference into Image intake first.');
+    return { group: 'floor_plans', item: { id: (0, draft_1.uid)(), media_id: media.id, media_sha256: media.sha256, image_to_plan: { origin_world: (0, exports.origin)(), rotation_rad: 0 }, calibration: { status: 'unscaled', reason: 'No measured calibration. Reference only.' } } };
+} return { group: 'modifiers', item: { ...common, kind: kind === 'modifier' ? 'flag' : kind, pose: { ...p, position: { ...p.position, z: 1.5 } }, width_m: 1, height_m: 1, notes: '' } }; }
+exports.groups = ['instances', 'marks', 'cameras', 'lights', 'modifiers', 'resources', 'floor_plans', 'beats', 'source_pins'];
+function itemById(payload, id) { for (const group of exports.groups) {
+    const item = payload[group].find(i => i.id === id);
+    if (item)
+        return { group, item };
+} return null; }
+function keyValue(item, property) { if (property === 'position')
+    return { kind: 'point', point: (0, draft_1.copy)(item.pose.position) }; if (property === 'orientation')
+    return (0, draft_1.copy)(item.pose.orientation); if (property === 'aim' || property === 'eyeline')
+    return (0, draft_1.copy)(item[property] || (0, exports.target)()); if (property === 'actor-posture')
+    return item.posture || 'standing'; if (property === 'light-enabled')
+    return !!item.enabled; if (property === 'light-output')
+    return item.output.relative; if (property === 'light-spread')
+    return item.emitter.full_beam_angle_deg ?? item.emitter.planned_spread_deg; throw Error('Unknown track property.'); }
+function properties(item, group) { if (!item.pose)
+    return []; const options = ['position', 'orientation']; if (group === 'cameras' || group === 'lights')
+    options.push('aim'); if (item.kind === 'actor')
+    options.push('eyeline', 'actor-posture'); if (group === 'lights') {
+    options.push('light-enabled', 'light-output');
+    if (['spot', 'area'].includes(item.emitter.kind))
+        options.push('light-spread');
+} return options; }
+function dependentPaths(payload, id) { const out = []; function walk(v, p) { if (v && typeof v === 'object')
+    for (const [k, x] of Object.entries(v)) {
+        if (k === 'id')
+            continue;
+        if (x === id || Array.isArray(x) && x.includes(id))
+            out.push(p + '/' + k);
+        else
+            walk(x, p + '/' + k);
+    } } for (const g of [...exports.groups, 'tracks'])
+    for (const item of payload[g]) {
+        if (item.id === id || g === 'tracks' && item.owner_id === id)
+            continue;
+        walk(item, g + '/' + item.id);
+    } return out; }
+
+},
+"spatial/draft":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.same = exports.copy = void 0;
+exports.uid = uid;
+exports.saveLocal = saveLocal;
+exports.removeLocal = removeLocal;
+exports.localDrafts = localDrafts;
+exports.boundedHistory = boundedHistory;
+exports.mergeDraft = mergeDraft;
+const copy = (value) => structuredClone(value);
+exports.copy = copy;
+function uid() { if (crypto.randomUUID)
+    return crypto.randomUUID(); const b = crypto.getRandomValues(new Uint8Array(16)); b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128; const h = Array.from(b, x => x.toString(16).padStart(2, '0')).join(''); return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20); }
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+exports.same = same;
+const PREFIX = 'storyboarder.spatial-draft/v1:';
+const MAX_BYTES = 8 * 1024 * 1024, MAX_TOTAL = 32 * 1024 * 1024;
+const key = (d) => PREFIX + d.project_id + ':' + d.setup_id + ':' + (d.base_version_id || 'new');
+function saveLocal(d) { const raw = JSON.stringify(d); if (new TextEncoder().encode(raw).length > MAX_BYTES)
+    throw Error('This local recovery copy exceeds 8 MiB. Export the draft before leaving.'); let total = raw.length * 2; for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k.startsWith(PREFIX) && k !== key(d))
+        total += (localStorage.getItem(k) || '').length * 2;
+} if (total > MAX_TOTAL)
+    throw Error('Local draft storage is full. Export or explicitly discard an older draft; nothing was overwritten.'); localStorage.setItem(key(d), raw); }
+function removeLocal(d) { localStorage.removeItem(key(d)); }
+function localDrafts(project) { const out = []; for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (!k.startsWith(PREFIX + project + ':'))
+        continue;
+    const raw = localStorage.getItem(k) || '';
+    if (raw.length > MAX_BYTES)
+        continue;
+    try {
+        const d = JSON.parse(raw);
+        if (d.schema === 'storyboarder.spatial-draft/v1' && d.project_id === project && d.payload?.schema === 'storyboarder.spatial-plan/v1' && typeof d.setup_id === 'string')
+            out.push(d);
+    }
+    catch { }
+} return out.sort((a, b) => b.updated_at.localeCompare(a.updated_at)); }
+function boundedHistory(values, next) { const all = [...values, next].slice(-50); let n = JSON.stringify(all).length * 2; while (n > MAX_TOTAL && all.length > 1) {
+    n -= JSON.stringify(all[0]).length * 2;
+    all.shift();
+} return all; }
+/** Stable-ID three-way draft proposal. Conflicts retain local values, never publish. */
+function mergeDraft(base, local, remote) { const conflicts = []; const visit = (b, l, r, path) => { if ((0, exports.same)(l, r))
+    return (0, exports.copy)(l); if ((0, exports.same)(l, b))
+    return (0, exports.copy)(r); if ((0, exports.same)(r, b))
+    return (0, exports.copy)(l); if (l === undefined || r === undefined || l === null || r === null) {
+    conflicts.push(path);
+    return l;
+} if (Array.isArray(l) && Array.isArray(r) && Array.isArray(b) && [...b, ...l, ...r].every(x => x && typeof x === 'object' && typeof x.id === 'string')) {
+    const bm = new Map(b.map(x => [x.id, x])), lm = new Map(l.map(x => [x.id, x])), rm = new Map(r.map(x => [x.id, x]));
+    return [...new Set([...bm.keys(), ...lm.keys(), ...rm.keys()])].sort().map(id => visit(bm.get(id), lm.get(id), rm.get(id), path + '/' + id)).filter(v => v !== undefined);
+} if (typeof l === 'object' && typeof r === 'object' && !Array.isArray(l) && !Array.isArray(r)) {
+    if (/\/(projection|aim|framing_target|time_mapping|sample|keys)$/.test(path)) {
+        conflicts.push(path);
+        return (0, exports.copy)(l);
+    }
+    const result = {};
+    for (const k of new Set([...Object.keys(b || {}), ...Object.keys(l), ...Object.keys(r)])) {
+        const v = visit(b?.[k], l[k], r[k], path + '/' + k);
+        if (v !== undefined)
+            result[k] = v;
+    }
+    return result;
+} conflicts.push(path); return (0, exports.copy)(l); }; return { payload: visit(base, local, remote, ''), conflicts }; }
+
+},
+"spatial/evaluate":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.rectangle = exports.DEFAULT_BOUNDS = exports.yawPitchRoll = exports.qinverse = exports.qvalues = exports.unit = exports.cross = exports.dot = exports.mul = exports.sub = exports.add = exports.xyz = exports.vec = exports.LIMITATIONS = exports.EPS = void 0;
+exports.qdict = qdict;
+exports.qmul = qmul;
+exports.rotate = rotate;
+exports.euler = euler;
+exports.slerp = slerp;
+exports.fromBasis = fromBasis;
+exports.look = look;
+exports.gateBounds = gateBounds;
+exports.framingOrientation = framingOrientation;
+exports.projectPoint = projectPoint;
+exports.resolvePosition = resolvePosition;
+exports.trackValue = trackValue;
+exports.clipPolygon = clipPolygon;
+exports.cameraCoverage = cameraCoverage;
+exports.lightContains = lightContains;
+exports.lightCoverage = lightCoverage;
+exports.evaluate = evaluate;
+exports.secondsToUs = secondsToUs;
+exports.EPS = 1e-10;
+exports.LIMITATIONS = 'Planned coverage only. Occlusion, transmission, bounce, ambient, photometry, exposure and safety certification: not modelled.';
+const vec = (v) => [v.x, v.y, v.z];
+exports.vec = vec;
+const xyz = (v) => ({ x: v[0], y: v[1], z: v[2] });
+exports.xyz = xyz;
+const add = (a, b) => a.map((v, i) => v + b[i]);
+exports.add = add;
+const sub = (a, b) => a.map((v, i) => v - b[i]);
+exports.sub = sub;
+const mul = (a, n) => a.map(v => v * n);
+exports.mul = mul;
+const dot = (a, b) => a.reduce((s, v, i) => s + v * b[i], 0);
+exports.dot = dot;
+const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+exports.cross = cross;
+const unit = (v) => Math.hypot(...v) > exports.EPS ? (0, exports.mul)(v, 1 / Math.hypot(...v)) : null;
+exports.unit = unit;
+const qvalues = (q) => [q.x, q.y, q.z, q.w];
+exports.qvalues = qvalues;
+function qdict(v) { const n = Math.hypot(...v); const q = v.map(x => x / n); const first = [q[3], ...q.slice(0, 3)].find(x => x !== 0) || 1; const sign = first > 0 ? 1 : -1; return { x: q[0] * sign || 0, y: q[1] * sign || 0, z: q[2] * sign || 0, w: q[3] * sign || 0 }; }
+function qmul(a, b) { const [x, y, z, w] = (0, exports.qvalues)(a), [X, Y, Z, W] = (0, exports.qvalues)(b); return qdict([w * X + x * W + y * Z - z * Y, w * Y - x * Z + y * W + z * X, w * Z + x * Y - y * X + z * W, w * W - x * X - y * Y - z * Z]); }
+const qinverse = (q) => ({ x: -q.x, y: -q.y, z: -q.z, w: q.w });
+exports.qinverse = qinverse;
+function rotate(q, v) { const u = [q.x, q.y, q.z], t = (0, exports.mul)((0, exports.cross)(u, v), 2); return (0, exports.add)(v, (0, exports.add)((0, exports.mul)(t, q.w), (0, exports.cross)(u, t))); }
+const yawPitchRoll = (yaw, pitch = 0, roll = 0) => qmul(qmul(qdict([0, 0, Math.sin(yaw / 2), Math.cos(yaw / 2)]), qdict([Math.sin(pitch / 2), 0, 0, Math.cos(pitch / 2)])), qdict([0, Math.sin(roll / 2), 0, Math.cos(roll / 2)]));
+exports.yawPitchRoll = yawPitchRoll;
+function euler(q) { const r = rotate(q, [1, 0, 0]), f = rotate(q, [0, 1, 0]), u = rotate(q, [0, 0, 1]), pitch = Math.asin(Math.max(-1, Math.min(1, f[2]))); if (Math.abs(Math.cos(pitch)) < 1e-9)
+    return [Math.atan2(r[1], r[0]), pitch, 0]; return [Math.atan2(-f[0], f[1]), pitch, Math.atan2(-r[2], u[2])]; }
+function slerp(A, B, t) { const a = (0, exports.qvalues)(A); let b = (0, exports.qvalues)(B), d = (0, exports.dot)(a, b); if (d < 0) {
+    b = (0, exports.mul)(b, -1);
+    d = -d;
+} d = Math.min(1, d); if (d > .9995)
+    return qdict(a.map((v, i) => v + (b[i] - v) * t)); const angle = Math.acos(d), u = Math.sin((1 - t) * angle) / Math.sin(angle), v = Math.sin(t * angle) / Math.sin(angle); return qdict(a.map((x, i) => x * u + b[i] * v)); }
+function fromBasis(r, f, u) { const m = [0, 1, 2].map(i => [r[i], f[i], u[i]]), tr = m[0][0] + m[1][1] + m[2][2]; let q; if (tr > 0) {
+    const s = Math.sqrt(tr + 1) * 2;
+    q = [(m[2][1] - m[1][2]) / s, (m[0][2] - m[2][0]) / s, (m[1][0] - m[0][1]) / s, s / 4];
+}
+else {
+    const i = [0, 1, 2].reduce((a, b) => m[a][a] >= m[b][b] ? a : b), j = (i + 1) % 3, k = (i + 2) % 3, s = Math.sqrt(Math.max(0, 1 + m[i][i] - m[j][j] - m[k][k])) * 2;
+    q = [0, 0, 0, 0];
+    q[i] = s / 4;
+    q[j] = (m[j][i] + m[i][j]) / s;
+    q[k] = (m[k][i] + m[i][k]) / s;
+    q[3] = (m[k][j] - m[j][k]) / s;
+} return qdict(q); }
+function look(direction, roll = 0) { const f = (0, exports.unit)(direction); if (!f)
+    return null; const r = (0, exports.unit)((0, exports.cross)(f, [0, 0, 1])) || (0, exports.unit)((0, exports.cross)(f, [0, 1, 0])), u = (0, exports.cross)(r, f), c = Math.cos(roll), s = Math.sin(roll); return fromBasis((0, exports.sub)((0, exports.mul)(r, c), (0, exports.mul)(u, s)), f, (0, exports.add)((0, exports.mul)(r, s), (0, exports.mul)(u, c))); }
+function gateBounds(p) { const g = p.active_gate_mm, l = g.x - p.sensor_width_mm / 2, b = g.y - p.sensor_height_mm / 2; return [l, l + g.width, b, b + g.height]; }
+function framingOrientation(camera, position, target, framing) { const relative = (0, exports.sub)(target, position), length = Math.hypot(...relative), p = camera.projection; if (length < exports.EPS)
+    return null; let ray; if (p.kind === 'perspective') {
+    const [l, r, b, t] = gateBounds(p);
+    ray = [l + (framing.ndc_x + 1) * (r - l) / 2, p.focal_length_mm, b + (framing.ndc_y + 1) * (t - b) / 2];
+}
+else {
+    const x = framing.ndc_x * p.width_m / 2, z = framing.ndc_y * p.width_m / p.aspect / 2, d = length * length - x * x - z * z;
+    if (d <= exports.EPS)
+        return null;
+    ray = [x, Math.sqrt(d), z];
+} return qmul(look(relative, framing.roll_rad), (0, exports.qinverse)(look(ray))); }
+function projectPoint(camera, point) { const p = camera.projection, [x, y, z] = rotate((0, exports.qinverse)(camera.pose.orientation), (0, exports.sub)((0, exports.vec)(point), (0, exports.vec)(camera.pose.position))); if (y <= exports.EPS)
+    return { in_front: false, inside: false, depth_m: y, ndc: null }; let nx, ny; if (p.kind === 'perspective') {
+    const [l, r, b, t] = gateBounds(p);
+    nx = 2 * (x / y * p.focal_length_mm - l) / (r - l) - 1;
+    ny = 2 * (z / y * p.focal_length_mm - b) / (t - b) - 1;
+}
+else {
+    nx = 2 * x / p.width_m;
+    ny = 2 * z / (p.width_m / p.aspect);
+} return { in_front: true, inside: Math.abs(nx) <= 1 + exports.EPS && Math.abs(ny) <= 1 + exports.EPS, depth_m: y, ndc: [nx, ny] }; }
+const clone = (x) => JSON.parse(JSON.stringify(x));
+function interpolate(a, b, t) { if (a && typeof a === 'object' && !Array.isArray(a))
+    return Object.fromEntries(Object.entries(a).map(([k, v]) => [k, k in b ? interpolate(v, b[k], t) : v])); if (typeof a === 'number')
+    return a + (b - a) * t; return a; }
+function resolvePosition(value, marks) { if (value.kind === 'point')
+    return (0, exports.vec)(value.point); const mark = marks[value.mark_id]; if (!mark)
+    throw Error('Choose an existing mark.'); return (0, exports.add)((0, exports.vec)(mark.position), (0, exports.vec)(value.offset_world)); }
+function trackValue(track, time, marks) { const keys = [...track.keys].sort((a, b) => a.time_us - b.time_us); if (!keys.length)
+    throw Error('A motion track needs at least one key.'); let lo = 0, hi = keys.length; while (lo < hi) {
+    const m = (lo + hi) >> 1;
+    if (keys[m].time_us <= time)
+        lo = m + 1;
+    else
+        hi = m;
+} const i = Math.max(0, lo - 1), a = keys[i], p = track.property, av = p === 'position' ? resolvePosition(a.value, marks) : a.value; if (i === keys.length - 1 || time <= a.time_us || a.next === 'hold')
+    return clone(av); const b = keys[i + 1], t = (time - a.time_us) / (b.time_us - a.time_us); if (p === 'position')
+    return (0, exports.add)(av, (0, exports.mul)((0, exports.sub)(resolvePosition(b.value, marks), av), t)); if (p === 'orientation')
+    return slerp(av, b.value, t); return interpolate(av, b.value, t); }
+exports.DEFAULT_BOUNDS = { min_x: -6, max_x: 6, min_y: -3, max_y: 9 };
+function clipPolygon(poly, fn) { if (!poly.length)
+    return []; const out = []; let previous = poly[poly.length - 1], a = fn(previous); for (const current of poly) {
+    const b = fn(current);
+    if ((a >= 0) !== (b >= 0)) {
+        const u = a / (a - b);
+        out.push([previous[0] + u * (current[0] - previous[0]), previous[1] + u * (current[1] - previous[1])]);
+    }
+    if (b >= 0)
+        out.push(current);
+    previous = current;
+    a = b;
+} return out; }
+const rectangle = (b) => [[b.min_x, b.min_y], [b.max_x, b.min_y], [b.max_x, b.max_y], [b.min_x, b.max_y]];
+exports.rectangle = rectangle;
+function clipBounds(poly, b) { for (const f of [(p) => p[0] - b.min_x, (p) => b.max_x - p[0], (p) => p[1] - b.min_y, (p) => b.max_y - p[1]])
+    poly = clipPolygon(poly, f); return poly; }
+function onEdge(poly, b) { return poly.some(p => Math.abs(p[0] - b.min_x) < 1e-7 || Math.abs(p[0] - b.max_x) < 1e-7 || Math.abs(p[1] - b.min_y) < 1e-7 || Math.abs(p[1] - b.max_y) < 1e-7); }
+const localAt = (item, p) => rotate((0, exports.qinverse)(item.pose.orientation), (0, exports.sub)(p, (0, exports.vec)(item.pose.position)));
+function cameraCoverage(camera, z, bounds) { const p = camera.projection, local = (v) => localAt(camera, [v[0], v[1], z]); let planes, fov = null; if (p.kind === 'perspective') {
+    const [l, r, b, t] = gateBounds(p), f = p.focal_length_mm;
+    planes = [v => f * local(v)[0] - l * local(v)[1], v => r * local(v)[1] - f * local(v)[0], v => f * local(v)[2] - b * local(v)[1], v => t * local(v)[1] - f * local(v)[2]];
+    fov = { horizontal_deg: (Math.atan2(r, f) - Math.atan2(l, f)) * 180 / Math.PI, vertical_deg: (Math.atan2(t, f) - Math.atan2(b, f)) * 180 / Math.PI };
+}
+else {
+    const w = p.width_m / 2, h = p.width_m / p.aspect / 2;
+    planes = [v => local(v)[0] + w, v => w - local(v)[0], v => local(v)[2] + h, v => h - local(v)[2]];
+} planes.push(v => local(v)[1] - exports.EPS, v => camera.coverage_display_distance_m - local(v)[1]); let poly = (0, exports.rectangle)(bounds); for (const plane of planes)
+    poly = clipPolygon(poly, plane); const clipped = onEdge(poly, bounds) || poly.some(v => Math.abs(local(v)[1] - camera.coverage_display_distance_m) < 1e-6); return { id: camera.id, polygons: poly.length >= 3 ? [poly] : [], status: poly.length < 3 ? 'no-intersection' : clipped ? 'clipped' : 'bounded', fov, display_clip_m: camera.coverage_display_distance_m, label: 'Camera gate coverage; display clip is not visibility proof' }; }
+function lightContains(light, point, displayClip = false) { const local = localAt(light, Array.isArray(point) ? point : (0, exports.vec)(point)), d = Math.hypot(...local); if (!light.enabled || light.output.relative === 0 || d < exports.EPS || displayClip && d > light.coverage_display_distance_m)
+    return false; const k = light.emitter.kind; if (k === 'point' || k === 'directional')
+    return true; if (local[1] <= 0)
+    return false; if (k === 'spot')
+    return local[1] / d >= Math.cos(light.emitter.full_beam_angle_deg * Math.PI / 360) - exports.EPS; const half = Math.tan(light.emitter.planned_spread_deg * Math.PI / 360), dims = light.source_dimensions_m; return Math.abs(local[0]) <= dims.width_m / 2 + local[1] * half && Math.abs(local[2]) <= dims.height_m / 2 + local[1] * half; }
+function lightCoverage(light, z, bounds, resolution = 32) { const kind = light.emitter.kind, o = (0, exports.vec)(light.pose.position), axis = rotate(light.pose.orientation, [0, 1, 0]), out = { id: light.id, kind, polygons: [], status: 'disabled', label: 'Schematic planned coverage; output opacity is not brightness' }; if (!light.enabled || light.output.relative === 0)
+    return out; const delta = z - o[2], display = light.coverage_display_distance_m; if (kind === 'directional')
+    return { ...out, polygons: [(0, exports.rectangle)(bounds)], status: 'clipped-unbounded', axis: (0, exports.xyz)(axis), label: 'Directional source: unbounded parallel rays' }; if (kind === 'point') {
+    if (Math.abs(delta) >= display)
+        return { ...out, status: 'no-intersection', label: 'Omnidirectional source; outside display radius' };
+    const radius = Math.sqrt(display * display - delta * delta), poly = Array.from({ length: 64 }, (_, i) => [o[0] + radius * Math.cos(i * 2 * Math.PI / 64), o[1] + radius * Math.sin(i * 2 * Math.PI / 64)]);
+    return { ...out, polygons: [clipBounds(poly, bounds)], status: 'display-only', label: 'Omnidirectional display-radius outline; no attenuation' };
+} if (kind === 'area') {
+    const tangent = Math.tan(light.emitter.planned_spread_deg * Math.PI / 360), w = light.source_dimensions_m.width_m / 2, h = light.source_dimensions_m.height_m / 2, local = (p) => localAt(light, [p[0], p[1], z]);
+    let poly = (0, exports.rectangle)(bounds);
+    for (const f of [(p) => local(p)[1] - exports.EPS, (p) => display - local(p)[1], (p) => w + local(p)[1] * tangent - local(p)[0], (p) => w + local(p)[1] * tangent + local(p)[0], (p) => h + local(p)[1] * tangent - local(p)[2], (p) => h + local(p)[1] * tangent + local(p)[2]])
+        poly = clipPolygon(poly, f);
+    return { ...out, polygons: poly.length >= 3 ? [poly] : [], status: poly.length < 3 ? 'no-intersection' : onEdge(poly, bounds) ? 'clipped-schematic' : 'bounded-schematic', label: 'Area source: authored rectangular spread envelope; not light transport' };
+} const a = light.emitter.full_beam_angle_deg * Math.PI / 360, ca = Math.cos(a), sa = Math.sin(a), dz = axis[2]; let minZ = dz * ca - Math.sqrt(Math.max(0, 1 - dz * dz)) * sa, maxZ = dz * ca + Math.sqrt(Math.max(0, 1 - dz * dz)) * sa; if (dz >= ca)
+    maxZ = 1; if (dz <= -ca)
+    minZ = -1; if (delta > exports.EPS && maxZ <= 0 || delta < -exports.EPS && minZ >= 0)
+    return { ...out, status: 'no-intersection' }; const bounded = delta > exports.EPS && minZ > exports.EPS || delta < -exports.EPS && maxZ < -exports.EPS; if (bounded) {
+    const r = rotate(light.pose.orientation, [1, 0, 0]), u = rotate(light.pose.orientation, [0, 0, 1]);
+    let poly = [], clippedDistance = false;
+    for (let i = 0; i < 96; i++) {
+        const angle = 2 * Math.PI * i / 96, ray = (0, exports.add)((0, exports.mul)(axis, ca), (0, exports.add)((0, exports.mul)(r, sa * Math.cos(angle)), (0, exports.mul)(u, sa * Math.sin(angle)))), t = delta / ray[2];
+        if (t > display)
+            clippedDistance = true;
+        poly.push((0, exports.add)(o, (0, exports.mul)(ray, t)).slice(0, 2));
+    }
+    if (!clippedDistance) {
+        poly = clipBounds(poly, bounds);
+        return { ...out, polygons: poly.length >= 3 ? [poly] : [], status: poly.length < 3 ? 'no-intersection' : onEdge(poly, bounds) ? 'clipped' : 'bounded', ...(Math.abs(Math.abs(dz) - 1) < 1e-12 ? { analytic_radius_m: Math.abs(delta) * Math.tan(a) } : {}) };
+    }
+} const dx = (bounds.max_x - bounds.min_x) / resolution, dy = (bounds.max_y - bounds.min_y) / resolution, polygons = []; for (let iy = 0; iy < resolution; iy++) {
+    let run = null;
+    for (let ix = 0; ix <= resolution; ix++) {
+        const inside = ix < resolution && lightContains(light, [bounds.min_x + (ix + .5) * dx, bounds.min_y + (iy + .5) * dy, z], true);
+        if (inside && run === null)
+            run = ix;
+        if (!inside && run !== null) {
+            const x1 = bounds.min_x + run * dx, x2 = bounds.min_x + ix * dx, y1 = bounds.min_y + iy * dy;
+            polygons.push([[x1, y1], [x2, y1], [x2, y1 + dy], [x1, y1 + dy]]);
+            run = null;
+        }
+    }
+} return { ...out, polygons, status: Math.abs(delta) < exports.EPS ? 'degenerate-source-plane' : bounded ? 'clipped' : 'clipped-unbounded', mesh_resolution: resolution, label: 'Clipped planned cone intersection (sampled mesh); dashed boundary is a display limit' }; }
+function evaluate(payload, time, plane = 0, bounds = exports.DEFAULT_BOUNDS, coverage = true) {
+    if (!Number.isSafeInteger(time))
+        throw Error('Time must be integer microseconds.');
+    const t = Math.max(0, Math.min(payload.action.duration_us, time)), tracks = new Map(payload.tracks.map(i => [i.owner_id + '/' + i.property, i])), marks = Object.fromEntries(payload.marks.map(m => [m.id, m])), items = ['instances', 'cameras', 'lights', 'modifiers'].flatMap(g => payload[g].map(i => ({ ...clone(i), category: g }))), byId = Object.fromEntries(items.map(i => [i.id, i])), diagnostics = [];
+    const sample = (i, p, d) => { const track = tracks.get(i.id + '/' + p); return track ? trackValue(track, t, marks) : d; };
+    for (const i of items) {
+        i.pose.position = (0, exports.xyz)(sample(i, 'position', (0, exports.vec)(i.pose.position)));
+        i.pose.orientation = sample(i, 'orientation', i.pose.orientation);
+        i.present = !i.presence || i.presence.start_us <= t && t <= i.presence.end_us;
+        if (i.kind === 'actor') {
+            i.posture = sample(i, 'actor-posture', i.posture);
+            i.evaluated_height_m = i.shape[i.posture + '_height_m'];
+        }
+        if (i.category === 'lights') {
+            i.enabled = sample(i, 'light-enabled', i.enabled);
+            i.output.relative = sample(i, 'light-output', i.output.relative);
+            const spread = i.emitter.kind === 'spot' ? 'full_beam_angle_deg' : 'planned_spread_deg';
+            if (spread in i.emitter)
+                i.emitter[spread] = sample(i, 'light-spread', i.emitter[spread]);
+        }
+    }
+    const target = (v, owner) => { if (v.kind !== 'item')
+        return resolvePosition(v, marks); const i = byId[v.item_id]; if (!i || !i.present) {
+        diagnostics.push({ code: 'target_absent', item_id: owner, target_id: v.item_id });
+        return null;
+    } return (0, exports.add)((0, exports.vec)(i.pose.position), (0, exports.vec)(v.offset_world)); };
+    for (const i of items) {
+        if (!i.present)
+            continue;
+        const p = (0, exports.vec)(i.pose.position), aim = sample(i, 'aim', i.aim), framing = i.framing_target;
+        if (aim || framing) {
+            const definition = framing || aim, point = target(definition.target, i.id), q = point ? (framing ? framingOrientation(i, p, point, framing) : look((0, exports.sub)(point, p), aim.roll_rad)) : null;
+            if (q)
+                i.pose.orientation = q;
+            else
+                diagnostics.push({ code: point ? 'aim_degenerate' : 'aim_unavailable', item_id: i.id, fallback: 'authored quaternion' });
+        }
+        const eye = sample(i, 'eyeline', i.eyeline);
+        if (eye) {
+            const p = target(eye.target, i.id);
+            i.eyeline_target_world = p ? (0, exports.xyz)(p) : null;
+        }
+    }
+    const result = { schema: 'storyboarder.spatial-evaluation/v1', evaluator: 'storyboarder.spatial-evaluator/v1', requested_time_us: time, evaluated_time_us: t, clamped: t !== time, target_plane_z_m: plane, bounds, items, diagnostics, limitations: exports.LIMITATIONS, camera_coverage: [], light_coverage: [] };
+    if (coverage) {
+        for (const c of items.filter(i => i.category === 'cameras')) {
+            const value = cameraCoverage(c, plane, bounds);
+            value.subject_samples = items.filter(i => i.category === 'instances' && i.present).map(i => { const p = (0, exports.vec)(i.pose.position), h = i.evaluated_height_m ?? i.shape.height_m ?? i.shape.extents?.height_m ?? 0; return { item_id: i.id, sample_kind: 'base/mid/top centre; no occlusion', points: [p, (0, exports.add)(p, [0, 0, h / 2]), (0, exports.add)(p, [0, 0, h])].map(p => projectPoint(c, (0, exports.xyz)(p))) }; });
+            result.camera_coverage.push(value);
+        }
+        for (const l of items.filter(i => i.category === 'lights')) {
+            const v = lightCoverage(l, plane, bounds);
+            v.subject_samples = items.filter(i => i.category === 'instances' && i.present).map(i => ({ item_id: i.id, inside: lightContains(l, { x: i.pose.position.x, y: i.pose.position.y, z: plane }) }));
+            result.light_coverage.push(v);
+        }
+    }
+    return result;
+}
+function secondsToUs(value) { const s = String(value).trim(); if (!/^\d+(\.\d+)?$/.test(s))
+    throw Error('Enter nonnegative seconds.'); const [whole, part = ''] = s.split('.'); const fraction = (part + '0000000').slice(0, 7); const result = Number(whole) * 1e6 + Number(fraction.slice(0, 6)) + (Number(fraction[6]) >= 5 ? 1 : 0); if (!Number.isSafeInteger(result) || result > 86400000000)
+    throw Error('Duration must be at most 24 hours.'); return result; }
+
+},
+"spatial/styles":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.SPATIAL_CSS = void 0;
+exports.SPATIAL_CSS = `
+.sp-editor{--sp-ink:#163329;--sp-line:#cfdbd4;--sp-muted:#61736a;color:var(--sp-ink);padding:18px;max-width:1900px;margin:auto}.sp-editor *{box-sizing:border-box}.sp-editor button,.sp-editor input,.sp-editor select,.sp-editor textarea{font:inherit}.sp-editor button{border:1px solid var(--sp-line);background:#fff;border-radius:6px;padding:6px 9px;cursor:pointer;color:var(--sp-ink)}.sp-editor button:disabled{opacity:.45;cursor:default}.sp-editor button.primary{background:#245e48;color:#fff}.sp-editor button[aria-pressed=true],.sp-editor button.active{background:#dfede4;border-color:#245e48}.sp-editor :focus-visible{outline:3px solid #cd7200;outline-offset:2px}.sp-header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px}.sp-header h1{font-size:24px;margin:3px 0}.sp-eyebrow{text-transform:uppercase;letter-spacing:.13em;font-size:10px;color:var(--sp-muted)}.sp-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}.sp-subline{font-size:12px;color:var(--sp-muted);margin:5px 0}.sp-badge{display:inline-block;padding:3px 7px;background:#e8efe9;border-radius:4px;font-size:11px}.sp-badge.warn{background:#fff0cd;color:#734900}.sp-selector{display:flex;gap:10px;flex-wrap:wrap;padding:10px;border:1px solid var(--sp-line);background:#f6f9f5;border-radius:8px;margin-bottom:10px}.sp-editor label{font-size:12px;display:flex;flex-direction:column;gap:4px;min-width:0}.sp-editor input,.sp-editor select,.sp-editor textarea{border:1px solid var(--sp-line);border-radius:4px;padding:6px;min-width:0;background:#fff;color:var(--sp-ink);width:100%}.sp-selector label{min-width:130px;flex:1}.sp-workbench{display:grid;grid-template-columns:190px minmax(280px,1fr) 295px;gap:10px;align-items:stretch}.sp-panel{border:1px solid var(--sp-line);border-radius:8px;background:#fff;min-width:0;overflow:hidden}.sp-panel h2{font-size:13px;margin:0;padding:11px;border-bottom:1px solid var(--sp-line);background:#f5f8f4}.sp-panel-body{padding:10px;max-height:660px;overflow:auto}.sp-object{width:100%;text-align:left;margin-bottom:4px;display:flex;justify-content:space-between;gap:5px}.sp-object small{color:var(--sp-muted)}.sp-add{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:10px}.sp-add button{padding:5px;font-size:11px}.sp-canvas-wrap{position:relative;background:#fafbf8;min-height:440px}.sp-plan{width:100%;height:540px;touch-action:none;display:block}.sp-plan text{font-family:system-ui,sans-serif}.sp-plan .sp-item{cursor:grab}.sp-plan .sp-item:focus-visible{outline:none;filter:drop-shadow(0 0 .06px #bd7100)}.sp-grid-label{font-size:.16px;fill:#63756a;paint-order:stroke;stroke:#fff;stroke-width:.035}.sp-canvas-toolbar{display:flex;gap:5px;flex-wrap:wrap;padding:7px;border-bottom:1px solid var(--sp-line)}.sp-canvas-toolbar label{max-width:90px}.sp-canvas-toolbar button{font-size:11px}.sp-legend{padding:8px 10px;font-size:10px;line-height:1.5;color:var(--sp-muted);background:#f4f6f1;border-top:1px solid var(--sp-line)}.sp-legend strong{color:var(--sp-ink)}.sp-coverage-list{display:flex;gap:5px;flex-wrap:wrap}.sp-inspector label{margin-bottom:6px}.sp-fields>.sp-field{margin-bottom:7px}.sp-fields .sp-fields{padding-left:8px;border-left:2px solid #e3e9e0}.sp-optional{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-top:5px}.sp-optional button,.sp-array>button{font-size:10px;padding:3px 5px}.sp-constant{display:flex;justify-content:space-between;font-size:10px;gap:6px;overflow-wrap:anywhere;color:var(--sp-muted)}.sp-id{font-size:9px;overflow-wrap:anywhere;color:var(--sp-muted)}.sp-editor fieldset{border:1px solid var(--sp-line);border-radius:5px;padding:7px;margin:8px 0;min-width:0}.sp-editor legend{font-size:11px;padding:0 3px}.sp-tuple{display:flex;gap:5px}.sp-editor details{border-bottom:1px solid #e2e8de;padding:5px 0}.sp-editor summary{cursor:pointer;font-size:12px;padding:4px 0}.sp-editor .sp-check{flex-direction:row;align-items:center}.sp-check input{width:auto}.sp-number small{display:block;color:#a32424;font-size:10px}.sp-timebar{margin-top:10px;padding:10px;background:#f6f9f5;border:1px solid var(--sp-line);border-radius:8px}.sp-timebar input[type=range]{flex:1;min-width:120px}.sp-timebar .sp-actions>label{width:100px}.sp-timeline{height:75px;background:#edf2eb;position:relative;overflow:auto;border-radius:5px;margin-top:8px}.sp-lane{height:25px;position:relative;border-bottom:1px solid var(--sp-line);padding-left:100px}.sp-lane span{position:absolute;left:3px;top:4px;font-size:10px}.sp-key{position:absolute!important;top:3px;width:17px;padding:0!important;font-size:12px!important}.sp-lane-grid{position:absolute;left:105px;right:12px;top:0;height:25px}.sp-cursor{position:absolute;top:0;bottom:0;border-left:1px solid #a64815;pointer-events:none}.sp-tabs{display:flex;gap:5px;flex-wrap:wrap;margin:12px 0}.sp-section{padding:12px;border:1px solid var(--sp-line);background:#fff;border-radius:8px;max-height:520px;overflow:auto}.sp-section h2{font-size:15px}.sp-message{background:#fff2d8;border:1px solid #e1b561;border-radius:6px;padding:10px;font-size:12px;margin:8px 0;white-space:pre-wrap;overflow-wrap:anywhere}.sp-error{background:#fff0ea;border-color:#d79374}.sp-success{background:#e9f3e9;border-color:#94b394}.sp-modal-backdrop{position:fixed;inset:0;background:#16271dcc;z-index:1000;display:grid;place-items:center;padding:20px}.sp-modal{background:#fff;border-radius:10px;padding:20px;width:min(720px,96vw);max-height:90vh;overflow:auto;box-shadow:0 20px 80px #0005}.sp-modal h2{margin:0 0 12px}.sp-modal table{width:100%;font-size:11px;table-layout:fixed;border-collapse:collapse}.sp-modal td,.sp-modal th{padding:6px;border-bottom:1px solid var(--sp-line);text-align:left;overflow-wrap:anywhere;vertical-align:top}.sp-modal .sp-actions{margin-top:15px;justify-content:flex-end}.sp-preview-value{font-size:11px;color:var(--sp-muted);max-height:100px;overflow:auto;white-space:pre-wrap}.sp-empty{padding:40px 20px;text-align:center}.sp-two{display:grid;grid-template-columns:1fr 1fr;gap:12px}.sp-downloads{display:flex;gap:8px;flex-wrap:wrap;font-size:12px}.sp-downloads a{padding:5px 8px;border:1px solid var(--sp-line);border-radius:4px}.sp-unit-note{font-size:10px;color:var(--sp-muted);margin:4px 0}.sp-item-title{font-size:.2px;fill:#183329;paint-order:stroke;stroke:#fff;stroke-width:.05;pointer-events:none}
+@media(max-width:1150px){.sp-workbench{grid-template-columns:150px minmax(270px,1fr)}.sp-inspector{grid-column:1/-1}.sp-inspector .sp-panel-body{max-height:400px}.sp-inspector>.sp-panel-body>.sp-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
+@media(max-width:650px){.sp-editor{padding:8px}.sp-workbench{grid-template-columns:1fr}.sp-panel-body{max-height:260px}.sp-plan{height:430px}.sp-two{grid-template-columns:1fr}.sp-inspector>.sp-panel-body>.sp-fields{display:block}.sp-object{width:auto;display:inline-flex;margin:3px}.sp-header h1{font-size:20px}}
+@media(prefers-reduced-motion:reduce){.sp-editor *{animation:none!important;transition:none!important}}
+`;
+
+},
+"spatial/types":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+
+},
+"types":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+
+},
+"utils":function(require,module,exports){
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.activeEntities = exports.kindLabel = exports.niceDate = exports.fieldText = exports.shortId = exports.sourceLabel = exports.operationLabel = exports.roleLabel = exports.statusLabel = exports.emptySourceMessage = exports.fieldLabel = exports.displayTitle = exports.human = void 0;
+exports.allRecords = allRecords;
+exports.commandDefaults = commandDefaults;
+exports.selectOptions = selectOptions;
+const labels = {
+    asset: 'Library item', context: 'Story direction', scene: 'Scene', location_id: 'Location', visual_style: 'Visual style', premise: 'Story premise',
+    arc: 'Sequence direction', tone: 'Tone', framing: 'Framing', camera: 'Camera plan', time: 'Time of day',
+    constraints: 'Production notes', owner_id: 'Apply direction to', key: 'Topic', content: 'Direction notes',
+    operation: 'How this changes earlier direction', revision: 'Version check', target_revision: 'Version check',
+    parent_id: 'Place under', position: 'Order', shot_id: 'Shot', asset_id: 'Library item', media_id: 'Image',
+    accepted: 'Added', discarded: 'Removed from intake', pending: 'Needs review', running: 'In progress', succeeded: 'Complete', failed: 'Needs attention', cancelled: 'Stopped',
+    selected: 'Selected', approved: 'Approved', archived: 'Archived', queued: 'Ready to run', draft: 'Draft',
+    append: 'Add to earlier notes', replace: 'Replace earlier notes', exclude: 'Hide earlier notes here',
+    order: 'Story order', relationship: 'Library connection', assignment: 'Shot reference', location_default: 'Default location',
+    story: 'Story flow', assets: 'Reference map', frame: 'Storyboard image', record: 'Item',
+    character: 'Character', location: 'Location', prop: 'Prop', reference: 'General reference',
+    'same-person-as': 'Same person as', 'appears-at': 'Appears at', 'alternate-view-of': 'Alternate view of',
+    'setting-reference': 'Location reference', 'part-of': 'Part of', 'inspired-by': 'Inspired by', 'related-to': 'Related to', 'wears': 'Wears',
+    create_title: 'New item name', create_type: 'Item type', include_media: 'Include images in package',
+    approved_only: 'Use approved frames only', recursive: 'Include images in subfolders',
+};
+const human = (value) => labels[value] || value.replaceAll('_', ' ').replaceAll('-', ' ').replace(/\b\w/g, c => c.toUpperCase());
+exports.human = human;
+const displayTitle = (value) => /^[A-Z0-9]+(?:_[A-Z0-9]+)+$/.test(value) ? value.split('_').map(part => /^\d+$/.test(part) ? part : part.charAt(0) + part.slice(1).toLowerCase()).join(' ') : value;
+exports.displayTitle = displayTitle;
+const fieldLabel = (name, fallback) => labels[name] || fallback || (0, exports.human)(name);
+exports.fieldLabel = fieldLabel;
+const emptySourceMessage = (source) => ({
+    assets: 'No library items to choose from yet. Create one first.',
+    sequences: 'No sequences to choose from yet. Create one first.',
+    scenes: 'No scenes to choose from yet. Create one first.',
+    shots: 'No shots to choose from yet. Create one first.',
+    locations: 'No locations to choose from yet. Add one to the reference library first.',
+    media: 'No project images yet. Import an image first.',
+    asset_images: 'No images in this library item yet. Add one first.',
+    story: 'No story levels to choose from yet. Create a sequence, scene, or shot first.',
+    parents: 'No suitable place to add this yet. Create a sequence or scene first.',
+    scripts: 'No image tools are connected yet. Use the Storyboarder CLI to add a trusted tool.',
+}[source] || 'Nothing to choose from yet. Add the item first.');
+exports.emptySourceMessage = emptySourceMessage;
+const statusLabel = (value) => (0, exports.human)(value);
+exports.statusLabel = statusLabel;
+const roleLabel = (value) => ({ subject: 'Subject', 'setting-reference': 'Location', costume: 'Wardrobe', prop: 'Prop', reference: 'General reference' }[value] || (0, exports.human)(value));
+exports.roleLabel = roleLabel;
+const operationLabel = (value) => ({ append: 'Added here', replace: 'Earlier direction replaced here', exclude: 'Earlier direction hidden here' }[value] || (0, exports.human)(value));
+exports.operationLabel = operationLabel;
+const sourceLabel = (kind) => ({ project: 'Project', sequence: 'Sequence', scene: 'Scene', shot: 'Shot', asset: 'Library item' }[kind] || (0, exports.human)(kind));
+exports.sourceLabel = sourceLabel;
+const shortId = (id) => id.slice(0, 8);
+exports.shortId = shortId;
+const fieldText = (value) => value == null ? '' : String(value);
+exports.fieldText = fieldText;
+const niceDate = (value) => new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+exports.niceDate = niceDate;
+const kindLabel = (e) => e.kind === 'asset' ? (0, exports.human)((0, exports.fieldText)(e.fields.type)) : (0, exports.sourceLabel)(e.kind);
+exports.kindLabel = kindLabel;
+const activeEntities = (state, kind) => state.entities.filter(e => !e.archived && (!kind || e.kind === kind));
+exports.activeEntities = activeEntities;
+function allRecords(state) { return [...state.entities, ...state.media, ...state.intake, ...state.asset_media, ...state.links, ...state.assignments, ...state.context_blocks, ...state.frames, ...state.layouts, ...state.jobs]; }
+function commandDefaults(entity) {
+    if (!entity)
+        return {};
+    return { ...entity, ...(entity.fields || {}), id: entity.id, revision: entity.revision, ...(entity.kind && entity.kind !== 'asset' ? { owner_id: entity.id } : {}), ...(entity.kind === 'shot' ? { shot_id: entity.id } : {}), ...(entity.kind === 'asset' ? { asset_id: entity.id, source_id: entity.id } : {}), ...(entity.key ? { content: entity.text } : {}), tags: entity.tags || [], aliases: entity.aliases || [] };
+}
+function selectOptions(field, state, meta, values) {
+    if (field.options.length)
+        return field.options.map(o => ({ value: o, label: (0, exports.human)(o) }));
+    const source = field.source;
+    if (source === 'scripts')
+        return meta.scripts.map(s => ({ value: s.name, label: s.name + (s.description ? ' — ' + s.description : '') }));
+    const kinds = { assets: 'asset', sequences: 'sequence', scenes: 'scene', shots: 'shot', projects: 'project' };
+    let records = [];
+    const byId = Object.fromEntries(state.entities.map(e => [e.id, e]));
+    if (kinds[source])
+        records = (0, exports.activeEntities)(state, kinds[source]);
+    else if (source === 'locations')
+        records = (0, exports.activeEntities)(state, 'asset').filter(e => e.fields.type === 'location');
+    else if (source === 'story' || source === 'parents')
+        records = (0, exports.activeEntities)(state).filter(e => e.kind !== 'asset' && (source !== 'parents' || e.kind !== 'shot'));
+    else
+        records = state[source] || [];
+    if (source === 'asset_images')
+        records = state.media;
+    if (source === 'asset_images' && values.asset_id) {
+        const allowed = new Set(state.asset_media.filter(m => m.asset_id === values.asset_id).map(m => m.media_id));
+        records = records.filter(r => allowed.has(r.id));
+    }
+    if (source === 'asset_media' && values.asset_id)
+        records = records.filter(r => r.asset_id === values.asset_id);
+    return records.map(r => {
+        let label = (0, exports.displayTitle)(r.title || r.original_name || r.name || r.key || 'Untitled item');
+        if (source === 'frames')
+            label = `${(0, exports.displayTitle)(byId[r.shot_id]?.title || 'Shot')} · image ${r.version} · ${(0, exports.statusLabel)(r.state)}`;
+        if (source === 'asset_media')
+            label = `${(0, exports.displayTitle)(byId[r.asset_id]?.title || 'Library item')} / ${state.media.find(m => m.id === r.media_id)?.original_name || 'Image'}${r.is_primary ? ' · cover image' : ''}`;
+        if (source === 'links')
+            label = `${(0, exports.displayTitle)(byId[r.source_id]?.title || 'Item')} → ${(0, exports.human)(r.relation)} → ${(0, exports.displayTitle)(byId[r.target_id]?.title || 'Item')}`;
+        if (source === 'assignments')
+            label = `${(0, exports.displayTitle)(byId[r.shot_id]?.title || 'Shot')} → ${(0, exports.roleLabel)(r.role)} → ${(0, exports.displayTitle)(byId[r.asset_id]?.title || 'Library item')}`;
+        if (source === 'intake')
+            label = `${r.original_name} · ${(0, exports.statusLabel)(r.state)}${r.duplicate ? ' · identical image' : ''}`;
+        return { value: r.id, label };
+    });
+}
+
+}};
+const cache={};function load(id){if(cache[id])return cache[id].exports;if(!modules[id])throw Error('Missing app module '+id);const m=cache[id]={exports:{}};function req(relative){const parts=id.split('/');parts.pop();for(const p of relative.split('/')){if(p==='.'||!p)continue;if(p==='..')parts.pop();else parts.push(p)}return load(parts.join('/').replace(/\.js$/,''));}modules[id](req,m,m.exports);return m.exports;}load('main');})();

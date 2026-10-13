@@ -5051,6 +5051,2568 @@
       "browser": false,
       "api_safe": true,
       "read_only": false
+    },
+    {
+      "name": "spatial.schema",
+      "label": "Spatial schema",
+      "fields": [],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.fixture",
+      "label": "Spatial fixture",
+      "fields": [
+        {
+          "name": "scene_id",
+          "label": "Scene Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "chair_asset_id",
+          "label": "Chair Asset Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.create-preview",
+      "label": "Spatial create preview",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_project_revision",
+          "label": "Expected Project Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "payload",
+          "label": "Payload",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.create",
+      "label": "Spatial create",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_project_revision",
+          "label": "Expected Project Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "payload",
+          "label": "Payload",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Expected Basis Sha256",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.list",
+      "label": "Spatial list",
+      "fields": [
+        {
+          "name": "scene_id",
+          "label": "Scene Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "include_archived",
+          "label": "Include Archived",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.show",
+      "label": "Spatial show",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.history",
+      "label": "Spatial history",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.validate",
+      "label": "Spatial validate",
+      "fields": [
+        {
+          "name": "payload",
+          "label": "Payload",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.revise-preview",
+      "label": "Spatial revise preview",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "payload",
+          "label": "Payload",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.revise",
+      "label": "Spatial revise",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "payload",
+          "label": "Payload",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Expected Basis Sha256",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.diff",
+      "label": "Spatial diff",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "from_version_id",
+          "label": "From Version Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "to_version_id",
+          "label": "To Version Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.restore-preview",
+      "label": "Spatial restore preview",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.restore",
+      "label": "Spatial restore",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Expected Basis Sha256",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.archive",
+      "label": "Spatial archive",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.unarchive",
+      "label": "Spatial unarchive",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.duplicate-preview",
+      "label": "Spatial duplicate preview",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "new_setup_id",
+          "label": "New Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.duplicate",
+      "label": "Spatial duplicate",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "new_setup_id",
+          "label": "New Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "title",
+          "label": "Title",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Expected Basis Sha256",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.evaluate",
+      "label": "Spatial evaluate",
+      "fields": [
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "times_us",
+          "label": "Times Us",
+          "type": "json-array",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target_plane_z_m",
+          "label": "Target Plane Z M",
+          "type": "number",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0.0
+        },
+        {
+          "name": "view_bounds",
+          "label": "View Bounds",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.bind-preview",
+      "label": "Spatial bind preview",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_shot_revision",
+          "label": "Expected Shot Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding_id",
+          "label": "Binding Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding",
+          "label": "Binding",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.bind",
+      "label": "Spatial bind",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_shot_revision",
+          "label": "Expected Shot Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding_id",
+          "label": "Binding Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding",
+          "label": "Binding",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Expected Basis Sha256",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.rebind-preview",
+      "label": "Spatial rebind preview",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_shot_revision",
+          "label": "Expected Shot Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding_id",
+          "label": "Binding Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding",
+          "label": "Binding",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.rebind",
+      "label": "Spatial rebind",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_shot_revision",
+          "label": "Expected Shot Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding_id",
+          "label": "Binding Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding",
+          "label": "Binding",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Expected Basis Sha256",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.binding-show",
+      "label": "Spatial binding show",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding_id",
+          "label": "Binding Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.binding-history",
+      "label": "Spatial binding history",
+      "fields": [
+        {
+          "name": "binding_id",
+          "label": "Binding Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.detach",
+      "label": "Spatial detach",
+      "fields": [
+        {
+          "name": "binding_id",
+          "label": "Binding Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "revision",
+          "label": "Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_shot_revision",
+          "label": "Expected Shot Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.impact",
+      "label": "Spatial impact",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "dependency_id",
+          "label": "Dependency Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.operation-show",
+      "label": "Spatial operation show",
+      "fields": [
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.doctor",
+      "label": "Spatial doctor",
+      "fields": [],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.backup",
+      "label": "Spatial backup",
+      "fields": [],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.plan-export",
+      "label": "Spatial plan export",
+      "fields": [
+        {
+          "name": "setup_id",
+          "label": "Setup Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "scope",
+          "label": "Scope",
+          "type": "select",
+          "required": false,
+          "options": [
+            "full-history",
+            "selected-with-history-closure",
+            "sparse-snapshot"
+          ],
+          "source": "",
+          "help": "",
+          "default": "full-history"
+        },
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.plan-import-preview",
+      "label": "Spatial plan import preview",
+      "fields": [
+        {
+          "name": "package",
+          "label": "Package",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "archive_base64",
+          "label": "Archive Base64",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "mode",
+          "label": "Mode",
+          "type": "select",
+          "required": false,
+          "options": [
+            "exact",
+            "copy"
+          ],
+          "source": "",
+          "help": "",
+          "default": "exact"
+        },
+        {
+          "name": "mappings",
+          "label": "Mappings",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "spatial.plan-import-apply",
+      "label": "Spatial plan import apply",
+      "fields": [
+        {
+          "name": "package",
+          "label": "Package",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "archive_base64",
+          "label": "Archive Base64",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "mode",
+          "label": "Mode",
+          "type": "select",
+          "required": false,
+          "options": [
+            "exact",
+            "copy"
+          ],
+          "source": "",
+          "help": "",
+          "default": "exact"
+        },
+        {
+          "name": "mappings",
+          "label": "Mappings",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Expected Basis Sha256",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.diagram-export",
+      "label": "Spatial diagram export",
+      "fields": [
+        {
+          "name": "version_id",
+          "label": "Version Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "binding_version_id",
+          "label": "Binding Version Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "times_us",
+          "label": "Times Us",
+          "type": "json-array",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "target_plane_z_m",
+          "label": "Target Plane Z M",
+          "type": "number",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0.0
+        },
+        {
+          "name": "view_bounds",
+          "label": "View Bounds",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "format",
+          "label": "Format",
+          "type": "select",
+          "required": false,
+          "options": [
+            "all",
+            "svg",
+            "png",
+            "pdf"
+          ],
+          "source": "",
+          "help": "",
+          "default": "all"
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "spatial.backup-restore",
+      "label": "Restore spatial project backup",
+      "fields": [
+        {
+          "name": "archive",
+          "label": "Archive",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "destination",
+          "label": "Destination",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "",
+      "destructive": false,
+      "browser": false,
+      "api_safe": false,
+      "read_only": false
+    },
+    {
+      "name": "observation.spatial-review-preview",
+      "label": "Spatial plan reviewed",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_previous_number",
+          "label": "Expected Previous Number",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "review",
+          "label": "Review",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.spatial-review",
+      "label": "Spatial plan reviewed",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_previous_number",
+          "label": "Expected Previous Number",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "review",
+          "label": "Review",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_basis_sha256",
+          "label": "Expected Basis Sha256",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "observation.spatial-review-show",
+      "label": "Spatial plan reviewed",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "review_id",
+          "label": "Review Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.spatial-review-validate",
+      "label": "Spatial plan reviewed",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "review_id",
+          "label": "Review Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "observation.spatial-review-history",
+      "label": "Spatial plan reviewed",
+      "fields": [
+        {
+          "name": "shot_id",
+          "label": "Shot Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "blocking",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.schema",
+      "label": "Production schema",
+      "fields": [],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.snapshot",
+      "label": "Production snapshot",
+      "fields": [
+        {
+          "name": "mode",
+          "label": "Mode",
+          "type": "select",
+          "required": false,
+          "options": [
+            "selected",
+            "head"
+          ],
+          "source": "",
+          "help": "",
+          "default": "selected"
+        },
+        {
+          "name": "include_archived",
+          "label": "Include Archived",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        },
+        {
+          "name": "closure",
+          "label": "Closure",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.show",
+      "label": "Production show",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version",
+          "label": "Version",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.history",
+      "label": "Production history",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.preview",
+      "label": "Production preview",
+      "fields": [
+        {
+          "name": "batch",
+          "label": "Batch",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.apply",
+      "label": "Production apply",
+      "fields": [
+        {
+          "name": "batch",
+          "label": "Batch",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "production.query",
+      "label": "Production query",
+      "fields": [
+        {
+          "name": "kind",
+          "label": "Kind",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "text",
+          "label": "Text",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": ""
+        },
+        {
+          "name": "scene_id",
+          "label": "Scene Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "script_block_id",
+          "label": "Script Block Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "include_proposals",
+          "label": "Include Proposals",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.impact",
+      "label": "Production impact",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.changes",
+      "label": "Production changes",
+      "fields": [
+        {
+          "name": "since",
+          "label": "Since",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        },
+        {
+          "name": "limit",
+          "label": "Limit",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 100
+        },
+        {
+          "name": "offset",
+          "label": "Offset",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.diff",
+      "label": "Production diff",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "from_version",
+          "label": "From Version",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "to_version",
+          "label": "To Version",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.reconcile",
+      "label": "Production reconcile",
+      "fields": [
+        {
+          "name": "replacements",
+          "label": "Replacements",
+          "type": "json-array",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "ids",
+          "label": "Ids",
+          "type": "json-array",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_checkpoint",
+          "label": "Expected Checkpoint",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "select",
+          "label": "Select",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.report",
+      "label": "Production report",
+      "fields": [
+        {
+          "name": "include_proposals",
+          "label": "Include Proposals",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        },
+        {
+          "name": "hashes",
+          "label": "Hashes",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.evaluate",
+      "label": "Production evaluate",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "version",
+          "label": "Version",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "frame",
+          "label": "Frame",
+          "type": "number",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0.0
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.convert-time",
+      "label": "Production convert time",
+      "fields": [
+        {
+          "name": "frames",
+          "label": "Frames",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "from_rate",
+          "label": "From Rate",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "to_rate",
+          "label": "To Rate",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "rounding",
+          "label": "Rounding",
+          "type": "select",
+          "required": false,
+          "options": [
+            "exact",
+            "floor",
+            "ceil",
+            "nearest"
+          ],
+          "source": "",
+          "help": "",
+          "default": "exact"
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.script-import-preview",
+      "label": "Production script import preview",
+      "fields": [
+        {
+          "name": "id",
+          "label": "Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_revision",
+          "label": "Expected Revision",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_checkpoint",
+          "label": "Expected Checkpoint",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "filename",
+          "label": "Filename",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "format",
+          "label": "Format",
+          "type": "select",
+          "required": false,
+          "options": [
+            "fountain",
+            "structured-json",
+            "screenjson"
+          ],
+          "source": "",
+          "help": "",
+          "default": "fountain"
+        },
+        {
+          "name": "text",
+          "label": "Text",
+          "type": "textarea",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "bytes_base64",
+          "label": "Bytes Base64",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "identity_map",
+          "label": "Identity Map",
+          "type": "json",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "select",
+          "label": "Select",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.example",
+      "label": "Production example",
+      "fields": [
+        {
+          "name": "expected_checkpoint",
+          "label": "Expected Checkpoint",
+          "type": "integer",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": 0
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.export",
+      "label": "Production export",
+      "fields": [],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.import-preview",
+      "label": "Production import preview",
+      "fields": [
+        {
+          "name": "package",
+          "label": "Package",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_checkpoint",
+          "label": "Expected Checkpoint",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
+    },
+    {
+      "name": "production.import-apply",
+      "label": "Production import apply",
+      "fields": [
+        {
+          "name": "package",
+          "label": "Package",
+          "type": "json",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "expected_checkpoint",
+          "label": "Expected Checkpoint",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "production.packet",
+      "label": "Production packet",
+      "fields": [
+        {
+          "name": "scene_id",
+          "label": "Scene Id",
+          "type": "text",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "include_pdf",
+          "label": "Include Pdf",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": true
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": false
+    },
+    {
+      "name": "production.adopt-preview",
+      "label": "Production adopt preview",
+      "fields": [
+        {
+          "name": "expected_checkpoint",
+          "label": "Expected Checkpoint",
+          "type": "integer",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "operation_id",
+          "label": "Operation Id",
+          "type": "text",
+          "required": true,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": null
+        },
+        {
+          "name": "select",
+          "label": "Select",
+          "type": "boolean",
+          "required": false,
+          "options": [],
+          "source": "",
+          "help": "",
+          "default": false
+        }
+      ],
+      "page": "production",
+      "destructive": false,
+      "browser": false,
+      "api_safe": true,
+      "read_only": true
     }
   ]
 }

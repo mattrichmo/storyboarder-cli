@@ -86,6 +86,7 @@ class AuthoringOperations:
         self.entity(conn, record_id, active=False)
         queries = {
             "children": ("SELECT id FROM entities WHERE parent_id=?", (record_id,)),
+            "production_history": ("SELECT DISTINCT source_id FROM production_legacy_pins WHERE entity_id=?", (record_id,)),
             "links": ("SELECT id FROM links WHERE source_id=? OR target_id=?", (record_id, record_id)),
             "assignments": ("SELECT id FROM assignments WHERE shot_id=? OR asset_id=?", (record_id, record_id)),
             "frames": ("SELECT id FROM frames WHERE shot_id=?", (record_id,)),

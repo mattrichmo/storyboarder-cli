@@ -1,0 +1,15 @@
+{
+  "transport": "isolated DOM + real FastAPI TestClient",
+  "native_navigation_tested": false,
+  "checks": [
+    "27 CLI-equivalent fixture records rendered without constructing the plan in UI",
+    "All six connected views render",
+    "Top-view keyboard edit creates an explicit action keyframe draft at frame 96",
+    "Viewer edit saves v2 alternative without moving selected action or shot pins",
+    "Camera framing preview renders from exact selected shot setup",
+    "External write marks stale draft; three-way rebase retains local title and CLI note"
+  ],
+  "mobile_horizontal_overflow": false,
+  "page_errors": [],
+  "passed": true
+}

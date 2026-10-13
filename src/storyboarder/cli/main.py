@@ -26,6 +26,7 @@ class ArgumentParser(argparse.ArgumentParser):
 
 
 COMMAND_GROUP_HELP = {
+    "production": "Build and revise connected production plans",
     "annotation": "Add and review pinned notes",
     "asset": "Find and manage library items and their images",
     "assignment": "Place library references in shots",
@@ -335,7 +336,7 @@ def main(argv=None):
                     key = "arg_" + field.name
                     if hasattr(args, key):
                         value = getattr(args, key)
-                        if field.type == "json":
+                        if field.type in ("json", "json-array"):
                             value = json.loads(Path(value[1:]).read_text() if value.startswith("@") else value)
                         payload[field.name] = value
                 result = execute(service, command, payload)

@@ -2,6 +2,6 @@
 __version__ = "1.1.0"
 API_VERSION = "1"
 PROJECT_VERSION = 1
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 EXPORT_VERSION = "storyboarder.export/v1"
 JOB_VERSION = "storyboarder.job/v1"

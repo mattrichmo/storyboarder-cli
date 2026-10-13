@@ -153,6 +153,8 @@ def execute(service, name, payload=None, browser=False, api=False):
             raise StoryboardError(f"{f.label} must be a number.")
         if f.type == "boolean" and not isinstance(value, bool):
             raise StoryboardError(f"{f.label} must be true or false.")
+        if f.type == "json-array" and not isinstance(value, list):
+            raise StoryboardError(f"{f.label} must be a JSON array.")
         if f.type == "json" and not isinstance(value, dict):
             raise StoryboardError(f"{f.label} has an invalid format. Review it and try again.")
         if f.type in ("text", "textarea", "select") and value is not None and not isinstance(value, str):

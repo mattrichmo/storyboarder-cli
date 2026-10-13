@@ -122,6 +122,9 @@ def doctor(service, hashes=False):
         try:
             from .observation_contracts import ObservationContracts
             issues.extend(ObservationContracts(service).integrity_issues())
+            from storyboarder.production.reports import integrity_issues as production_integrity
+            with service.repo.readonly_transaction() as production_conn:
+                issues.extend(production_integrity(service,production_conn,hashes))
         except Exception as exc:
             issues.append({"severity": "error", "code": "observation_contract_integrity_check",
                            "message": "Observation contract history could not be checked safely. Preserve the project folder and inspect a verified backup.",
@@ -277,6 +280,21 @@ def backup(service):
             for artifact in lock.execute("SELECT path,sha256 FROM source_artifacts"):
                 src = safe_path(service.root, artifact["path"], must_exist=True)
                 copy_plan.append((src, artifact["path"], artifact["sha256"]))
+            # Production script originals are inline in the SQLite snapshot. Portable
+            # referenced files remain immutable-by-hash and must travel with a backup.
+            from storyboarder.production.external import media_refs as production_media_refs
+            planned = {relative: expected for _,relative,expected in copy_plan}
+            for version_row in lock.execute('SELECT payload_json FROM production_versions'):
+                for ref in production_media_refs(json.loads(version_row['payload_json'])):
+                    if not ref['path']:
+                        continue
+                    relative,expected=ref['path'],ref['sha256']
+                    if relative in planned:
+                        if planned[relative] and planned[relative]!=expected:
+                            raise StoryboardError('Production media hashes disagree for one path; backup was not published.')
+                        continue
+                    src=safe_path(service.root,relative,must_exist=True)
+                    copy_plan.append((src,relative,expected));planned[relative]=expected
             jobs = safe_path(service.root, ".storyboarder/jobs")
             if jobs.is_dir():
                 for file in jobs.rglob("*"):
