@@ -5,8 +5,8 @@
 <h1 align="center">Storyboarder</h1>
 
 <p align="center">
-  <strong>An agent-first, local production desk for stories, references, and frames.</strong><br>
-  Agents and filmmakers plan shots, connect references, and build storyboards from the same project data.
+  <strong>A local-first workspace for planning films through storyboards.</strong><br>
+  Plan scenes and shots, collect references, and review storyboard images.
 </p>
 
 <p align="center">
@@ -22,74 +22,40 @@
   <a href="#documentation">Documentation</a>
 </p>
 
-![Storyboarder planning system illustration showing references connected to one scene, three distinct shots, and structured CLI output](docs/images/storyboarder-cover.png)
+Storyboarder is a local-first workspace for creating storyboards for human-led film
+productions. The storyboard is the main output: a sequence of images and shot notes
+that helps a production team decide what to shoot and how.
 
-<p align="center"><em>Cover illustration, not a product screenshot: connected references and scene direction lead to distinct shot plans and structured handoff data.</em></p>
+Filmmakers can organize scenes, plan shots, collect references, compare storyboard
+images, and export boards through the browser or terminal. AI agents and scripts can
+read and update the same project through a structured CLI and versioned local API.
+Creative direction, image selection, and approval remain explicit choices.
+
+Projects are stored locally and require no account or subscription. Core authoring
+and exports work offline. Collaboration uses the same local project data; cloud sync
+and live multi-user editing are not included.
 
 ![Story flow canvas showing the Winter Station sequence, scenes, and connected shot cards](docs/images/canvas-desktop.png)
 
 <p align="center"><em>The story flow canvas, using the included fictional Winter Station demo.</em></p>
 
-Storyboarder is a local storyboard planning desk built for agentic production workflows
-and film teams. Its center is a typed, allowlisted command catalog over a local SQLite
-project: agents inspect and update production data through the structured CLI or
-versioned loopback API, while filmmakers use the browser and full-screen terminal desk
-over the same application services. Plan sequences, scenes, and shots; collect character,
-location, prop, and other references; compare storyboard images; and export boards and
-production handoffs.
-
-The spatial planner adds timed actor and prop blocking, camera plans, lighting intent, and
-coverage diagrams. Storyboarder records authored intent and connections; it is not a
-motion solver, film renderer, or Blender integration. A shot can link to source elements
-in an imported screenplay. Source links and production provenance are available through
-the CLI and local API as preview workflows.
-
-The agent-facing contract is documented and machine-readable: the CLI supports JSON and
-JSON Lines, and the API publishes its OpenAPI schema, command catalog, and typed authoring
-fields. Updates carry record revisions, so stale writes return a conflict instead of
-silently replacing newer work. Context composition includes the source and provenance of
-inherited direction.
-
-Agent integrations run against your local project. The API binds to loopback and uses a
-launch-scoped write token. Optional external scripts must be registered explicitly; runs,
-generated outputs, and imports have review and approval steps. The package stores project
-data locally without an account, subscription, cloud database, or bundled image-generation
-provider. Current agent entry points are the CLI and local API; an MCP server is not
-included. See [Local API](docs/API.md) and [External-script workflow](docs/AUTOMATION.md).
-Core authoring and exports work offline.
-
-## Connected production workspace
-
-The **Production** workspace and `storyboarder production` commands add a revision-pinned
-production graph: scripts and exact passages, reusable locations, shared scene action,
-camera/lighting setups, shots, storyboard panels, takes and editorial selections. The
-CLI and viewer use the same transactional mutation rules, explicit alternative selection,
-change-impact checks and readiness reports. Schema **009** is additive; older workspaces
-and records remain intact.
-
-Start with the [connected CLI-to-viewer walkthrough](docs/CONNECTED_PRODUCTION.md).
-The [18-area implementation matrix](docs/PRODUCTION_IMPLEMENTATION_STATUS.md) distinguishes
-implemented behavior from advanced features still requiring work; the new proxy viewer
-is not a physical renderer or a bundled autonomous creative agent.
-See [executed validation and environment limits](docs/PRODUCTION_VALIDATION.md).
-
 ## What you can do
 
-| Workflow | What Storyboarder gives you |
+| Task | Available tools |
 |---|---|
 | **Plan the story** | Ordered sequences, scenes, and shots with action, dialogue, framing, camera direction, duration, and continuity notes. |
-| **Organize references** | A typed library for characters, locations, props, and general references; tags, aliases, exact-image assignments, and duplicate intake review. |
-| **Carry direction into each shot** | Project, sequence, scene, and shot notes that append to, replace, or exclude inherited direction. |
-| **Plan blocking and lighting** | Browser editor for actor, prop, and wall proxies, marks, camera and light intent, modifiers, and timed tracks; CLI commands for immutable plan versions, exact shot bindings, authored reviews, diagrams, and portable transfer. |
-| **Arrange the production visually** | Story flow, asset network, and scene board canvases with pan/zoom, filtering, keyboard controls, typed connections, and saved layouts. |
-| **Review storyboard images** | Separate frame candidates, version history, comparison, and explicit draft, selected, approved, or archived states. |
-| **Deliver and recover** | HTML/PDF/PNG boards, JSON/Markdown handoff packages, managed media, manifest hashes, health checks, and portable backups. |
-| **Automate your own tools** | Structured CLI output and explicitly registered local scripts with requests, logs, cancellation, result review, and approval. |
+| **Organize references** | A library for characters, locations, props, and other references, with tags, duplicate review, and links from specific images to shots. |
+| **Carry direction into each shot** | Project, sequence, scene, and shot notes that can add to, replace, or leave out earlier direction. |
+| **Plan blocking and lighting** | A browser editor for actor and prop positions, camera plans, lights, and timed action; saved versions and diagram exports through the CLI. |
+| **Arrange the production visually** | Story flow, reference map, and scene board canvases with filtering, keyboard controls, connections, and saved layouts. |
+| **Review storyboard images** | Image candidates for each shot, version history, comparison, and draft, selected, approved, or archived states. |
+| **Export boards and back up work** | HTML/PDF/PNG boards, JSON/Markdown handoff packages, project health checks, and portable backups. |
+| **Use scripts and external tools** | Structured CLI output and registered local scripts with requests, logs, cancellation, result review, and approval. |
 
-The current source also includes **ScreenJSON and OTIO JSON documents, immutable drafts,
-and production provenance through the CLI and local API**. These are an implementation
-preview; their dedicated browser and terminal workspaces are still unfinished.
-See [source documents and provenance](#source-documents-and-provenance) for the supported workflow.
+You can also import supported ScreenJSON screenplay drafts and OTIO JSON timelines,
+retain earlier versions, and trace links from source passages to shots. These CLI and
+local API workflows are in preview; their dedicated browser and terminal workspaces
+are unfinished. See [source documents and provenance](#source-documents-and-provenance).
 
 <details>
 <summary><strong>See the project overview</strong></summary>
@@ -101,47 +67,14 @@ fictional demo graphics; they are examples of the workflow, not finished shot ar
 
 </details>
 
-## Spatial blocking and lighting
-
-Agents and scripts can author and manage versioned plans through the structured spatial
-CLI. Start with the offline **Doorway to table** fixture and use preview/apply commands to
-save a version; follow the [CLI spatial workflow](docs/CLI.md#spatial-blocking-and-lighting).
-
-The browser's **Blocking & lighting** workspace is a visual companion for inspecting and
-editing the same plans. Open a scene to start a blank plan or load the built-in **Doorway
-example**. Place actor, prop, and wall proxies with marks, cameras, lights, and modifiers;
-use beats and timed tracks with the scrubber to inspect the action. **Review & save**
-records an immutable plan version.
-
-![Blocking & lighting editor with the saved Doorway to table plan, shot, camera coverage, and lighting cues](docs/images/spatial-blocking-desktop.png)
-<p align="center"><em>The browser visualizes the Doorway plan authored through the structured CLI. Agents and scripts use CLI commands to create and manage exact versions.</em></p>
-
-![Blocking & lighting at four seconds with the key light selected and the 1.6 metre coverage plane visible](docs/images/spatial-lighting-desktop.png)
-<p align="center"><em>At 4 seconds and a 1.6 m plane, the same plan shows authored camera and lighting coverage. Colors and envelopes are schematic intent, not measured exposure.</em></p>
-
-A shot can bind an exact saved plan version, camera, and action-time sample. Choose an
-explicit mapping when action time needs to map to shot time; the binding leaves the shot's
-written duration unchanged. A spatial review is an authored checklist tied to that binding
-and an existing v1 observation contract. It does not verify physical results or approve
-a storyboard frame.
-
-The structured CLI also supports shot bindings, authored reviews, diagram exports,
-portable transfer, and recovery. Export SVG, PNG, or PDF diagrams for an exact setup or
-shot binding, and use the native package commands to preview a transfer before applying
-it. The browser can recover an unsaved local draft; `spatial doctor` checks spatial
-integrity and `spatial backup` creates a recovery point.
-
-Lighting and coverage diagrams are schematic planning guides. They show authored intent,
-not photometric exposure, rendered light transport, or shadow results.
-
 ## Quick start
 
 **Requires Python 3.11 or later.** Clone the repository, or extract a source archive
-and open a terminal in its `storyboarder` folder.
+and open a terminal in its `storyboarder-cli` folder.
 
 ```sh
-git clone https://github.com/mattrichmo/storyboarder.git
-cd storyboarder
+git clone https://github.com/mattrichmo/storyboarder-cli.git
+cd storyboarder-cli
 ```
 
 ### macOS / Linux
@@ -203,9 +136,9 @@ the script refuses to overwrite an existing project. Its generated panels are de
 
 | Interface | Start it | Best for |
 |---|---|---|
-| Browser | `storyboarder ui --project ./stories/projects/my-film` | Visual planning, reference review, canvas arrangement, and frame comparison for people. |
-| Terminal | `storyboarder tui --project ./stories/projects/my-film` | Full-screen authoring and project review for people. |
-| CLI | `storyboarder --project ./stories/projects/my-film shot list --json` | Repeatable commands for scripts and agents, with structured output. |
+| Browser | `storyboarder ui --project ./stories/projects/my-film` | Visual planning, reference review, canvas arrangement, and frame comparison. |
+| Terminal | `storyboarder tui --project ./stories/projects/my-film` | Full-screen authoring and project review. |
+| CLI | `storyboarder --project ./stories/projects/my-film shot list --json` | Individual commands, repeatable workflows, and agent integrations. |
 
 ![Storyboarder TUI scene and shot editor showing a scene with multiple shots and the selected shot's preview and direction](docs/images/tui-terminal-desk.png)
 
@@ -216,6 +149,60 @@ A standalone project works too: create it with
 with `storyboarder ui --project ./stories/standalone`. Workspace registration is optional.
 Running bare `storyboarder` opens the terminal desk in an interactive terminal and
 prints help in a non-interactive shell.
+
+## Connected production workspace
+
+The **Production** workspace connects script passages, locations, shared scene action,
+camera and lighting setups, shots, storyboard panels, takes, and editorial selections.
+Shots refer to specific saved versions of their plans. You can compare alternatives,
+select the version to use, and review which shots are affected by a changed script or
+setup. Readiness reports identify missing planning information; creative approval is
+recorded separately.
+
+The browser and `storyboarder production` commands work on the same records. Existing
+outline, storyboard, and spatial workflows remain available. You can explicitly bring
+outline records and storyboard artwork into Production; existing spatial plans stay
+in their separate workspace.
+
+Start with the [connected production walkthrough](docs/CONNECTED_PRODUCTION.md).
+See [implementation status](docs/PRODUCTION_IMPLEMENTATION_STATUS.md) for current
+capabilities and unfinished features, and [validation results](docs/PRODUCTION_VALIDATION.md)
+for checks performed and their limits.
+
+## Spatial blocking and lighting
+
+Open a scene in the browser's **Blocking & lighting** workspace to start a blank plan
+or load the built-in **Doorway example**. Place actor, prop, and wall proxies with
+marks, cameras, lights, and modifiers. Use beats and timed tracks with the scrubber
+to inspect the action. **Review & save** records a plan version without changing
+earlier versions.
+
+![Blocking & lighting editor with the saved Doorway to table plan, shot, camera coverage, and lighting cues](docs/images/spatial-blocking-desktop.png)
+<p align="center"><em>The Doorway to table example, showing blocking, a camera plan, and lighting cues.</em></p>
+
+![Blocking & lighting at four seconds with the key light selected and the 1.6 metre coverage plane visible](docs/images/spatial-lighting-desktop.png)
+<p align="center"><em>The plan at 4 seconds, with the key light selected and coverage shown on a 1.6 m plane.</em></p>
+
+The [spatial CLI workflow](docs/CLI.md#spatial-blocking-and-lighting) can create and
+revise the same plans, link a shot to a specific plan version and camera, and export
+SVG, PNG, or PDF diagrams. It also provides review checklists, portable plan transfers,
+integrity checks, and backups. The browser can recover an unsaved local draft.
+
+These views and diagrams show planned blocking, framing, and lighting. They do not
+simulate motion, exposure, light transport, or shadows, and a planning review does
+not approve a storyboard image.
+
+## Working with agents and scripts
+
+Agents use the CLI or local API to work on the same project as the browser and
+terminal interfaces. The CLI supports JSON and JSON Lines; the API provides an
+OpenAPI schema, command catalog, and typed authoring fields. Updates that require
+a record revision reject stale writes instead of overwriting newer changes.
+
+The API runs on loopback and requires a launch-scoped token for writes. External
+scripts must be registered explicitly, and their generated outputs remain pending
+until approved. There is no bundled image-generation provider or MCP server.
+See [Local API](docs/API.md) and [External-script workflow](docs/AUTOMATION.md).
 
 ## CLI workflows
 
@@ -333,14 +320,16 @@ with a conflict instead of overwriting newer work. See the
 
 ## Command map
 
-Every group and subcommand has `--help`. The
-[full CLI reference](docs/CLI.md#command-catalog) documents all **150 shared application
-commands**, including their flags, choices, defaults, and required fields, plus lifecycle commands.
+Every group and subcommand has `--help`. The [CLI reference](docs/CLI.md#command-catalog)
+and [production command guide](docs/CONNECTED_PRODUCTION.md#discover-the-command-surface)
+describe the available commands, flags, and workflows. The
+[machine-readable catalog](docs/commands.json) lists their fields and defaults.
 
 | Area | Commands to reach for |
 |---|---|
 | Launch and select projects | `ui`, `tui`, `workspace init/list/register/switch`, `project create/open/show/list/switch` |
 | Story and guide | `sequence`, `scene`, `shot` → `create/update/list/show`; `project update`, `story move` |
+| Connected production plans | `production schema/snapshot/query/show/history/preview/apply/reconcile/report/packet`; see the [production command guide](docs/CONNECTED_PRODUCTION.md#discover-the-command-surface) for the full list |
 | Library and relationships | `asset create/update/list/show/attach/primary/detach/merge`, `link create/list/remove` |
 | Import and review | `import`, `media import/list/show/tags`, `intake list/accept/discard` |
 | Shot references and direction | `assignment create/update/list/remove`, `context put/resolve/list/remove` |
@@ -391,8 +380,10 @@ rather than infer missing footage.
 OTIO imports preserve media references without fetching or playing the referenced media.
 
 Dedicated source-document workspaces and visual draft comparison remain unfinished; the
-terminal desk includes a focused exact Observation coverage page. Fountain, FDX, PDF screenplay imports, and general
-NLE interoperability are not implemented. Read the [format profiles](docs/FORMATS.md)
+terminal desk includes a focused Observation coverage page. The separate Production
+workspace supports a [core Fountain import](docs/CONNECTED_PRODUCTION.md#script-import-and-reconciliation).
+Full Fountain support, FDX and PDF screenplay imports, and general NLE interoperability
+are not implemented. Read the [format profiles](docs/FORMATS.md)
 and [implementation status](docs/V2_IMPLEMENTATION_STATUS.md) before adopting these
 preview workflows. Back up existing projects before opening them with the newer schema.
 
@@ -431,6 +422,7 @@ or outside the checkout, and keep separate backups of material you care about.
 | If you want to… | Read |
 |---|---|
 | Walk through a production project | [Creator guide](docs/CREATOR_GUIDE.md) |
+| Connect script passages, blocking, setups, and shots | [Connected production](docs/CONNECTED_PRODUCTION.md) · [Current capabilities](docs/PRODUCTION_IMPLEMENTATION_STATUS.md) |
 | Find exact CLI flags and output behavior | [CLI reference](docs/CLI.md) · [Command schema catalog](docs/commands.json) |
 | Work in the terminal or canvas | [Terminal desk](docs/TUI.md) · [Canvas and accessibility](docs/CANVAS.md) |
 | Understand references, direction, and delivery | [Context and media](docs/CONTEXT_AND_MEDIA.md) · [Exports and recovery](docs/EXPORTS_AND_RECOVERY.md) |
